@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTP Devis Pro - Chargement</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+            background: #0A0A0F;
+        }
+
+        /* Conteneur principal */
+        .loading-container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* Partie gauche - Texte */
+        .left-panel {
+            flex: 1;
+            background: #0A0A0F;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Logo */
+        .logo {
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            font-size: 48px;
+            color: #06B6D4;
+            margin-bottom: 15px;
+        }
+
+        .logo h1 {
+            font-size: 2rem;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+
+        .logo p {
+            color: #6B7280;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        /* Titre principal */
+        .main-title {
+            margin-bottom: 30px;
+        }
+
+        .main-title h2 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: white;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        .main-title h2 span {
+            color: #06B6D4;
+        }
+
+        .main-title p {
+            color: #9CA3AF;
+            font-size: 1rem;
+            line-height: 1.6;
+            max-width: 90%;
+        }
+
+        /* Features */
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #D1D5DB;
+        }
+
+        .feature i {
+            color: #10B981;
+            font-size: 12px;
+        }
+
+        /* Barre de chargement */
+        .loader-section {
+            margin-top: 20px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 3px;
+            background: #1F2937;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #06B6D4, #7C3AED);
+            border-radius: 3px;
+            transition: width 0.2s ease;
+            position: relative;
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .step {
+            font-size: 0.7rem;
+            color: #4B5563;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .step.active {
+            color: #06B6D4;
+        }
+
+        .step.completed {
+            color: #10B981;
+        }
+
+        .step .step-dot {
+            width: 6px;
+            height: 6px;
+            background: currentColor;
+            border-radius: 50%;
+        }
+
+        .step.active .step-dot {
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        /* Partie droite - Image */
+        .right-panel {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bg-image {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.88;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Carrousel d'images */
+        .image-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .image-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1.2s ease-in-out;
+        }
+
+        .image-slide.active {
+            opacity: 1;
+        }
+
+        /* Gradient overlay sur l'image */
+        .right-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(10,10,15,0.3) 0%, rgba(10,10,15,0.1) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Bulle de chargement */
+        .loading-percent {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #06B6D4;
+            margin-top: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .loading-container {
+                flex-direction: column;
+            }
+            .left-panel {
+                padding: 40px;
+                justify-content: center;
+            }
+            .main-title h2 {
+                font-size: 1.5rem;
+            }
+            .right-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <!-- Partie Gauche - Texte -->
+        <div class="left-panel">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-hard-hat"></i>
+                </div>
+                <h1>BTP Devis Pro</h1>
+                <p>Solution intelligente de devis pour le BTP</p>
+            </div>
+
+            <div class="main-title">
+                <h2>Créez des devis <span>en 2 minutes</span></h2>
+                <p>Gagnez du temps et professionnalisez votre activité avec notre solution complète de gestion de devis pour le secteur du BTP.</p>
+            </div>
+
+            <div class="features">
+                <div class="feature"><i class="fas fa-check"></i> Calcul automatique</div>
+                <div class="feature"><i class="fas fa-check"></i> PDF professionnels</div>
+                <div class="feature"><i class="fas fa-check"></i> Gestion clients</div>
+                <div class="feature"><i class="fas fa-check"></i> Export Excel</div>
+                <div class="feature"><i class="fas fa-check"></i> Facturation</div>
+                <div class="feature"><i class="fas fa-check"></i> Sauvegarde cloud</div>
+            </div>
+
+            <div class="loader-section">
+                <div class="progress-label">
+                    <span>CHARGEMENT</span>
+                    <span id="percentDisplay">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-steps" id="progressSteps">
+                    <div class="step" data-step="0">
+                        <div class="step-dot"></div>
+                        <span>Modules</span>
+                    </div>
+                    <div class="step" data-step="1">
+                        <div class="step-dot"></div>
+                        <span>Base de données</span>
+                    </div>
+                    <div class="step" data-step="2">
+                        <div class="step-dot"></div>
+                        <span>Interface</span>
+                    </div>
+                    <div class="step" data-step="3">
+                        <div class="step-dot"></div>
+                        <span>Prêt</span>
+                    </div>
+                </div>
+                <div class="loading-percent" id="loadingMessage">Initialisation...</div>
+            </div>
+        </div>
+
+        <!-- Partie Droite - Image (carrousel) -->
+        <div class="right-panel">
+            <div class="image-slider" id="imageSlider">
+                <div class="image-slide active" style="background-image: url('https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1200&q=80')"></div>
+                <div class="image-slide" style="background-image: url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1200&q=80')"></div>
+                <div class="image-slide" style="background-image: url('https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200&q=80')"></div>
+                <div class="image-slide" style="background-image: url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&q=80')"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Carrousel d'images
+        const slides = document.querySelectorAll('.image-slide');
+        let currentSlide = 0;
+        
+        function nextSlide() {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (currentSlide + 1) % slides.length;
+            slides[currentSlide].classList.add('active');
+        }
+        
+        setInterval(nextSlide, 5000);
+
+        // Simulation de chargement
+        let progress = 0;
+        const progressFill = document.getElementById('progressFill');
+        const percentDisplay = document.getElementById('percentDisplay');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const steps = document.querySelectorAll('.step');
+        
+        const messages = [
+            'Initialisation des modules...',
+            'Connexion à la base de données...',
+            'Chargement de l\'interface...',
+            'Finalisation...'
+        ];
+        
+        function updateStep(stepIndex) {
+            steps.forEach((step, idx) => {
+                step.classList.remove('active', 'completed');
+                if (idx < stepIndex) {
+                    step.classList.add('completed');
+                } else if (idx === stepIndex) {
+                    step.classList.add('active');
+                }
+            });
+        }
+        
+        function updateProgress() {
+            if (progress < 100) {
+                const increment = progress < 30 ? 2 : (progress < 70 ? 1.5 : 1);
+                progress = Math.min(progress + increment, 100);
+                progressFill.style.width = progress + '%';
+                percentDisplay.textContent = Math.floor(progress) + '%';
+                
+                // Mettre à jour l'étape et le message
+                const stepIndex = Math.min(Math.floor(progress / 25), 3);
+                updateStep(stepIndex);
+                loadingMessage.textContent = messages[stepIndex] || 'Préparation...';
+                
+                setTimeout(updateProgress, 80);
+            } else {
+                loadingMessage.textContent = 'Redirection vers l\'application...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 600);
+            }
+        }
+        
+        updateProgress();
+    </script>
+</body>
+</html>
