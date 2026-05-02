@@ -580,15 +580,20 @@ async exportClientsToExcel() {
             <div class="cards-grid">
                 ${clients.map(c => `
                     <div class="glass-card">
-                        <div class="card-icon"><i class="fas fa-user"></i></div>
-                        <div class="card-title">${c.nom}</div>
-                        <p>${c.email || '-'}</p>
-                        <p>${c.telephone || '-'}</p>
-                        <div style="margin-top:1rem; display:flex; gap:0.5rem">
-                            <button class="btn-icon" onclick="app.editClient(${c.id_client})"><i class="fas fa-edit"></i></button>
-                            <button class="btn-icon" onclick="app.deleteClient(${c.id_client})"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </div>
+    <div class="card-icon"><i class="fas fa-user"></i></div>
+    <div class="card-title">${c.nom}</div>
+    <p style="word-break: break-all;">
+        <i class="fas fa-envelope"></i> ${c.email || '-'}
+    </p>
+    <p><i class="fas fa-phone"></i> ${c.telephone || '-'}</p>
+    <p style="word-break: break-word;">
+        <i class="fas fa-map-marker-alt"></i> ${c.adresse || '-'}
+    </p>
+    <div style="margin-top:1rem; display:flex; gap:0.5rem">
+        <button class="btn-icon" onclick="app.editClient(${c.id_client})"><i class="fas fa-edit"></i></button>
+        <button class="btn-icon" onclick="app.deleteClient(${c.id_client})"><i class="fas fa-trash"></i></button>
+    </div>
+</div>
                 `).join('')}
             </div>
         </div>
@@ -904,12 +909,26 @@ async exportDevisToExcel() {
     }
     
     async deleteClient(id) {
-        if (confirm('Supprimer ce client ?')) {
-            await apiRequest(`/api/clients/${id}`, { method: 'DELETE' });
-            alert('Client supprimé');
-            this.loadPage('clients');
+    if (confirm('⚠️ Supprimer ce client ? Cette action est irréversible.')) {
+        try {
+            console.log("Suppression client ID:", id);
+            const response = await apiRequest(`/api/clients/${id}`, { method: 'DELETE' });
+            const result = await response.json();
+            
+            console.log("Résultat API:", result);
+            
+            if (result.success) {
+    Toast.success('Client supprimé avec succès');
+    window.location.reload();  // ← Recharge toute la page
+} else {
+                Toast.error(result.message);
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            Toast.error('Erreur de connexion');
         }
     }
+}
     
     async deleteProjet(id) {
         if (confirm('Supprimer ce projet ?')) {

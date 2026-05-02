@@ -897,5 +897,34 @@ body {
     border-color: #06B6D4;
 }
 
+/* Pour les cartes clients */
+.glass-card p {
+    word-break: break-word;        /* Coupe les mots trop longs */
+    overflow-wrap: break-word;     /* Coupe les mots trop longs */
+    white-space: normal;           /* Permet le retour à la ligne */
+    max-width: 100%;              /* Ne dépasse pas la carte */
+}
+
+/* Spécifique pour les emails */
+.glass-card p i.fa-envelope {
+    margin-right: 8px;
+}
+
+.glass-card p {
+    font-size: 0.85rem;
+    margin: 8px 0;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .glass-card p {
+        font-size: 0.7rem;
+    }
+    
+    .glass-card p i {
+        width: 20px;
+    }
+}
+
 /* Ajouter FontAwesome si pas déjà présent */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
