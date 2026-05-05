@@ -2,19 +2,19 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>BTP Devis Pro - Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E3A8A">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
     <!-- Bouton menu mobile -->
-    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="position: fixed; top: 15px; left: 15px; z-index: 1001; background: rgba(15,23,42,0.9); border: none; color: white; padding: 12px; border-radius: 10px; cursor: pointer;">
         <i class="fas fa-bars"></i>
     </button>
 
@@ -67,10 +67,7 @@
             <header class="glass-header">
                 <h1 id="page-title">Dashboard</h1>
                 <div class="header-right">
-                    <div class="language-selector">
-                        <button class="lang-btn" onclick="setLanguage('fr')">🇫🇷 FR</button>
-                        <button class="lang-btn" onclick="setLanguage('en')">🇬🇧 EN</button>
-                    </div>
+                    <!-- Langue supprimée -->
                 </div>
             </header>
             <div class="content-area" id="content-area">
@@ -84,10 +81,12 @@
         // Fonction pour le menu mobile
         function toggleMobileMenu() {
             const sidebar = document.querySelector('.sidebar');
-            sidebar.classList.toggle('open');
+            if (sidebar) {
+                sidebar.classList.toggle('open');
+            }
         }
 
-        // Fermer le menu quand on clique sur un lien (mobile)
+        // Fermer le menu quand on clique ailleurs (mobile)
         document.addEventListener('click', function(e) {
             const sidebar = document.querySelector('.sidebar');
             const menuBtn = document.querySelector('.mobile-menu-btn');
@@ -96,14 +95,6 @@
                     sidebar.classList.remove('open');
                 }
             }
-        });
-
-        // Détecter si l'app est installable
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            console.log('Installation PWA possible');
         });
     </script>
 </body>
