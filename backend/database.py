@@ -2,6 +2,7 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 import threading
+import platform
 
 class Database:
     _instance = None
@@ -18,7 +19,12 @@ class Database:
             return
         self._initialized = True
         
-        app_data = os.path.join(os.environ['APPDATA'], 'BTPDevisPro')
+        # Chemin de la base de données (compatible Windows et Linux)
+        if platform.system() == 'Windows':
+            app_data = os.path.join(os.environ['APPDATA'], 'BTPDevisPro')
+        else:
+            app_data = os.path.join(os.path.expanduser('~'), '.btpdevispro')
+        
         os.makedirs(app_data, exist_ok=True)
         self.db_path = os.path.join(app_data, 'btp_devis.db')
         self.local = threading.local()
@@ -187,12 +193,6 @@ class Database:
             
             conn.commit()
             print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
-    
-    def get_connection(self):
-        if not hasattr(self.local, 'connection') or self.local.connection is None:
-            self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.local.connection.row_factory = sqlite3.Row
-        return self.local.connection
     
     def execute_query(self, query, params=None):
         conn = self.get_connection()
