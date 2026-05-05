@@ -10,6 +10,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from flask import send_from_directory
+import os
 
 app = Flask(__name__)
 # Configuration SendGrid
@@ -40,7 +42,16 @@ devis_model = Devis()
 facture_model = Facture()
 abonnement_model = Abonnement()
 settings_model = Settings()
+# Servir les fichiers du frontend
+@app.route('/')
+def serve_frontend():
+    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    return send_from_directory(frontend_path, 'index.html')
 
+@app.route('/<path:path>')
+def serve_static(path):
+    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    return send_from_directory(frontend_path, path)
 # ==================== AUTHENTIFICATION ====================
 @app.route('/api/register', methods=['POST'])
 def register():
