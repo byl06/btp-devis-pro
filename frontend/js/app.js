@@ -1,5 +1,5 @@
 // Configuration
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://btp-devis-pro-1.onrender.com';
 
 // Récupérer le token
 const token = localStorage.getItem('token');
