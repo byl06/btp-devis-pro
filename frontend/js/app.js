@@ -2656,6 +2656,8 @@ async refreshClientsPage() {
     await this.loadPage('clients');
 }
 
+
+
 // Filtrage des devis
 filterDevis() {
     if (!this.allDevis) return;
@@ -2883,3 +2885,23 @@ function formatMoney(amount) {
 
 // Initialisation
 app = new BTPDevisApp();
+// Fin du fichier app.js - Ajoute ceci à la toute fin
+
+// Fonction pour le menu mobile
+function toggleMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('open');
+    }
+}
+
+// Fermer le menu quand on clique sur un lien (mobile)
+document.addEventListener('click', function(e) {
+    const sidebar = document.querySelector('.sidebar');
+    const menuBtn = document.querySelector('.mobile-menu-btn');
+    if (window.innerWidth <= 768) {
+        if (sidebar && menuBtn && !sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+            sidebar.classList.remove('open');
+        }
+    }
+});

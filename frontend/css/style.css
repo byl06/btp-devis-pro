@@ -925,5 +925,123 @@ body {
         width: 20px;
     }
 }
+
+/* ==================== RESPONSIVE MOBILE ==================== */
+
+/* Tablettes et mobiles */
+@media (max-width: 768px) {
+    /* Sidebar cachée par défaut */
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        width: 280px;
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+    
+    /* Main content pleine largeur */
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+    }
+    
+    /* Header adapté */
+    .glass-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    /* Grille des cartes */
+    .cards-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    /* Tableau responsive */
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .data-table {
+        font-size: 0.8rem;
+    }
+    
+    .data-table th, 
+    .data-table td {
+        padding: 8px;
+        white-space: nowrap;
+    }
+    
+    /* Boutons menu mobile */
+    .mobile-menu-btn {
+        display: block;
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        z-index: 1001;
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    
+    /* Formulaires */
+    .modal-content {
+        width: 95%;
+        padding: 1rem;
+    }
+    
+    .materiaux-item {
+        flex-direction: column;
+    }
+    
+    .materiaux-item input {
+        width: 100%;
+    }
+}
+
+/* Petit mobile */
+@media (max-width: 480px) {
+    .glass-card {
+        padding: 1rem;
+    }
+    
+    .card-value {
+        font-size: 1.2rem;
+    }
+    
+    .btn-primary, .btn-secondary {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    
+    h2 {
+        font-size: 1.2rem;
+    }
+    
+    .search-box input {
+        width: 150px;
+    }
+}
+
+/* Bouton menu mobile */
+.mobile-menu-btn {
+    display: none;
+}
 /* Ajouter FontAwesome si pas déjà présent */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
