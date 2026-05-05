@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redimensionneur de logo BTP Devis Pro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0F172A;
+            color: white;
+            text-align: center;
+            padding: 50px;
+        }
+        canvas {
+            margin: 20px;
+            border: 2px solid #06B6D4;
+            border-radius: 10px;
+        }
+        input, button {
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        button {
+            background: #06B6D4;
+            color: white;
+            font-weight: bold;
+        }
+        .download-link {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            background: #1E3A8A;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🖼️ Redimensionneur de logo</h1>
+    <input type="file" id="upload" accept="image/*">
+    <button onclick="resizeAll()">Générer toutes les tailles</button>
+    <div id="result"></div>
+
+    <script>
+        let originalImage = null;
+        
+        document.getElementById('upload').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    alert('✅ Logo chargé ! Cliquez sur "Générer toutes les tailles"');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        });
+        
+        function resizeAll() {
+            if (!originalImage) {
+                alert('Veuillez d\'abord charger un logo');
+                return;
+            }
+            
+            const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<h3>Téléchargez vos icônes :</h3>';
+            
+            sizes.forEach(size => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // Dessiner l'image redimensionnée
+                ctx.drawImage(originalImage, 0, 0, size, size);
+                
+                // Créer le lien de téléchargement
+                const link = document.createElement('a');
+                link.className = 'download-link';
+                link.download = `icon-${size}.png`;
+                link.href = canvas.toDataURL();
+                link.innerHTML = `📥 icon-${size}.png`;
+                resultDiv.appendChild(link);
+            });
+            
+            resultDiv.innerHTML += '<br><p style="color: #10B981;">✅ Toutes les icônes sont prêtes !</p>';
+            resultDiv.innerHTML += '<p>Placez-les dans le dossier <strong>frontend/icons/</strong></p>';
+        }
+    </script>
+</body>
+</html>
