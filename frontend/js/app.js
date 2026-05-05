@@ -1,7 +1,7 @@
 // Configuration
-const API_URL = window.location.origin === 'http://localhost:8000' 
-    ? 'http://localhost:5000' 
-    : 'https://btp-devis-pro-1.onrender.com';
+// Configuration API - détection automatique
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocal ? 'http://localhost:5000' : 'https://btp-devis-pro-1.onrender.com';
 
 // Récupérer le token
 const token = localStorage.getItem('token');

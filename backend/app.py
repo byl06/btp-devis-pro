@@ -24,10 +24,8 @@ app.config['MAIL_DEFAULT_SENDER'] = 'bylgaitb@gmail.com'  # Ton email
 
 mail = Mail(app)
 
-# Configuration CORS complète
-CORS(app, origins=["http://localhost:8000"], supports_credentials=True, allow_headers=["Content-Type", "Authorization"])
-CORS(app)
-
+# Configuration CORS - Autorise toutes les origines (pour Render)
+CORS(app, origins=["http://localhost:8000", "https://btp-devis-pro-1.onrender.com"], supports_credentials=True)
 # Configuration JWT
 app.config['JWT_SECRET_KEY'] = 'super-secret-key-btp-2024'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
