@@ -9,13 +9,12 @@ class Database:
     
     def connect(self):
         try:
-            # Remplace par TES identifiants Render
             self.connection = psycopg2.connect(
-                host='dpg-d8097lho3t8c73di9j80-a',      # Copie depuis Render
+                host='dpg-d8097lho3t8c73di9j80-a.virginia-postgres.render.com',
                 port=5432,
                 database='btp_devis',
                 user='btp_user',
-                password='6Rezh4lvx9HyeAvUKEDZwBtyF9s8wUTC'  # Copie depuis Render
+                password='6Rezh4lvx9HyeAvUKEDZwBtyF9s8wUTC'
             )
             self.create_tables()
             print("✅ Connecté à PostgreSQL (données persistantes)")
@@ -27,7 +26,6 @@ class Database:
     def create_tables(self):
         cursor = self.connection.cursor()
         
-        # Table UTILISATEUR
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS utilisateur (
                 id_user SERIAL PRIMARY KEY,
@@ -40,7 +38,6 @@ class Database:
             )
         ''')
         
-        # Table CLIENT
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS client (
                 id_client SERIAL PRIMARY KEY,
@@ -52,7 +49,6 @@ class Database:
             )
         ''')
         
-        # Table PROJET
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS projet (
                 id_projet SERIAL PRIMARY KEY,
@@ -63,7 +59,6 @@ class Database:
             )
         ''')
         
-        # Table DEVIS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS devis (
                 id_devis SERIAL PRIMARY KEY,
@@ -76,7 +71,6 @@ class Database:
             )
         ''')
         
-        # Table LIGNE_DEVIS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS ligne_devis (
                 id_ligne SERIAL PRIMARY KEY,
@@ -88,7 +82,6 @@ class Database:
             )
         ''')
         
-        # Table FACTURE
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS facture (
                 id_facture SERIAL PRIMARY KEY,
@@ -99,7 +92,6 @@ class Database:
             )
         ''')
         
-        # Table ABONNEMENTS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS abonnements (
                 id_abonnement SERIAL PRIMARY KEY,
@@ -111,7 +103,6 @@ class Database:
             )
         ''')
         
-        # Table SETTINGS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 id_setting SERIAL PRIMARY KEY,
@@ -129,7 +120,6 @@ class Database:
             )
         ''')
         
-        # Table NOTIFICATIONS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS notifications (
                 id_notification SERIAL PRIMARY KEY,
@@ -141,7 +131,6 @@ class Database:
             )
         ''')
         
-        # Table PAIEMENTS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS paiements (
                 id_paiement SERIAL PRIMARY KEY,
@@ -156,36 +145,35 @@ class Database:
         
         self.connection.commit()
         
-        # Créer l'admin s'il n'existe pas
-        import bcrypt
-        cursor.execute("SELECT * FROM utilisateur WHERE email = 'bylgaitb@gmail.com'")
-        admin = cursor.fetchone()
+        # Créer l'admin UNIQUEMENT si la table est vide
+        cursor.execute("SELECT COUNT(*) FROM utilisateur")
+        count = cursor.fetchone()[0]
         
-        if not admin:
-            hashed = bcrypt.hashpw(b'000000', bcrypt.gensalt())
-            cursor.execute('''
-                INSERT INTO utilisateur (id_user, nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
-                VALUES (1, 'Admin BTP', 'bylgaitb@gmail.com', '000000', %s, 'BTP Pro', '+229 90000000')
-            ''', (hashed,))
+        if count == 0:
+            import bcrypt
+            password = "000000"
+            hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             
-            date_fin_100ans = datetime.now() + timedelta(days=365*100)
-            cursor.execute('''
+            cursor.execute("""
+                INSERT INTO utilisateur (id_user, nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
+                VALUES (1, 'Admin BTP', 'bylgaitb@gmail.com', %s, %s, 'BTP Pro', '+229 90000000')
+            """, (password, hashed.decode()))
+            
+            date_fin = datetime.now() + timedelta(days=365*100)
+            cursor.execute("""
                 INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
                 VALUES (1, 'actif', %s, %s, 'illimite')
-            ''', (datetime.now(), date_fin_100ans))
+            """, (datetime.now(), date_fin))
             
-            cursor.execute('''
+            cursor.execute("""
                 INSERT INTO settings (id_user, company_name, created_at, updated_at)
                 VALUES (1, 'BTP Devis Pro', %s, %s)
-            ''', (datetime.now(), datetime.now()))
+            """, (datetime.now(), datetime.now()))
             
             self.connection.commit()
             print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
         
         print("✅ Tables PostgreSQL créées/vérifiées")
-    
-    def get_connection(self):
-        return self.connection
     
     def execute_query(self, query, params=None):
         cursor = None
@@ -208,7 +196,6 @@ class Database:
             cursor = self.connection.cursor()
             cursor.execute(query, params or ())
             rows = cursor.fetchall()
-            # Convertir en dictionnaires
             colnames = [desc[0] for desc in cursor.description]
             return [dict(zip(colnames, row)) for row in rows]
         except Exception as e:
