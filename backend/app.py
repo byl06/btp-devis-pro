@@ -632,7 +632,8 @@ def generate_pdf(id_devis):
         
         # ========== SIGNATURES ==========
         signature_data = [
-            [f'Pour {settings.get("company_name", "l\'entreprise")}', 'Pour le client'],
+            entreprise_name = settings.get("company_name", "l'entreprise")
+[f'Pour {entreprise_name}', 'Pour le client'],
             ['_________________________', '_________________________'],
             ['Date et signature', 'Date et signature']
         ]
