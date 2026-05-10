@@ -1,50 +1,36 @@
-import sqlite3
+import psycopg2
 import os
 from datetime import datetime, timedelta
-import threading
-import platform
 
 class Database:
-    _instance = None
-    _lock = threading.Lock()
-    
-    def __new__(cls):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-            return cls._instance
-    
     def __init__(self):
-        if hasattr(self, '_initialized'):
-            return
-        self._initialized = True
-        
-        # Chemin de la base de données (compatible Windows et Linux)
-        if platform.system() == 'Windows':
-            app_data = os.path.join(os.environ['APPDATA'], 'BTPDevisPro')
-        else:
-            app_data = os.path.join(os.path.expanduser('~'), '.btpdevispro')
-        
-        os.makedirs(app_data, exist_ok=True)
-        self.db_path = os.path.join(app_data, 'btp_devis.db')
-        self.local = threading.local()
-        self.create_tables()
-        print(f"✅ Connecté à SQLite: {self.db_path}")
+        self.connection = None
+        self.connect()
     
-    def get_connection(self):
-        if not hasattr(self.local, 'connection') or self.local.connection is None:
-            self.local.connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.local.connection.row_factory = sqlite3.Row
-        return self.local.connection
+    def connect(self):
+        try:
+            # Remplace par TES identifiants Render
+            self.connection = psycopg2.connect(
+                host='dpg-d8097lho3t8c73di9j80-a',      # Copie depuis Render
+                port=5432,
+                database='btp_devis',
+                user='btp_user',
+                password='6Rezh4lvx9HyeAvUKEDZwBtyF9s8wUTC'  # Copie depuis Render
+            )
+            self.create_tables()
+            print("✅ Connecté à PostgreSQL (données persistantes)")
+            return True
+        except Exception as e:
+            print(f"❌ Erreur: {e}")
+            return False
     
     def create_tables(self):
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = self.connection.cursor()
         
         # Table UTILISATEUR
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS UTILISATEUR (
-                id_user INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS utilisateur (
+                id_user SERIAL PRIMARY KEY,
                 nom TEXT,
                 email TEXT UNIQUE,
                 mot_de_passe TEXT,
@@ -56,30 +42,32 @@ class Database:
         
         # Table CLIENT
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS CLIENT (
-                id_client INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS client (
+                id_client SERIAL PRIMARY KEY,
                 nom TEXT,
                 telephone TEXT,
                 email TEXT,
-                adresse TEXT
+                adresse TEXT,
+                id_user INTEGER
             )
         ''')
         
         # Table PROJET
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS PROJET (
-                id_projet INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS projet (
+                id_projet SERIAL PRIMARY KEY,
                 nom_projet TEXT,
                 description TEXT,
-                localisation TEXT
+                localisation TEXT,
+                id_user INTEGER
             )
         ''')
         
         # Table DEVIS
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS DEVIS (
-                id_devis INTEGER PRIMARY KEY AUTOINCREMENT,
-                date_creation DATETIME,
+            CREATE TABLE IF NOT EXISTS devis (
+                id_devis SERIAL PRIMARY KEY,
+                date_creation TIMESTAMP,
                 total REAL,
                 statut TEXT DEFAULT 'brouillon',
                 id_client INTEGER,
@@ -90,8 +78,8 @@ class Database:
         
         # Table LIGNE_DEVIS
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS LIGNE_DEVIS (
-                id_ligne INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS ligne_devis (
+                id_ligne SERIAL PRIMARY KEY,
                 designation TEXT,
                 quantite INTEGER,
                 prix_unitaire REAL,
@@ -102,9 +90,9 @@ class Database:
         
         # Table FACTURE
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS FACTURE (
-                id_facture INTEGER PRIMARY KEY AUTOINCREMENT,
-                date_facture DATETIME,
+            CREATE TABLE IF NOT EXISTS facture (
+                id_facture SERIAL PRIMARY KEY,
+                date_facture TIMESTAMP,
                 montant REAL,
                 statut TEXT DEFAULT 'non payée',
                 id_devis INTEGER UNIQUE
@@ -113,20 +101,20 @@ class Database:
         
         # Table ABONNEMENTS
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ABONNEMENTS (
-                id_abonnement INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS abonnements (
+                id_abonnement SERIAL PRIMARY KEY,
                 id_user INTEGER NOT NULL,
                 statut TEXT DEFAULT 'actif',
-                date_debut DATETIME,
-                date_fin DATETIME,
+                date_debut TIMESTAMP,
+                date_fin TIMESTAMP,
                 type_abonnement TEXT DEFAULT 'mensuel'
             )
         ''')
         
         # Table SETTINGS
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS SETTINGS (
-                id_setting INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS settings (
+                id_setting SERIAL PRIMARY KEY,
                 id_user INTEGER NOT NULL,
                 company_name TEXT,
                 company_logo TEXT,
@@ -136,88 +124,93 @@ class Database:
                 primary_color TEXT DEFAULT '#1E3A8A',
                 secondary_color TEXT DEFAULT '#7C3AED',
                 accent_color TEXT DEFAULT '#06B6D4',
-                created_at DATETIME,
-                updated_at DATETIME
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP
             )
         ''')
         
         # Table NOTIFICATIONS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS notifications (
-                id_notification INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_notification SERIAL PRIMARY KEY,
                 id_user INTEGER NOT NULL,
                 message TEXT,
                 type TEXT DEFAULT 'info',
                 est_lue INTEGER DEFAULT 0,
-                date_creation DATETIME
+                date_creation TIMESTAMP
             )
         ''')
         
         # Table PAIEMENTS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS paiements (
-                id_paiement INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_paiement SERIAL PRIMARY KEY,
                 id_user INTEGER NOT NULL,
                 montant REAL,
-                date_paiement DATETIME,
+                date_paiement TIMESTAMP,
                 reference_paiement TEXT,
                 methode TEXT,
                 statut TEXT DEFAULT 'valide'
             )
         ''')
         
-        conn.commit()
+        self.connection.commit()
         
-        # === CRÉATION DE L'ADMIN ===
+        # Créer l'admin s'il n'existe pas
         import bcrypt
-        admin = self.fetch_one("SELECT * FROM UTILISATEUR WHERE email = 'bylgaitb@gmail.com'")
+        cursor.execute("SELECT * FROM utilisateur WHERE email = 'bylgaitb@gmail.com'")
+        admin = cursor.fetchone()
+        
         if not admin:
             hashed = bcrypt.hashpw(b'000000', bcrypt.gensalt())
             cursor.execute('''
-                INSERT INTO UTILISATEUR (id_user, nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
-                VALUES (1, 'Admin BTP', 'bylgaitb@gmail.com', '000000', ?, 'BTP Pro', '+229 90000000')
+                INSERT INTO utilisateur (id_user, nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
+                VALUES (1, 'Admin BTP', 'bylgaitb@gmail.com', '000000', %s, 'BTP Pro', '+229 90000000')
             ''', (hashed,))
             
-            # Ajouter l'abonnement illimité pour admin (100 ans)
             date_fin_100ans = datetime.now() + timedelta(days=365*100)
             cursor.execute('''
-                INSERT INTO ABONNEMENTS (id_user, statut, date_debut, date_fin, type_abonnement)
-                VALUES (1, 'actif', ?, ?, 'illimite')
+                INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
+                VALUES (1, 'actif', %s, %s, 'illimite')
             ''', (datetime.now(), date_fin_100ans))
             
-            # Ajouter les settings par défaut
             cursor.execute('''
-                INSERT INTO SETTINGS (id_user, company_name, created_at, updated_at)
-                VALUES (1, 'BTP Devis Pro', ?, ?)
+                INSERT INTO settings (id_user, company_name, created_at, updated_at)
+                VALUES (1, 'BTP Devis Pro', %s, %s)
             ''', (datetime.now(), datetime.now()))
             
-            conn.commit()
+            self.connection.commit()
             print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
+        
+        print("✅ Tables PostgreSQL créées/vérifiées")
+    
+    def get_connection(self):
+        return self.connection
     
     def execute_query(self, query, params=None):
-        conn = self.get_connection()
         cursor = None
         try:
-            cursor = conn.cursor()
+            cursor = self.connection.cursor()
             cursor.execute(query, params or ())
-            conn.commit()
+            self.connection.commit()
             return cursor
         except Exception as e:
             print(f"❌ Erreur: {e}")
-            conn.rollback()
+            self.connection.rollback()
             return None
         finally:
             if cursor:
                 cursor.close()
     
     def fetch_all(self, query, params=None):
-        conn = self.get_connection()
         cursor = None
         try:
-            cursor = conn.cursor()
+            cursor = self.connection.cursor()
             cursor.execute(query, params or ())
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # Convertir en dictionnaires
+            colnames = [desc[0] for desc in cursor.description]
+            return [dict(zip(colnames, row)) for row in rows]
         except Exception as e:
             print(f"❌ Erreur: {e}")
             return []
@@ -226,13 +219,15 @@ class Database:
                 cursor.close()
     
     def fetch_one(self, query, params=None):
-        conn = self.get_connection()
         cursor = None
         try:
-            cursor = conn.cursor()
+            cursor = self.connection.cursor()
             cursor.execute(query, params or ())
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                colnames = [desc[0] for desc in cursor.description]
+                return dict(zip(colnames, row))
+            return None
         except Exception as e:
             print(f"❌ Erreur: {e}")
             return None
