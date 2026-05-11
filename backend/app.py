@@ -1070,24 +1070,36 @@ def admin_get_abonnements():
         user_id = get_jwt_identity()
         user = utilisateur_model.get_by_id(user_id)
         
-        # Vérifier que c'est l'admin
         if user['email'] != 'admin@btp.com' and user['email'] != 'bylgaitb@gmail.com':
             return jsonify({'error': 'Non autorisé'}), 403
         
-        # Récupérer TOUS les utilisateurs SAUF l'admin principal (id_user=1)
-        # Pour voir les autres comptes à gérer
         query = """
         SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
-               a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement,
-               (julianday(a.date_fin) - julianday('now')) as jours_restants
-        FROM UTILISATEUR u
-        LEFT JOIN ABONNEMENTS a ON u.id_user = a.id_user
+               a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
+        FROM utilisateur u
+        LEFT JOIN abonnements a ON u.id_user = a.id_user
         WHERE u.id_user != 1
         ORDER BY a.date_fin ASC
         """
         abonnements = utilisateur_model.db.fetch_all(query)
+        
+        # Calculer les jours restants en Python
+        for abo in abonnements:
+            if abo.get('date_fin'):
+                if isinstance(abo['date_fin'], str):
+                    date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
+                else:
+                    date_fin = abo['date_fin']
+                jours_restants = (date_fin - datetime.now()).days
+                abo['jours_restants'] = max(0, jours_restants)
+            else:
+                abo['jours_restants'] = 0
+        
         return jsonify(abonnements)
     except Exception as e:
+        print(f"❌ Erreur admin: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/abonnement/<int:id_user>/prolonger', methods=['POST'])
