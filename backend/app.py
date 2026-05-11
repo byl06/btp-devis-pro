@@ -363,7 +363,7 @@ def restore_database():
         # Réinsérer les settings si nécessaire
         settings = backup_data.get('settings')
         if settings:
-            devis_model.db.execute_query("DELETE FROM SETTINGS WHERE id_user = ?", (user_id,))
+            devis_model.db.execute_query("DELETE FROM SETTINGS WHERE id_user = %s", (user_id,))
             sql_settings = """
             INSERT INTO SETTINGS (id_user, company_name, company_logo, company_email, company_phone, 
                                  company_address, primary_color, secondary_color, accent_color, created_at, updated_at) 
