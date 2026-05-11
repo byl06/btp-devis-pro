@@ -74,7 +74,7 @@ def register():
             
             query = """
             INSERT INTO ABONNEMENTS (id_user, statut, date_debut, date_fin, type_abonnement)
-            VALUES (?, 'actif', ?, ?, 'essai')
+            VALUES (%s, 'actif', %s, %s, 'essai')
             """
             utilisateur_model.db.execute_query(query, (user_id, datetime.now(), date_fin_essai))
             
@@ -110,7 +110,7 @@ def login():
 def get_clients():
     try:
         user_id = get_jwt_identity()
-        query = "SELECT * FROM CLIENT WHERE id_user = ? OR id_user IS NULL ORDER BY nom"
+        query = "SELECT * FROM CLIENT WHERE id_user = %s OR id_user IS NULL ORDER BY nom"
         clients = client_model.db.fetch_all(query, (user_id,))
         return jsonify(clients)
     except Exception as e:
@@ -122,7 +122,7 @@ def create_client():
     try:
         user_id = get_jwt_identity()
         data = request.json
-        query = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (?, ?, ?, ?, ?)"
+        query = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
         client_model.db.execute_query(query, (data['nom'], data['telephone'], data['email'], data['adresse'], user_id))
         return jsonify({'success': True, 'message': 'Client créé'})
     except Exception as e:
@@ -135,8 +135,8 @@ def update_client(id_client):
         data = request.json
         query = """
         UPDATE CLIENT 
-        SET nom = ?, telephone = ?, email = ?, adresse = ?
-        WHERE id_client = ?
+        SET nom = %s, telephone = %s, email = %s, adresse = %s
+        WHERE id_client = %s
         """
         result = client_model.db.execute_query(query, (
             data['nom'], data['telephone'], data['email'], data['adresse'], id_client
@@ -165,7 +165,7 @@ def get_projets():
         query = """
         SELECT DISTINCT p.* FROM PROJET p
         LEFT JOIN DEVIS d ON p.id_projet = d.id_projet
-        WHERE d.id_user = ? OR d.id_user IS NULL
+        WHERE d.id_user = %s OR d.id_user IS NULL
         ORDER BY p.nom_projet
         """
         projets = projet_model.db.fetch_all(query, (user_id,))
@@ -179,7 +179,7 @@ def create_projet():
     try:
         user_id = get_jwt_identity()
         data = request.json
-        query = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (?, ?, ?, ?)"
+        query = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
         projet_model.db.execute_query(query, (data['nom_projet'], data['description'], data['localisation'], user_id))
         return jsonify({'success': True, 'message': 'Projet créé'})
     except Exception as e:
@@ -192,8 +192,8 @@ def update_projet(id_projet):
         data = request.json
         query = """
         UPDATE PROJET 
-        SET nom_projet = ?, description = ?, localisation = ?
-        WHERE id_projet = ?
+        SET nom_projet = %s, description = %s, localisation = %s
+        WHERE id_projet = %s
         """
         result = projet_model.db.execute_query(query, (
             data['nom_projet'], data['description'], data['localisation'], id_projet
@@ -265,11 +265,11 @@ def backup_database():
         # Récupérer les devis de l'utilisateur avec leurs lignes
         devis = devis_model.get_by_user(user_id)
         for devis_item in devis:
-            lignes = devis_model.db.fetch_all("SELECT * FROM LIGNE_DEVIS WHERE id_devis = ?", (devis_item['id_devis'],))
+            lignes = devis_model.db.fetch_all("SELECT * FROM LIGNE_DEVIS WHERE id_devis = %s", (devis_item['id_devis'],))
             devis_item['lignes'] = lignes
         
         # Récupérer les settings
-        settings = utilisateur_model.db.fetch_one("SELECT * FROM SETTINGS WHERE id_user = ?", (user_id,))
+        settings = utilisateur_model.db.fetch_one("SELECT * FROM SETTINGS WHERE id_user = %s", (user_id,))
         
         data = {
             'user_id': user_id,
@@ -306,7 +306,7 @@ def restore_database():
         
         # Insérer les clients
         for client in backup_data.get('clients', []):
-            sql = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (?, ?, ?, ?, ?)"
+            sql = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
             devis_model.db.execute_query(sql, (
                 client['nom'], 
                 client['telephone'], 
@@ -318,7 +318,7 @@ def restore_database():
 
         # Insérer les projets
         for projet in backup_data.get('projets', []):
-            sql = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (?, ?, ?, ?)"
+            sql = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
             devis_model.db.execute_query(sql, (
                 projet['nom_projet'], 
                 projet['description'], 
@@ -331,7 +331,7 @@ def restore_database():
         for devis_item in backup_data.get('devis', []):
             sql = """
             INSERT INTO DEVIS (date_creation, total, statut, id_client, id_user, id_projet) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
             devis_model.db.execute_query(sql, (
                 devis_item['date_creation'],
@@ -350,7 +350,7 @@ def restore_database():
             for ligne in devis_item.get('lignes', []):
                 sql_ligne = """
                 INSERT INTO LIGNE_DEVIS (designation, quantite, prix_unitaire, total_ligne, id_devis) 
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 """
                 devis_model.db.execute_query(sql_ligne, (
                     ligne['designation'],
@@ -367,7 +367,7 @@ def restore_database():
             sql_settings = """
             INSERT INTO SETTINGS (id_user, company_name, company_logo, company_email, company_phone, 
                                  company_address, primary_color, secondary_color, accent_color, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             devis_model.db.execute_query(sql_settings, (
                 user_id,
@@ -414,7 +414,7 @@ def generate_pdf(id_devis):
             return jsonify({'error': 'Devis non trouvé'}), 404
         
         # Récupérer les paramètres de l'entreprise
-        settings_query = "SELECT * FROM SETTINGS WHERE id_user = ?"
+        settings_query = "SELECT * FROM SETTINGS WHERE id_user = %s"
         settings = utilisateur_model.db.fetch_one(settings_query, (user_id,))
         
         if not settings:
@@ -718,14 +718,14 @@ def start_trial():
 def get_settings():
     try:
         user_id = get_jwt_identity()
-        query = "SELECT * FROM SETTINGS WHERE id_user = ?"
+        query = "SELECT * FROM SETTINGS WHERE id_user = %s"
         settings = utilisateur_model.db.fetch_one(query, (user_id,))
         
         if not settings:
             from datetime import datetime
             query_insert = """
             INSERT INTO SETTINGS (id_user, company_name, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
             """
             utilisateur_model.db.execute_query(query_insert, (user_id, 'Mon Entreprise', datetime.now(), datetime.now()))
             settings = utilisateur_model.db.fetch_one(query, (user_id,))
@@ -739,7 +739,7 @@ def get_settings():
 def delete_devis(id_devis):
     try:
         # Vérifier si le devis est supprimable (pas validé)
-        check_query = "SELECT statut FROM DEVIS WHERE id_devis = ?"
+        check_query = "SELECT statut FROM DEVIS WHERE id_devis = %s"
         devis_check = devis_model.db.fetch_one(check_query, (id_devis,))
         
         if not devis_check:
@@ -749,10 +749,10 @@ def delete_devis(id_devis):
             return jsonify({'success': False, 'message': 'Un devis validé ne peut pas être supprimé'}), 400
         
         # Supprimer les lignes d'abord (clé étrangère)
-        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = ?", (id_devis,))
+        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = %s", (id_devis,))
         
         # Supprimer le devis
-        devis_model.db.execute_query("DELETE FROM DEVIS WHERE id_devis = ?", (id_devis,))
+        devis_model.db.execute_query("DELETE FROM DEVIS WHERE id_devis = %s", (id_devis,))
         
         return jsonify({'success': True, 'message': 'Devis supprimé'})
     except Exception as e:
@@ -793,7 +793,7 @@ def create_facture(id_devis):
 @jwt_required()
 def pay_facture(id_facture):
     try:
-        query = "UPDATE FACTURE SET statut = 'payée' WHERE id_facture = ?"
+        query = "UPDATE FACTURE SET statut = 'payée' WHERE id_facture = %s"
         facture_model.db.execute_query(query, (id_facture,))
         return jsonify({'success': True, 'message': 'Facture payée'})
     except Exception as e:
@@ -809,10 +809,10 @@ def update_settings():
         
         query = """
         UPDATE SETTINGS 
-        SET company_name = ?, company_email = ?, company_phone = ?, 
-            company_address = ?, primary_color = ?, secondary_color = ?, 
-            accent_color = ?, updated_at = ?
-        WHERE id_user = ?
+        SET company_name = %s, company_email = %s, company_phone = %s, 
+            company_address = %s, primary_color = %s, secondary_color = %s, 
+            accent_color = %s, updated_at = %s
+        WHERE id_user = %s
         """
         utilisateur_model.db.execute_query(query, (
             data.get('company_name', ''),
@@ -854,7 +854,7 @@ def upload_logo():
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
         
-        query = "UPDATE SETTINGS SET company_logo = ?, updated_at = ? WHERE id_user = ?"
+        query = "UPDATE SETTINGS SET company_logo = %s, updated_at = %s WHERE id_user = %s"
         utilisateur_model.db.execute_query(query, (filename, datetime.now(), user_id))
         
         return jsonify({'success': True, 'logo': filename})
@@ -893,7 +893,7 @@ def get_factures(id_user):
         FROM FACTURE f
         JOIN DEVIS d ON f.id_devis = d.id_devis
         JOIN CLIENT c ON d.id_client = c.id_client
-        WHERE d.id_user = ?
+        WHERE d.id_user = %s
         ORDER BY f.date_facture DESC
         """
         factures = devis_model.db.fetch_all(query, (id_user,))
@@ -910,13 +910,13 @@ def update_devis(id_devis):
         data = request.json
         
         # Vérifier si le devis est modifiable
-        check_query = "SELECT statut FROM DEVIS WHERE id_devis = ?"
+        check_query = "SELECT statut FROM DEVIS WHERE id_devis = %s"
         devis_check = devis_model.db.fetch_one(check_query, (id_devis,))
         if devis_check and devis_check['statut'] == 'validé':
             return jsonify({'success': False, 'message': 'Un devis validé ne peut pas être modifié'}), 400
         
         # Supprimer les anciennes lignes
-        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = ?", (id_devis,))
+        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = %s", (id_devis,))
         
         # Recalculer le total
         total_materiaux = sum(ligne['quantite'] * ligne['prix_unitaire'] for ligne in data['lignes'])
@@ -925,8 +925,8 @@ def update_devis(id_devis):
         # Mettre à jour le devis
         query = """
         UPDATE DEVIS 
-        SET id_client = ?, id_projet = ?, total = ?, date_creation = ?
-        WHERE id_devis = ?
+        SET id_client = %s, id_projet = %s, total = %s, date_creation = %s
+        WHERE id_devis = %s
         """
         devis_model.db.execute_query(query, (data['id_client'], data['id_projet'], total, datetime.now(), id_devis))
         
@@ -935,7 +935,7 @@ def update_devis(id_devis):
             total_ligne = ligne['quantite'] * ligne['prix_unitaire']
             query_ligne = """
             INSERT INTO LIGNE_DEVIS (designation, quantite, prix_unitaire, total_ligne, id_devis)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             """
             devis_model.db.execute_query(query_ligne, (
                 ligne['designation'], ligne['quantite'], ligne['prix_unitaire'], total_ligne, id_devis
@@ -1108,22 +1108,22 @@ def admin_prolonger_abonnement(id_user):
         
         from datetime import datetime, timedelta
         
-        check_query = "SELECT * FROM ABONNEMENTS WHERE id_user = ?"
+        check_query = "SELECT * FROM ABONNEMENTS WHERE id_user = %s"
         abonnement = utilisateur_model.db.fetch_one(check_query, (id_user,))
         
         if abonnement:
             nouvelle_date = abonnement['date_fin'] + timedelta(days=jours)
             query = """
             UPDATE ABONNEMENTS 
-            SET date_fin = ?, statut = 'actif', type_abonnement = ?
-            WHERE id_user = ?
+            SET date_fin = %s, statut = 'actif', type_abonnement = %s
+            WHERE id_user = %s
             """
             utilisateur_model.db.execute_query(query, (nouvelle_date, offreType, id_user))
         else:
             nouvelle_date = datetime.now() + timedelta(days=jours)
             query = """
             INSERT INTO ABONNEMENTS (id_user, statut, date_debut, date_fin, type_abonnement)
-            VALUES (?, 'actif', ?, ?, ?)
+            VALUES (%s, 'actif', %s, %s, %s)
             """
             utilisateur_model.db.execute_query(query, (id_user, datetime.now(), nouvelle_date, offreType))
         
@@ -1131,7 +1131,7 @@ def admin_prolonger_abonnement(id_user):
         notification_message = f"✅ Abonnement {offreType} renouvelé pour {jours} jours. Échéance: {nouvelle_date.strftime('%d/%m/%Y')}"
         notification_query = """
         INSERT INTO notifications (id_user, message, type, date_creation)
-        VALUES (?, ?, 'renouvellement', ?)
+        VALUES (%s, %s, 'renouvellement', %s)
         """
         utilisateur_model.db.execute_query(notification_query, (id_user, notification_message, datetime.now()))
         
@@ -1140,7 +1140,7 @@ def admin_prolonger_abonnement(id_user):
         reference = f"PAY_{id_user}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         paiement_query = """
         INSERT INTO paiements (id_user, montant, date_paiement, reference_paiement, methode, statut)
-        VALUES (?, ?, ?, ?, ?, 'valide')
+        VALUES (%s, %s, %s, %s, %s, 'valide')
         """
         utilisateur_model.db.execute_query(paiement_query, (id_user, montant, datetime.now(), reference, methode))
         
@@ -1156,7 +1156,7 @@ def get_notifications():
         user_id = get_jwt_identity()
         query = """
         SELECT * FROM notifications 
-        WHERE id_user = ? AND est_lue = FALSE
+        WHERE id_user = %s AND est_lue = FALSE
         ORDER BY date_creation DESC
         """
         notifications = utilisateur_model.db.fetch_all(query, (user_id,))
@@ -1168,7 +1168,7 @@ def get_notifications():
 @jwt_required()
 def marquer_notification_lue(id_notification):
     try:
-        query = "UPDATE notifications SET est_lue = TRUE WHERE id_notification = ?"
+        query = "UPDATE notifications SET est_lue = TRUE WHERE id_notification = %s"
         utilisateur_model.db.execute_query(query, (id_notification,))
         return jsonify({'success': True})
     except Exception as e:
@@ -1187,7 +1187,7 @@ def admin_changer_offre(id_user):
         data = request.json
         type_offre = data.get('type_offre', 'pro')
         
-        query = "UPDATE ABONNEMENTS SET type_abonnement = ? WHERE id_user = ?"
+        query = "UPDATE ABONNEMENTS SET type_abonnement = %s WHERE id_user = %s"
         utilisateur_model.db.execute_query(query, (type_offre, id_user))
         
         return jsonify({'success': True, 'message': f'Offre changée en {type_offre}'})
@@ -1204,7 +1204,7 @@ def admin_suspendre_abonnement(id_user):
         if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
             return jsonify({'error': 'Non autorisé'}), 403
         
-        query = "UPDATE ABONNEMENTS SET statut = 'suspendu' WHERE id_user = ?"
+        query = "UPDATE ABONNEMENTS SET statut = 'suspendu' WHERE id_user = %s"
         utilisateur_model.db.execute_query(query, (id_user,))
         
         return jsonify({'success': True, 'message': 'Abonnement suspendu'})
@@ -1245,7 +1245,7 @@ def admin_get_paiements(id_user):
         if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
             return jsonify({'error': 'Non autorisé'}), 403
         
-        query = "SELECT * FROM paiements WHERE id_user = ? ORDER BY date_paiement DESC"
+        query = "SELECT * FROM paiements WHERE id_user = %s ORDER BY date_paiement DESC"
         paiements = utilisateur_model.db.fetch_all(query, (id_user,))
         return jsonify(paiements)
     except Exception as e:
