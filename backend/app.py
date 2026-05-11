@@ -1070,11 +1070,9 @@ def admin_get_abonnements():
         user_id = get_jwt_identity()
         user = utilisateur_model.get_by_id(user_id)
         
-        # Vérifier par EMAIL (pas par ID)
         if user['email'] != 'admin@btp.com' and user['email'] != 'bylgaitb@gmail.com':
             return jsonify({'error': 'Non autorisé'}), 403
         
-        # Récupérer TOUS les utilisateurs SAUF l'admin actuel
         query = """
         SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
                a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
@@ -1085,19 +1083,36 @@ def admin_get_abonnements():
         """
         abonnements = utilisateur_model.db.fetch_all(query)
         
-        # Calculer les jours restants en Python
+        # Calculer les jours restants en Python avec gestion des None
+        result = []
         for abo in abonnements:
-            if abo.get('date_fin'):
-                if isinstance(abo['date_fin'], str):
-                    date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
-                else:
-                    date_fin = abo['date_fin']
-                jours_restants = (date_fin - datetime.now()).days
-                abo['jours_restants'] = max(0, jours_restants)
+            item = dict(abo)  # Copier le dictionnaire
+            if item.get('date_fin') and item['date_fin'] is not None:
+                try:
+                    if isinstance(item['date_fin'], str):
+                        date_fin = datetime.fromisoformat(item['date_fin'].replace('Z', '+00:00'))
+                    else:
+                        date_fin = item['date_fin']
+                    jours_restants = (date_fin - datetime.now()).days
+                    item['jours_restants'] = max(0, jours_restants)
+                except:
+                    item['jours_restants'] = 0
             else:
-                abo['jours_restants'] = 0
+                item['jours_restants'] = 0
+            
+            # S'assurer que tous les champs existent
+            if not item.get('statut'):
+                item['statut'] = 'inactif'
+            if not item.get('type_abonnement'):
+                item['type_abonnement'] = 'aucun'
+            if not item.get('date_debut'):
+                item['date_debut'] = None
+            if not item.get('date_fin'):
+                item['date_fin'] = None
+            
+            result.append(item)
         
-        return jsonify(abonnements)
+        return jsonify(result)
     except Exception as e:
         print(f"❌ Erreur admin: {e}")
         import traceback
