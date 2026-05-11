@@ -1070,16 +1070,18 @@ def admin_get_abonnements():
         user_id = get_jwt_identity()
         user = utilisateur_model.get_by_id(user_id)
         
+        # Vérifier par EMAIL (pas par ID)
         if user['email'] != 'admin@btp.com' and user['email'] != 'bylgaitb@gmail.com':
             return jsonify({'error': 'Non autorisé'}), 403
         
+        # Récupérer TOUS les utilisateurs SAUF l'admin actuel
         query = """
         SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
                a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
         FROM utilisateur u
         LEFT JOIN abonnements a ON u.id_user = a.id_user
-        WHERE u.id_user != 1
-        ORDER BY a.date_fin ASC
+        WHERE u.email != 'bylgaitb@gmail.com' AND u.email != 'admin@btp.com'
+        ORDER BY u.id_user
         """
         abonnements = utilisateur_model.db.fetch_all(query)
         
