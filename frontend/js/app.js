@@ -807,6 +807,24 @@ async exportClientsToExcel() {
     }
 }
 
+
+async ajouterEssai(id_user) {
+    if (confirm(`Ajouter 14 jours d'essai gratuit à l'utilisateur ID ${id_user} ?`)) {
+        try {
+            const response = await apiRequest(`/api/admin/abonnement/${id_user}/trial`, { method: 'POST' });
+            const result = await response.json();
+            if (result.success) {
+                Toast.success('14 jours d\'essai ajoutés avec succès !');
+                this.loadPage('admin');
+            } else {
+                Toast.error(result.error);
+            }
+        } catch (error) {
+            Toast.error('Erreur lors de l\'ajout');
+        }
+    }
+}
+
 async exportDevisToExcel() {
     try {
         const devis = await this.fetchDevis();
@@ -1264,6 +1282,7 @@ openCreateDevisModal() {
             try {
                 const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
                 const result = await response.json();
+                console.log('Résultat complet:', result);
                 if (result.success) {
                     alert('✅ Devis créé avec succès !');
                     modal.remove();
@@ -2281,119 +2300,163 @@ async renderAdmin() {
         const isAdmin = user && (user.email === 'admin@btp.com' || user.email === 'bylgaitb@gmail.com');
         
         if (!isAdmin) {
-            return '<div class="glass-card">Accès non autorisé</div>';
+            return '<div class="glass-card" style="text-align:center; padding:3rem;">⛔ Accès non autorisé</div>';
         }
         
         const abonnements = await this.fetchAbonnements();
         
         if (!abonnements || abonnements.length === 0) {
-            return '<div class="glass-card">Aucun abonnement trouvé</div>';
+            return '<div class="glass-card" style="text-align:center; padding:3rem;">📭 Aucun utilisateur (hors admin) trouvé</div>';
         }
         
         return `
             <div class="page-content">
-                <h2><i class="fas fa-chart-line"></i> Administration</h2>
-                <p style="color:#94A3B8; margin-bottom:1.5rem;">Gestion des abonnements clients</p>
-                
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="admin-search" placeholder="Rechercher..." oninput="app.filterAdminAbonnements()">
+                <!-- EN-TÊTE -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 style="font-size: 1.8rem; font-weight: 600; display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-shield-alt" style="color: var(--accent, #06B6D4);"></i>
+                            Administration
+                        </h2>
+                        <p style="color: var(--gray-light, #94A3B8); margin-top: 0.25rem;">Gestion des abonnements clients</p>
                     </div>
-                    <button class="btn-secondary" onclick="app.exportAbonnements()" style="background:#10B981;">
+                    <button class="btn-primary" onclick="app.exportAbonnements()" style="background: linear-gradient(135deg, #10B981, #059669);">
                         <i class="fas fa-file-excel"></i> Export Excel
                     </button>
                 </div>
-                
+
+                <!-- STATS RAPIDES -->
+                <div class="cards-grid" style="margin-bottom: 2rem;">
+                    <div class="glass-card" style="text-align: center;">
+                        <div class="card-icon" style="margin: 0 auto 1rem auto; width: 50px; height: 50px;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="card-value">${abonnements.length}</div>
+                        <div class="card-title">Utilisateurs</div>
+                    </div>
+                    <div class="glass-card" style="text-align: center;">
+                        <div class="card-icon" style="margin: 0 auto 1rem auto; width: 50px; height: 50px;">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="card-value">${abonnements.filter(a => a.statut === 'actif').length}</div>
+                        <div class="card-title">Abonnements actifs</div>
+                    </div>
+                    <div class="glass-card" style="text-align: center;">
+                        <div class="card-icon" style="margin: 0 auto 1rem auto; width: 50px; height: 50px;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="card-value">${abonnements.filter(a => a.jours_restants > 0 && a.jours_restants < 8).length}</div>
+                        <div class="card-title">Expiration ≤ 7j</div>
+                    </div>
+                </div>
+
+                <!-- TABLEAU DES ABONNEMENTS -->
                 <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Client</th>
-                                <th>Email</th>
-                                <th>Entreprise</th>
-                                <th>Offre</th>
-                                <th>Statut</th>
-                                <th>Expire le</th>
-                                <th>Jours restants</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-table-body">
-                            ${abonnements.map(a => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                        <h3 style="font-weight: 600;"><i class="fas fa-list"></i> Liste des abonnements</h3>
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="admin-search" placeholder="Rechercher par nom, email..." oninput="app.filterAdminAbonnements()" style="width: 250px;">
+                        </div>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; min-width: 900px;">
+                            <thead>
                                 <tr>
-                                    <td>${a.nom || '-'}</td>
-                                    <td>${a.email}</td>
-                                    <td>${a.entreprise || '-'}</td>
-                                    <td>
-                                        <select onchange="app.changerOffre(${a.id_user}, this.value)" class="filter-select">
-                                            <option value="starter" ${a.type_abonnement === 'starter' ? 'selected' : ''}>🟢 Starter (15k)</option>
-                                            <option value="pro" ${a.type_abonnement === 'pro' ? 'selected' : ''}>🔵 Pro (30k)</option>
-                                            <option value="annuel" ${a.type_abonnement === 'annuel' ? 'selected' : ''}>🔴 Annuel (250k)</option>
-                                        </select>
-                                    </div>
-                                    <td>
-                                        <span class="status-badge ${a.statut === 'actif' ? 'success' : 'warning'}">
-                                            ${a.statut || 'inactif'}
-                                        </span>
-                                    </div>
-                                    <td>${a.date_fin ? new Date(a.date_fin).toLocaleDateString() : '-'}</div>
-                                    <td>
-                                        <span style="color:${a.jours_restants < 7 ? '#F87171' : '#10B981'}; font-weight:bold;">
-                                            ${a.jours_restants > 0 ? a.jours_restants + ' jours' : 'Expiré'}
-                                        </span>
-                                    </div>
-                                    <td>
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-        <!-- Offre Starter (15k - 30 jours) -->
-        <div class="admin-tooltip" data-tooltip="Starter: 10 clients, 10 projets, 20 devis max">
-            <button class="btn-offer starter" onclick="app.prolongerAbonnement(${a.id_user}, 30, 15000, 'starter')">
-                🟢 +30j <span class="offer-price">15k</span>
-            </button>
-        </div>
-        
-        <!-- Offre Pro (30k - 30 jours) -->
-        <div class="admin-tooltip" data-tooltip="Pro: Illimité, export Excel, factures">
-            <button class="btn-offer pro" onclick="app.prolongerAbonnement(${a.id_user}, 30, 30000, 'pro')">
-                🔵 +30j <span class="offer-price">30k</span>
-            </button>
-        </div>
-        
-        <!-- Offre Annuel (250k - 365 jours) -->
-        <div class="admin-tooltip" data-tooltip="Annuel: Illimité + support prioritaire">
-            <button class="btn-offer annuel" onclick="app.prolongerAbonnement(${a.id_user}, 365, 250000, 'annuel')">
-                🔴 +1an <span class="offer-price">250k</span>
-            </button>
-        </div>
-        
-        <!-- Menu déroulant pour changer l'offre -->
-        <select onchange="app.changerOffre(${a.id_user}, this.value)" class="filter-select" style="padding: 8px; border-radius: 8px;">
-            <option value="starter" ${a.type_abonnement === 'starter' ? 'selected' : ''}>🟢 Starter</option>
-            <option value="pro" ${a.type_abonnement === 'pro' ? 'selected' : ''}>🔵 Pro</option>
-            <option value="annuel" ${a.type_abonnement === 'annuel' ? 'selected' : ''}>🔴 Annuel</option>
-        </select>
-        
-        <!-- Suspendre -->
-        <button class="btn-icon suspend" onclick="app.suspendreAbonnement(${a.id_user})" title="Suspendre">
-            <i class="fas fa-pause-circle"></i>
-        </button>
-        
-        <!-- Historique -->
-        <button class="btn-icon history" onclick="app.voirPaiements(${a.id_user})" title="Historique">
-            <i class="fas fa-history"></i>
-        </button>
-    </div>
-</td>
+                                    <th>Client</th>
+                                    <th>Email</th>
+                                    <th>Entreprise</th>
+                                    <th>Offre</th>
+                                    <th>Statut</th>
+                                    <th>Expiration</th>
+                                    <th>Jours restants</th>
+                                    <th>Actions</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody id="admin-table-body">
+                                ${abonnements.map(a => `
+                                    <tr>
+                                        <td><strong>${this.escapeHtml(a.nom || '-')}</strong></td>
+                                        <td style="color: var(--gray-light);">${this.escapeHtml(a.email)}</td>
+                                        <td>${this.escapeHtml(a.entreprise || '-')}</td>
+                                        <td>
+                                            <span class="offer-badge" style="
+                                                display: inline-block;
+                                                padding: 4px 12px;
+                                                border-radius: 20px;
+                                                font-size: 0.75rem;
+                                                font-weight: 600;
+                                                background: ${a.type_abonnement === 'starter' ? 'rgba(16, 185, 129, 0.15)' : a.type_abonnement === 'pro' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)'};
+                                                color: ${a.type_abonnement === 'starter' ? '#10B981' : a.type_abonnement === 'pro' ? '#3B82F6' : '#F59E0B'};
+                                            ">
+                                                ${a.type_abonnement === 'starter' ? '🟢 Starter' : a.type_abonnement === 'pro' ? '🔵 Pro' : '🟠 Annuel'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge ${a.statut === 'actif' ? 'success' : 'warning'}">
+                                                ${a.statut === 'actif' ? '✅ Actif' : '⛔ Inactif'}
+                                            </span>
+                                        </td>
+                                        <td style="font-size: 0.85rem;">${a.date_fin ? new Date(a.date_fin).toLocaleDateString('fr-FR') : '-'}</td>
+                                        <td>
+                                            <span style="
+                                                display: inline-block;
+                                                padding: 4px 10px;
+                                                border-radius: 20px;
+                                                font-size: 0.8rem;
+                                                font-weight: bold;
+                                                background: ${a.jours_restants < 7 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'};
+                                                color: ${a.jours_restants < 7 ? '#EF4444' : '#10B981'};
+                                            ">
+                                                ${a.jours_restants > 0 ? a.jours_restants + ' jours' : 'Expiré'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                                <!-- Bouton Essai 14 jours -->
+                                                <button class="btn-icon" onclick="app.ajouterEssai(${a.id_user})" title="14 jours d'essai" style="background: #8B5CF6;">
+                                                    <i class="fas fa-gift"></i>
+                                                </button>
+                                                <!-- Bouton Starter -->
+                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 15000, 'starter')" title="Starter +30j (15k)" style="background: #10B981;">
+                                                    <i class="fas fa-leaf"></i>
+                                                </button>
+                                                <!-- Bouton Pro -->
+                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 30000, 'pro')" title="Pro +30j (30k)" style="background: #3B82F6;">
+                                                    <i class="fas fa-crown"></i>
+                                                </button>
+                                                <!-- Bouton Annuel -->
+                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 365, 250000, 'annuel')" title="Annuel +1an (250k)" style="background: #F59E0B;">
+                                                    <i class="fas fa-gem"></i>
+                                                </button>
+                                                <!-- Changer offre -->
+                                                <select onchange="app.changerOffre(${a.id_user}, this.value)" class="filter-select" style="padding: 6px 10px; font-size: 0.75rem;">
+                                                    <option value="starter" ${a.type_abonnement === 'starter' ? 'selected' : ''}>🟢 Starter</option>
+                                                    <option value="pro" ${a.type_abonnement === 'pro' ? 'selected' : ''}>🔵 Pro</option>
+                                                    <option value="annuel" ${a.type_abonnement === 'annuel' ? 'selected' : ''}>🔴 Annuel</option>
+                                                </select>
+                                                <!-- Suspendre -->
+                                                <button class="btn-icon" onclick="app.suspendreAbonnement(${a.id_user})" title="Suspendre" style="background: #EF4444;">
+                                                    <i class="fas fa-pause-circle"></i>
+                                                </button>
+                                                <!-- Historique -->
+                                                <button class="btn-icon" onclick="app.voirPaiements(${a.id_user})" title="Historique" style="background: #6B7280;">
+                                                    <i class="fas fa-history"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
     } catch (error) {
-        console.error('Erreur:', error);
-        return '<div class="glass-card">Erreur chargement admin</div>';
+        console.error('❌ Erreur renderAdmin:', error);
+        return '<div class="glass-card" style="text-align:center; padding:3rem;">❌ Erreur chargement de la page admin</div>';
     }
 }
 

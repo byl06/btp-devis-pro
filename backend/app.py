@@ -108,6 +108,41 @@ def login():
         print(f"❌ Erreur login: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+@app.route('/api/admin/abonnement/<int:id_user>/trial', methods=['POST'])
+@jwt_required()
+def admin_add_trial(id_user):
+    try:
+        admin_id = get_jwt_identity()
+        admin = utilisateur_model.get_by_id(admin_id)
+        
+        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        from datetime import datetime, timedelta
+        date_fin = datetime.now() + timedelta(days=14)
+        
+        # Vérifier si l'utilisateur a déjà un abonnement
+        check_query = "SELECT * FROM abonnements WHERE id_user = %s"
+        existing = utilisateur_model.db.fetch_one(check_query, (id_user,))
+        
+        if existing:
+            query = """
+            UPDATE abonnements 
+            SET date_fin = %s, statut = 'actif', type_abonnement = 'essai'
+            WHERE id_user = %s
+            """
+            utilisateur_model.db.execute_query(query, (date_fin, id_user))
+        else:
+            query = """
+            INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
+            VALUES (%s, 'actif', %s, %s, 'essai')
+            """
+            utilisateur_model.db.execute_query(query, (id_user, datetime.now(), date_fin))
+        
+        return jsonify({'success': True, 'message': '14 jours d\'essai ajoutés'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 # ==================== CLIENTS ====================
 @app.route('/api/clients', methods=['GET'])
 @jwt_required()
