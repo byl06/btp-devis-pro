@@ -221,3 +221,6 @@ class Database:
         finally:
             if cursor:
                 cursor.close()
+    def rollback(self):
+        if self.connection:
+           self.connection.rollback()
