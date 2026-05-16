@@ -1280,22 +1280,29 @@ openCreateDevisModal() {
             submitBtn.disabled = true;
             
             try {
-                const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
-                const result = await response.json();
-                console.log('Résultat complet:', result);
-                if (result.success) {
-                    alert('✅ Devis créé avec succès !');
-                    modal.remove();
-                    this.loadPage('devis');
-                } else {
-                    alert('❌ ' + (result.message || 'Erreur lors de la création'));
-                }
-            } catch (error) {
-                alert('❌ Erreur de connexion');
-            } finally {
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-            }
+    const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
+    
+    console.log('Status HTTP:', response.status);
+    
+    const result = await response.json();
+    console.log('Résultat complet:', result);
+    console.log('Type de result.success:', typeof result.success);
+    console.log('Valeur de result.success:', result.success);
+    
+    if (result.success === true) {
+        alert('✅ Devis créé avec succès !');
+        modal.remove();
+        this.loadPage('devis');
+    } else {
+        alert('❌ ' + (result.message || 'Erreur lors de la création'));
+    }
+} catch (error) {
+    console.error('Erreur détaillée:', error);
+    alert('❌ Erreur de connexion: ' + error.message);
+} finally {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+}
         });
         
         calculateTotal();
