@@ -27,7 +27,7 @@ mail = Mail(app)
 # Configuration CORS - Autorise toutes les origines (pour Render)
 CORS(app, origins=["http://localhost:8000", "https://btp-devis-pro-1.onrender.com"], supports_credentials=True)
 # Configuration JWT
-app.config['JWT_SECRET_KEY'] = 'super-secret-key-btp-2024'
+app.config['JWT_SECRET_KEY'] = 'btp-devis-pro-super-secret-key-2024-32chars'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
 jwt = JWTManager(app)
@@ -89,7 +89,10 @@ def login():
         data = request.json
         user = utilisateur_model.authenticate(data['email'], data['mot_de_passe'])
         if user:
-            token = create_access_token(identity=str(user['id_user']))
+            # Convertir l'ID en string (important pour JWT)
+            user_id = str(user['id_user'])
+            token = create_access_token(identity=user_id)
+            
             return jsonify({
                 'success': True,
                 'token': token,
@@ -102,6 +105,7 @@ def login():
             })
         return jsonify({'success': False, 'message': 'Identifiants incorrects'}), 401
     except Exception as e:
+        print(f"❌ Erreur login: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==================== CLIENTS ====================
