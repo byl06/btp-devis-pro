@@ -13,11 +13,14 @@ class Utilisateur:
             mot_de_passe_bytes = mot_de_passe
         salt = bcrypt.gensalt()
         mot_de_passe_hash = bcrypt.hashpw(mot_de_passe_bytes, salt)
+        # Convertir en string pour PostgreSQL
+        hash_str = mot_de_passe_hash.decode('utf-8')
+        
         query = """
         INSERT INTO utilisateur (nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
         VALUES (%s, %s, %s, %s, %s, %s)
         """
-        return self.db.execute_query(query, (nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone))
+        return self.db.execute_query(query, (nom, email, mot_de_passe, hash_str, entreprise, telephone))
     
     def get_by_email(self, email):
         query = "SELECT * FROM utilisateur WHERE email = %s"
@@ -34,8 +37,13 @@ class Utilisateur:
         user = self.get_by_email(email)
         if user:
             stored_hash = user.get('mot_de_passe_hash')
-            if stored_hash and self.verify_password(mot_de_passe, stored_hash):
-                return user
+            if stored_hash:
+                if isinstance(stored_hash, str):
+                    stored_hash = stored_hash.encode('utf-8')
+                if isinstance(mot_de_passe, str):
+                    mot_de_passe = mot_de_passe.encode('utf-8')
+                if bcrypt.checkpw(mot_de_passe, stored_hash):
+                    return user
         return None
     
     def get_by_id(self, id_user):
