@@ -1179,12 +1179,13 @@ def get_notifications():
         user_id = get_jwt_identity()
         query = """
         SELECT * FROM notifications 
-        WHERE id_user = %s AND est_lue = FALSE
+        WHERE id_user = %s AND est_lue = 0
         ORDER BY date_creation DESC
         """
         notifications = utilisateur_model.db.fetch_all(query, (user_id,))
         return jsonify(notifications)
     except Exception as e:
+        print(f"❌ Erreur: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/notifications/<int:id_notification>/lire', methods=['PUT'])
@@ -1194,6 +1195,29 @@ def marquer_notification_lue(id_notification):
         query = "UPDATE notifications SET est_lue = TRUE WHERE id_notification = %s"
         utilisateur_model.db.execute_query(query, (id_notification,))
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+
+@app.route('/api/db-reset', methods=['POST'])
+@jwt_required()
+def db_reset():
+    try:
+        user_id = get_jwt_identity()
+        user = utilisateur_model.get_by_id(user_id)
+        if user['email'] != 'bylgaitb@gmail.com':
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        # Forcer un rollback pour débloquer
+        utilisateur_model.db.connection.rollback()
+        
+        # Reset des séquences si nécessaire
+        cursor = utilisateur_model.db.connection.cursor()
+        cursor.execute("SELECT setval('utilisateur_id_user_seq', (SELECT MAX(id_user) FROM utilisateur))")
+        utilisateur_model.db.connection.commit()
+        
+        return jsonify({'success': True, 'message': 'Base de données réinitialisée'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
