@@ -1070,25 +1070,44 @@ def admin_get_abonnements():
         user_id = get_jwt_identity()
         user = utilisateur_model.get_by_id(user_id)
         
-        # Vérifier que c'est bien l'admin
-        if user['email'] != 'admin@btp.com' and user['email'] != 'bylgaitb@gmail.com':
-            return jsonify({'error': 'Non autorisé'}), 403
+        # VÉRIFICATION CRITIQUE : l'utilisateur existe-t-il ?
+        if not user:
+            return jsonify({'error': 'Utilisateur non trouvé'}), 404
         
-        # Requête simple sans calcul de jours
+        # Vérifier que c'est bien l'admin par SON ID (plus fiable)
+        # L'admin a l'ID=1 d'après ton diagnostic
+        if user['id_user'] != 1:
+            return jsonify({'error': 'Non autorisé - Vous n\'êtes pas administrateur'}), 403
+        
+        # Requête pour récupérer tous les autres utilisateurs
         query = """
         SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
                a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
         FROM utilisateur u
         LEFT JOIN abonnements a ON u.id_user = a.id_user
+        WHERE u.id_user != 1
         ORDER BY u.id_user
         """
         abonnements = utilisateur_model.db.fetch_all(query)
+        
+        # Convertir les dates en string pour JSON
+        for abo in abonnements:
+            if abo.get('date_debut'):
+                abo['date_debut'] = abo['date_debut'].isoformat() if hasattr(abo['date_debut'], 'isoformat') else str(abo['date_debut'])
+            if abo.get('date_fin'):
+                abo['date_fin'] = abo['date_fin'].isoformat() if hasattr(abo['date_fin'], 'isoformat') else str(abo['date_fin'])
+            if not abo.get('statut'):
+                abo['statut'] = 'inactif'
+            if not abo.get('type_abonnement'):
+                abo['type_abonnement'] = 'aucun'
         
         return jsonify(abonnements)
         
     except Exception as e:
         print(f"❌ Erreur admin: {e}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500 
 
 @app.route('/api/admin/abonnement/<int:id_user>/prolonger', methods=['POST'])
 @jwt_required()
