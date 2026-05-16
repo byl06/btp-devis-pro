@@ -1109,25 +1109,21 @@ def admin_get_abonnements():
         user_id = get_jwt_identity()
         user = utilisateur_model.get_by_id(user_id)
         
-        # VÉRIFICATION CRITIQUE : l'utilisateur existe-t-il ?
         if not user:
             return jsonify({'error': 'Utilisateur non trouvé'}), 404
         
-        # Vérifier que c'est bien l'admin par SON ID (plus fiable)
-        # L'admin a l'ID=1 d'après ton diagnostic
         if user['id_user'] != 1:
-            return jsonify({'error': 'Non autorisé - Vous n\'êtes pas administrateur'}), 403
+            return jsonify({'error': 'Non autorisé'}), 403
         
-        # Requête pour récupérer tous les autres utilisateurs
+        # Requête SANS jours_restants
         query = """
-SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
-       a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement,
-       EXTRACT(DAY FROM (a.date_fin - NOW())) as jours_restants
-FROM utilisateur u
-LEFT JOIN abonnements a ON u.id_user = a.id_user
-WHERE u.id_user != 1
-ORDER BY u.id_user
-"""
+        SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
+               a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
+        FROM utilisateur u
+        LEFT JOIN abonnements a ON u.id_user = a.id_user
+        WHERE u.id_user != 1
+        ORDER BY u.id_user
+        """
         abonnements = utilisateur_model.db.fetch_all(query)
         
         # Convertir les dates en string pour JSON
@@ -1140,13 +1136,13 @@ ORDER BY u.id_user
                 abo['statut'] = 'inactif'
             if not abo.get('type_abonnement'):
                 abo['type_abonnement'] = 'aucun'
+            # Ajouter jours_restants par défaut (0)
+            abo['jours_restants'] = 0
         
         return jsonify(abonnements)
         
     except Exception as e:
         print(f"❌ Erreur admin: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500 
 
 @app.route('/api/admin/abonnement/<int:id_user>/prolonger', methods=['POST'])
