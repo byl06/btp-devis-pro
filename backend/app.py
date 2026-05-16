@@ -1120,13 +1120,14 @@ def admin_get_abonnements():
         
         # Requête pour récupérer tous les autres utilisateurs
         query = """
-        SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
-               a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
-        FROM utilisateur u
-        LEFT JOIN abonnements a ON u.id_user = a.id_user
-        WHERE u.id_user != 1
-        ORDER BY u.id_user
-        """
+SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
+       a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement,
+       EXTRACT(DAY FROM (a.date_fin - NOW())) as jours_restants
+FROM utilisateur u
+LEFT JOIN abonnements a ON u.id_user = a.id_user
+WHERE u.id_user != 1
+ORDER BY u.id_user
+"""
         abonnements = utilisateur_model.db.fetch_all(query)
         
         # Convertir les dates en string pour JSON
@@ -1227,7 +1228,7 @@ def get_notifications():
 @jwt_required()
 def marquer_notification_lue(id_notification):
     try:
-        query = "UPDATE notifications SET est_lue = TRUE WHERE id_notification = %s"
+        query = "UPDATE notifications SET est_lue = 1 WHERE id_notification = %s"
         utilisateur_model.db.execute_query(query, (id_notification,))
         return jsonify({'success': True})
     except Exception as e:
