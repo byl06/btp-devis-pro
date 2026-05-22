@@ -1289,13 +1289,17 @@ openCreateDevisModal() {
     console.log('Type de result.success:', typeof result.success);
     console.log('Valeur de result.success:', result.success);
     
-    if (result.success === true) {
-        alert('✅ Devis créé avec succès !');
-        modal.remove();
-        this.loadPage('devis');
-    } else {
-        alert('❌ ' + (result.message || 'Erreur lors de la création'));
+    // Vérification plus souple
+if (result.success === true || result.success === "true") {
+    alert('✅ Devis créé avec succès !');
+    modal.remove();
+    this.loadPage('devis');
+} else {
+    // Afficher l'erreur seulement si c'est une vraie erreur
+    if (result.message) {
+        alert('❌ ' + result.message);
     }
+}
 } catch (error) {
     console.error('Erreur détaillée:', error);
     alert('❌ Erreur de connexion: ' + error.message);
@@ -2739,7 +2743,11 @@ async refreshClientsPage() {
 
 // Filtrage des devis
 filterDevis() {
-    if (!this.allDevis) return;
+    // Vérifier que allDevis est bien un tableau
+    if (!this.allDevis || !Array.isArray(this.allDevis)) {
+        console.warn("allDevis n'est pas un tableau:", this.allDevis);
+        return;
+    }
     
     let filtered = [...this.allDevis];
     
@@ -2747,11 +2755,8 @@ filterDevis() {
     const searchTerm = document.getElementById('search-devis')?.value.toLowerCase().trim() || '';
     if (searchTerm) {
         filtered = filtered.filter(d => {
-            // Recherche par référence
             if (d.id_devis && d.id_devis.toString().includes(searchTerm)) return true;
-            // Recherche par nom du client (normalisé)
             if (d.client_nom && d.client_nom.toLowerCase().includes(searchTerm)) return true;
-            // Recherche par nom du projet
             if (d.nom_projet && d.nom_projet.toLowerCase().includes(searchTerm)) return true;
             return false;
         });
@@ -2784,7 +2789,6 @@ filterDevis() {
     }
     
     console.log(`🔍 Recherche: "${searchTerm}" -> ${filtered.length} résultats`);
-    console.log("Termes trouvés:", filtered.map(d => d.client_nom));
 }
 
 async showSubscriptionBanner() {
