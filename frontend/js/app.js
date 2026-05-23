@@ -993,39 +993,59 @@ openCreateClientModal() {
     const closeBtns = modal.querySelectorAll('.close-modal');
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     
-    // Soumission
-    const form = modal.querySelector('#client-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    // Soumission avec verrou anti-doublon
+const form = modal.querySelector('#client-form');
+let isSubmitting = false;
 
-        const limitesOk = await this.checkLimites('client');
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (isSubmitting) {
+        console.log("⏳ Déjà en cours...");
+        return;
+    }
+
+    const limitesOk = await this.checkLimites('client');
     if (!limitesOk) return;
+    
+    const clientData = {
+        nom: document.getElementById('client-nom').value,
+        telephone: document.getElementById('client-telephone').value,
+        email: document.getElementById('client-email').value,
+        adresse: document.getElementById('client-adresse').value
+    };
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    isSubmitting = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await apiRequest('/api/clients', {
+            method: 'POST',
+            body: JSON.stringify(clientData)
+        });
+        const result = await response.json();
         
-        const clientData = {
-            nom: document.getElementById('client-nom').value,
-            telephone: document.getElementById('client-telephone').value,
-            email: document.getElementById('client-email').value,
-            adresse: document.getElementById('client-adresse').value
-        };
-        
-        try {
-            const response = await apiRequest('/api/clients', {
-                method: 'POST',
-                body: JSON.stringify(clientData)
-            });
-            const result = await response.json();
-            
-            if (result.success) {
-    Toast.success('Client ajouté avec succès');
-    modal.remove();
-    setTimeout(() => this.loadPage('clients'), 1000);
-} else {
-    Toast.error(result.message || 'Erreur lors de la création');
-}
-        } catch (error) {
-            alert('❌ Erreur de connexion');
+        if (result.success) {
+            Toast.success('Client ajouté avec succès');
+            modal.remove();
+            setTimeout(() => this.loadPage('clients'), 1000);
+        } else {
+            Toast.error(result.message || 'Erreur lors de la création');
+            isSubmitting = false;
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
         }
-    });
+    } catch (error) {
+        alert('❌ Erreur de connexion');
+        isSubmitting = false;
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
 }
 
 
@@ -1067,36 +1087,58 @@ openCreateProjetModal() {
     const closeBtns = modal.querySelectorAll('.close-modal');
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     
-    const form = modal.querySelector('#projet-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const limitesOk = await this.checkLimites('projet');
+    // Soumission avec verrou anti-doublon
+const form = modal.querySelector('#projet-form');
+let isSubmitting = false;
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (isSubmitting) {
+        console.log("⏳ Déjà en cours...");
+        return;
+    }
+    
+    const limitesOk = await this.checkLimites('projet');
     if (!limitesOk) return;
+    
+    const projetData = {
+        nom_projet: document.getElementById('projet-nom').value,
+        description: document.getElementById('projet-description').value,
+        localisation: document.getElementById('projet-localisation').value
+    };
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    isSubmitting = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await apiRequest('/api/projets', {
+            method: 'POST',
+            body: JSON.stringify(projetData)
+        });
+        const result = await response.json();
         
-        const projetData = {
-            nom_projet: document.getElementById('projet-nom').value,
-            description: document.getElementById('projet-description').value,
-            localisation: document.getElementById('projet-localisation').value
-        };
-        
-        try {
-            const response = await apiRequest('/api/projets', {
-                method: 'POST',
-                body: JSON.stringify(projetData)
-            });
-            const result = await response.json();
-            
-            if (result.success) {
-    Toast.success('Devis créé avec succès');
-    modal.remove();
-    this.loadPage('devis');
-} else {
-    Toast.error(result.message || 'Erreur lors de la création');
-}
-        } catch (error) {
-            alert('❌ Erreur de connexion');
+        if (result.success) {
+            Toast.success('Projet créé avec succès');
+            modal.remove();
+            this.loadPage('projets');
+        } else {
+            Toast.error(result.message || 'Erreur lors de la création');
+            isSubmitting = false;
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
         }
-    });
+    } catch (error) {
+        alert('❌ Erreur de connexion');
+        isSubmitting = false;
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
 }
 
 openCreateDevisModal() {
@@ -1236,83 +1278,97 @@ openCreateDevisModal() {
         const closeBtns = modal.querySelectorAll('.close-modal');
         closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
         
-        // Soumission
-        const form = modal.querySelector('#devis-form');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const limitesOk = await this.checkLimites('devis');
-    if (!limitesOk) return;
-            
-            const id_client = modal.querySelector('#devis-client').value;
-            const id_projet = modal.querySelector('#devis-projet').value;
-            
-            if (!id_client || !id_projet) {
-                alert('Veuillez sélectionner un client et un projet');
-                return;
-            }
-            
-            const lignes = [];
-            const items = modal.querySelectorAll('.materiaux-item');
-            items.forEach(item => {
-                const designation = item.querySelector('.designation')?.value;
-                const quantite = parseFloat(item.querySelector('.quantite')?.value);
-                const prix_unitaire = parseFloat(item.querySelector('.prix')?.value);
-                if (designation && quantite > 0 && prix_unitaire > 0) {
-                    lignes.push({ designation, quantite, prix_unitaire });
-                }
-            });
-            
-            if (lignes.length === 0) {
-                alert('Veuillez ajouter au moins un matériau');
-                return;
-            }
-            
-            const devisData = {
-                id_client: parseInt(id_client),
-                id_user: this.currentUser.id,
-                id_projet: parseInt(id_projet),
-                lignes: lignes
-            };
-            
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
-            submitBtn.disabled = true;
-            
-            try {
-    const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
+        // Soumission avec verrou anti-doublon
+const form = modal.querySelector('#devis-form');
+let isSubmitting = false; // Verrou
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
     
-    console.log('Status HTTP:', response.status);
-    
-    const result = await response.json();
-    console.log('Résultat complet:', result);
-    console.log('Type de result.success:', typeof result.success);
-    console.log('Valeur de result.success:', result.success);
-    
-    // Vérification plus souple
-// Le backend retourne {success: true} mais parfois avec des guillemets
-if (result.success == true || result.success === "true" || result.id_devis) {
-    alert('✅ Devis créé avec succès !');
-    modal.remove();
-    setTimeout(() => {
-        this.loadPage('devis');
-    }, 500);
-} else {
-    // Afficher l'erreur seulement si c'est une vraie erreur
-    if (result.message) {
-        alert('❌ ' + result.message);
+    // Empêcher les doubles clics
+    if (isSubmitting) {
+        console.log("⏳ Déjà en cours, veuillez patienter...");
+        return;
     }
-}
-} catch (error) {
-    console.error('Erreur détaillée:', error);
-    alert('❌ Erreur de connexion: ' + error.message);
-} finally {
-    submitBtn.innerHTML = originalText;
-    submitBtn.disabled = false;
-}
-        });
+    
+    const limitesOk = await this.checkLimites('devis');
+    if (!limitesOk) return;
+    
+    const id_client = modal.querySelector('#devis-client').value;
+    const id_projet = modal.querySelector('#devis-projet').value;
+    
+    if (!id_client || !id_projet) {
+        alert('Veuillez sélectionner un client et un projet');
+        return;
+    }
+    
+    const lignes = [];
+    const items = modal.querySelectorAll('.materiaux-item');
+    items.forEach(item => {
+        const designation = item.querySelector('.designation')?.value;
+        const quantite = parseFloat(item.querySelector('.quantite')?.value);
+        const prix_unitaire = parseFloat(item.querySelector('.prix')?.value);
+        if (designation && quantite > 0 && prix_unitaire > 0) {
+            lignes.push({ designation, quantite, prix_unitaire });
+        }
+    });
+    
+    if (lignes.length === 0) {
+        alert('Veuillez ajouter au moins un matériau');
+        return;
+    }
+    
+    const devisData = {
+        id_client: parseInt(id_client),
+        id_user: this.currentUser.id,
+        id_projet: parseInt(id_projet),
+        lignes: lignes
+    };
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Verrouiller et désactiver le bouton
+    isSubmitting = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
         
-        calculateTotal();
+        console.log('Status HTTP:', response.status);
+        
+        const result = await response.json();
+        console.log('Résultat complet:', result);
+        
+        // Vérification
+        if (result.success == true || result.success === "true" || result.id_devis) {
+            alert('✅ Devis créé avec succès !');
+            modal.remove();
+            setTimeout(() => {
+                this.loadPage('devis');
+            }, 500);
+        } else {
+            if (result.message) {
+                alert('❌ ' + result.message);
+            }
+            // Déverrouiller en cas d'erreur
+            isSubmitting = false;
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Erreur détaillée:', error);
+        alert('❌ Erreur de connexion: ' + error.message);
+        isSubmitting = false;
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+    // Pas de finally ici car on ne veut pas déverrouiller en cas de succès
+    // (la modale est fermée donc pas besoin)
+});
+
+calculateTotal();
     });
 }
 
