@@ -1290,10 +1290,13 @@ openCreateDevisModal() {
     console.log('Valeur de result.success:', result.success);
     
     // Vérification plus souple
-if (result.success === true || result.success === "true") {
+// Le backend retourne {success: true} mais parfois avec des guillemets
+if (result.success == true || result.success === "true" || result.id_devis) {
     alert('✅ Devis créé avec succès !');
     modal.remove();
-    this.loadPage('devis');
+    setTimeout(() => {
+        this.loadPage('devis');
+    }, 500);
 } else {
     // Afficher l'erreur seulement si c'est une vraie erreur
     if (result.message) {
