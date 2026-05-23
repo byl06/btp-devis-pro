@@ -181,14 +181,14 @@ class Database:
             cursor = self.connection.cursor()
             cursor.execute(query, params or ())
             self.connection.commit()
+            # NE PAS fermer le cursor ici - on le retourne pour fetch
             return cursor
         except Exception as e:
-            print(f"❌ Erreur: {e}")
+            print(f"❌ Erreur execute_query: {e}")
             self.connection.rollback()
-            return None
-        finally:
             if cursor:
                 cursor.close()
+            return None
     
     def fetch_all(self, query, params=None):
         cursor = None
@@ -221,6 +221,7 @@ class Database:
         finally:
             if cursor:
                 cursor.close()
+    
     def rollback(self):
         if self.connection:
-           self.connection.rollback()
+            self.connection.rollback()
