@@ -101,26 +101,42 @@ class Projet:
 class Devis:
     def __init__(self):
         self.db = Database()
-    
+
     def create(self, id_client, id_user, id_projet, lignes):
-        total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
-        total = total_materiaux * 1.2
-        query = """
-        INSERT INTO devis (date_creation, total, statut, id_client, id_user, id_projet)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """
-        cursor = self.db.execute_query(query, (datetime.now(), total, 'brouillon', id_client, id_user, id_projet))
-        if cursor:
-            id_devis = cursor.lastrowid
-            for ligne in lignes:
-                total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
-                query_ligne = """
-                INSERT INTO ligne_devis (designation, quantite, prix_unitaire, total_ligne, id_devis)
-                VALUES (%s, %s, %s, %s, %s)
-                """
-                self.db.execute_query(query_ligne, (ligne['designation'], ligne['quantite'], ligne['prix_unitaire'], total_ligne, id_devis))
-            return id_devis
-        return None
+        try:
+            total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
+            total = total_materiaux * 1.2
+            
+            query = """
+            INSERT INTO devis (date_creation, total, statut, id_client, id_user, id_projet)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id_devis
+            """
+            cursor = self.db.execute_query(query, (datetime.now(), total, 'brouillon', id_client, id_user, id_projet))
+            
+            if cursor:
+                # Pour PostgreSQL, récupérer l'ID avec RETURNING
+                try:
+                    id_devis = cursor.fetchone()[0]
+                except:
+                    # Alternative: utiliser lastval()
+                    cursor2 = self.db.execute_query("SELECT lastval()")
+                    id_devis = cursor2.fetchone()[0]
+                
+                # Insérer les lignes
+                for ligne in lignes:
+                    total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
+                    query_ligne = """
+                    INSERT INTO ligne_devis (designation, quantite, prix_unitaire, total_ligne, id_devis)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """
+                    self.db.execute_query(query_ligne, (ligne['designation'], ligne['quantite'], ligne['prix_unitaire'], total_ligne, id_devis))
+                
+                return id_devis
+            return None
+        except Exception as e:
+            print(f"❌ Erreur dans create_devis: {e}")
+            return None
     
     def get_by_user(self, id_user):
         query = """
