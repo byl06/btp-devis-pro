@@ -275,10 +275,7 @@ updateAdminMenu() {
     try {
         const response = await apiRequest(`/api/devis?user_id=${this.currentUser.id}`);
         const data = await response.json();
-        if (data && !Array.isArray(data)) {
-            return Object.values(data);
-        }
-        return Array.isArray(data) ? data : [];
+        return this.normalizeResponse(data);
     } catch (error) {
         console.error("Erreur fetchDevis:", error);
         return [];
@@ -289,12 +286,8 @@ updateAdminMenu() {
     try {
         const response = await apiRequest('/api/clients');
         const data = await response.json();
-        console.log("fetchClients retourne:", data);
-        // Si c'est un objet, le convertir en tableau
-        if (data && !Array.isArray(data)) {
-            return Object.values(data);
-        }
-        return Array.isArray(data) ? data : [];
+        console.log("fetchClients brut:", data);
+        return this.normalizeResponse(data);
     } catch (error) {
         console.error("Erreur fetchClients:", error);
         return [];
@@ -305,10 +298,7 @@ updateAdminMenu() {
     try {
         const response = await apiRequest('/api/projets');
         const data = await response.json();
-        if (data && !Array.isArray(data)) {
-            return Object.values(data);
-        }
-        return Array.isArray(data) ? data : [];
+        return this.normalizeResponse(data);
     } catch (error) {
         console.error("Erreur fetchProjets:", error);
         return [];
@@ -648,10 +638,9 @@ async exportClientsToExcel() {
     async renderFactures() {
     try {
         const userId = this.currentUser.id;
-        console.log("Chargement factures pour user:", userId);
-        
-        const response = await apiRequest(`/api/factures/${this.currentUser.id}`);
-        const factures = this.safeArray(await response.json());
+        const response = await apiRequest(`/api/factures/${userId}`);
+        const data = await response.json();
+        const factures = this.normalizeResponse(data);
         
         console.log("Factures reçues:", factures);
         
@@ -2138,12 +2127,12 @@ applyThemeColors(colors) {
 async fetchNotifications() {
     try {
         const response = await apiRequest('/api/notifications');
-        return await response.json();
+        const data = await response.json();
+        return this.normalizeResponse(data);
     } catch (error) {
         return [];
     }
 }
-
 // Afficher les notifications au chargement
 async showNotifications() {
     const notifications = await this.fetchNotifications();
@@ -2556,9 +2545,10 @@ async renderAdmin() {
 async fetchAbonnements() {
     try {
         const response = await apiRequest('/api/admin/abonnements');
-        return await response.json();
+        const data = await response.json();
+        return this.normalizeResponse(data);
     } catch (error) {
-        console.error('Erreur:', error);
+        console.error("Erreur fetchAbonnements:", error);
         return [];
     }
 }
@@ -2766,6 +2756,21 @@ async voirPaiements(id_user) {
     } catch (error) {
         alert('Erreur chargement historique');
     }
+}
+
+// Normaliser la réponse API (si elle est encapsulée)
+normalizeResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+        // Chercher un tableau dans les propriétés
+        if (data.data && Array.isArray(data.data)) return data.data;
+        if (data.clients && Array.isArray(data.clients)) return data.clients;
+        if (data.projets && Array.isArray(data.projets)) return data.projets;
+        if (data.devis && Array.isArray(data.devis)) return data.devis;
+        // Sinon, prendre toutes les valeurs
+        return Object.values(data);
+    }
+    return [];
 }
 
 async exportAbonnements() {
