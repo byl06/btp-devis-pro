@@ -272,31 +272,48 @@ updateAdminMenu() {
     }
     
     async fetchDevis() {
-        try {
-            const response = await apiRequest(`/api/devis?user_id=${this.currentUser.id}`);
-            return await response.json();
-        } catch (error) {
-            return [];
+    try {
+        const response = await apiRequest(`/api/devis?user_id=${this.currentUser.id}`);
+        const data = await response.json();
+        if (data && !Array.isArray(data)) {
+            return Object.values(data);
         }
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error("Erreur fetchDevis:", error);
+        return [];
     }
+}
     
     async fetchClients() {
-        try {
-            const response = await apiRequest('/api/clients');
-            return await response.json();
-        } catch (error) {
-            return [];
+    try {
+        const response = await apiRequest('/api/clients');
+        const data = await response.json();
+        console.log("fetchClients retourne:", data);
+        // Si c'est un objet, le convertir en tableau
+        if (data && !Array.isArray(data)) {
+            return Object.values(data);
         }
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error("Erreur fetchClients:", error);
+        return [];
     }
+}
     
     async fetchProjets() {
-        try {
-            const response = await apiRequest('/api/projets');
-            return await response.json();
-        } catch (error) {
-            return [];
+    try {
+        const response = await apiRequest('/api/projets');
+        const data = await response.json();
+        if (data && !Array.isArray(data)) {
+            return Object.values(data);
         }
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error("Erreur fetchProjets:", error);
+        return [];
     }
+}
 
     async deleteDevis(id) {
     if (confirm('⚠️ Supprimer ce devis ? Cette action est irréversible.')) {
@@ -344,8 +361,9 @@ updateAdminMenu() {
     
     async renderDashboard() {
     const stats = await this.getStats();
-    const devis = await this.fetchDevis();
-
+    const devisRaw = await this.fetchDevis();
+    const devis = this.safeArray(devisRaw);
+    
     // Afficher le bandeau d'abonnement
     await this.showSubscriptionBanner();
     
@@ -355,18 +373,26 @@ updateAdminMenu() {
         return Math.round(value).toLocaleString('fr-FR') + ' FCFA';
     };
     
+    // Normaliser les devis pour le tableau
+    const derniersDevis = devis.slice(0,5).map(d => ({
+        id_devis: d.id_devis || d.id,
+        client_nom: d.client_nom || d.nom || 'Client inconnu',
+        total: parseFloat(d.total) || 0,
+        statut: d.statut || 'brouillon'
+    }));
+    
     return `
         <div class="page-content">
             <div class="cards-grid">
                 <div class="glass-card">
                     <div class="card-icon"><i class="fas fa-file-invoice"></i></div>
                     <div class="card-title">Total Devis</div>
-                    <div class="card-value">${stats.totalDevis}</div>
+                    <div class="card-value">${stats.totalDevis || 0}</div>
                 </div>
                 <div class="glass-card">
                     <div class="card-icon"><i class="fas fa-users"></i></div>
                     <div class="card-title">Clients</div>
-                    <div class="card-value">${stats.totalClients}</div>
+                    <div class="card-value">${stats.totalClients || 0}</div>
                 </div>
                 <div class="glass-card">
                     <div class="card-icon"><i class="fas fa-chart-line"></i></div>
@@ -376,7 +402,7 @@ updateAdminMenu() {
                 <div class="glass-card">
                     <div class="card-icon"><i class="fas fa-check-circle"></i></div>
                     <div class="card-title">Devis Validés</div>
-                    <div class="card-value">${stats.devisValides}</div>
+                    <div class="card-value">${stats.devisValides || 0}</div>
                 </div>
             </div>
             <div class="table-container">
@@ -386,17 +412,17 @@ updateAdminMenu() {
                         <tr><th>Réf</th><th>Client</th><th>Montant</th><th>Statut</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
-                        ${devis.slice(0,5).map(d => `
+                        ${derniersDevis.length > 0 ? derniersDevis.map(d => `
                             <tr>
                                 <td>#${d.id_devis}</td>
                                 <td>${d.client_nom}</td>
-                                <td>${Math.round(d.total || 0).toLocaleString('fr-FR')} FCFA</div>
+                                <td>${Math.round(d.total).toLocaleString('fr-FR')} FCFA</div>
                                 <td><span class="status-badge ${d.statut === 'validé' ? 'success' : 'warning'}">${d.statut}</span></div>
                                 <td>
                                     <button class="btn-icon" onclick="app.viewDevis(${d.id_devis})"><i class="fas fa-eye"></i></button>
                                     <button class="btn-icon" onclick="app.downloadPDF(${d.id_devis})"><i class="fas fa-download"></i></button>
                                 </div>
-                            </tr>`).join('')}
+                            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;">Aucun devis</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -405,12 +431,25 @@ updateAdminMenu() {
 }
     
     async renderDevisList() {
-    const devis = this.safeArray(await this.fetchDevis());
+    const devisRaw = await this.fetchDevis();
+    const devis = this.safeArray(devisRaw);
     
-    // Stocker tous les devis pour le filtrage
-    this.allDevis = devis;
+    console.log("📋 Devis reçus:", devis.length);
     
-    if (devis.length === 0) {
+    // Normaliser chaque devis pour mobile
+    const normalizedDevis = devis.map(d => ({
+        id_devis: d.id_devis || d.id,
+        date_creation: d.date_creation || new Date().toISOString(),
+        client_nom: d.client_nom || d.nom || 'Client inconnu',
+        nom_projet: d.nom_projet || d.projet || 'Projet inconnu',
+        total: parseFloat(d.total) || 0,
+        statut: d.statut || 'brouillon'
+    }));
+    
+    // Stocker les devis normalisés pour le filtrage
+    this.allDevis = normalizedDevis;
+    
+    if (normalizedDevis.length === 0) {
         return `
             <div class="glass-card" style="text-align:center; padding:60px;">
                 <p>Aucun devis</p>
@@ -451,7 +490,7 @@ updateAdminMenu() {
             
             <!-- Compteur de résultats -->
             <div id="devis-count" style="margin-bottom:1rem; color:#94A3B8; font-size:0.9rem;">
-                ${devis.length} devis trouvés
+                ${normalizedDevis.length} devis trouvés
             </div>
             
             <!-- Tableau des devis -->
@@ -468,7 +507,7 @@ updateAdminMenu() {
                     </tr>
                 </thead>
                 <tbody id="devis-table-body">
-                    ${this.renderDevisTableRows(devis)}
+                    ${this.renderDevisTableRows(normalizedDevis)}
                 </tbody>
             </table>
         </div>
@@ -546,56 +585,31 @@ async exportClientsToExcel() {
 }
     
    async renderClients() {
-    // Forcer un nouveau fetch (pas de cache)
-   const clients = this.safeArray(await this.fetchClients());
-    console.log("🟢 Rendu des clients:", clients.length);
+    const clients = this.safeArray(await this.fetchClients());
+    console.log("🟢 Rendu des clients:", clients);
+    console.log("Premier client:", clients[0]);
     
-    if (clients.length === 0) {
-        return `
-            <div>
-                <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
-                    <button class="btn-secondary" onclick="app.exportClientsToExcel()" style="background:#10B981; border-color:#10B981;">
-                        <i class="fas fa-file-excel"></i> Export Excel
-                    </button>
-                </div>
-                <div class="glass-card" style="text-align:center;">
-                    <p>Aucun client</p>
-                    <button class="btn-primary" onclick="app.openCreateClientModal()">+ Ajouter un client</button>
-                </div>
-            </div>
-        `;
+    if (!clients || clients.length === 0) {
+        return `<div class="glass-card">Aucun client</div>`;
     }
     
     return `
         <div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
                 <h3>Mes clients (${clients.length})</h3>
-                <div style="display:flex; gap:0.5rem;">
-                    <button class="btn-secondary" onclick="app.exportClientsToExcel()" style="background:#10B981; border-color:#10B981;">
-                        <i class="fas fa-file-excel"></i> Export Excel
-                    </button>
-                    <button class="btn-primary" onclick="app.openCreateClientModal()">
-                        <i class="fas fa-plus"></i> Ajouter
-                    </button>
-                </div>
+                <button class="btn-primary" onclick="app.openCreateClientModal()">+ Ajouter</button>
             </div>
             <div class="cards-grid">
                 ${clients.map(c => `
                     <div class="glass-card">
-    <div class="card-icon"><i class="fas fa-user"></i></div>
-    <div class="card-title">${c.nom}</div>
-    <p style="word-break: break-all;">
-        <i class="fas fa-envelope"></i> ${c.email || '-'}
-    </p>
-    <p><i class="fas fa-phone"></i> ${c.telephone || '-'}</p>
-    <p style="word-break: break-word;">
-        <i class="fas fa-map-marker-alt"></i> ${c.adresse || '-'}
-    </p>
-    <div style="margin-top:1rem; display:flex; gap:0.5rem">
-        <button class="btn-icon" onclick="app.editClient(${c.id_client})"><i class="fas fa-edit"></i></button>
-        <button class="btn-icon" onclick="app.deleteClient(${c.id_client})"><i class="fas fa-trash"></i></button>
-    </div>
-</div>
+                        <div class="card-title">${c.nom || c.client_nom || 'Sans nom'}</div>
+                        <p><i class="fas fa-envelope"></i> ${c.email || c.client_email || '-'}</p>
+                        <p><i class="fas fa-phone"></i> ${c.telephone || c.client_telephone || '-'}</p>
+                        <div style="margin-top:1rem;">
+                            <button class="btn-icon" onclick="app.editClient(${c.id_client || c.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn-icon" onclick="app.deleteClient(${c.id_client || c.id})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
                 `).join('')}
             </div>
         </div>
