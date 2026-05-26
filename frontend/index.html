@@ -14,9 +14,9 @@
 </head>
 <body>
     <!-- Bouton menu mobile -->
-    <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="position: fixed; top: 15px; left: 15px; z-index: 1001; background: rgba(15,23,42,0.9); border: none; color: white; padding: 12px; border-radius: 10px; cursor: pointer;">
-        <i class="fas fa-bars"></i>
-    </button>
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+    <i class="fas fa-bars"></i>
+</button>
 
     <div class="app-container">
         <!-- Sidebar -->
@@ -99,6 +99,7 @@
     </script>
 
     <!-- Menu hamburger pour mobile -->
+<!-- Menu hamburger mobile -->
 <script>
 (function() {
     // Créer l'overlay
@@ -113,6 +114,12 @@
         if (sidebar) {
             sidebar.classList.toggle('open');
             overlay.classList.toggle('active');
+            // Empêcher le scroll du body quand menu ouvert
+            if (sidebar.classList.contains('open')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
         }
     };
     
@@ -122,31 +129,31 @@
         if (sidebar) {
             sidebar.classList.remove('open');
             overlay.classList.remove('active');
+            document.body.style.overflow = '';
         }
     });
     
-    // Fermer le menu quand on clique sur un lien (navigation)
+    // Fermer le menu quand on clique sur un lien du menu
     document.addEventListener('click', function(e) {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.querySelector('.sidebar-overlay');
-        const menuBtn = document.querySelector('.mobile-menu-btn');
-        
         if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('open')) {
-            // Si on clique sur un lien dans le menu
             if (e.target.closest('.nav-item')) {
                 sidebar.classList.remove('open');
                 overlay.classList.remove('active');
+                document.body.style.overflow = '';
             }
         }
     });
     
-    // Reinitialiser le menu quand la fenêtre redimensionne
+    // Réinitialiser le menu quand la fenêtre redimensionne
     window.addEventListener('resize', function() {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.querySelector('.sidebar-overlay');
         if (window.innerWidth > 768 && sidebar) {
             sidebar.classList.remove('open');
             if (overlay) overlay.classList.remove('active');
+            document.body.style.overflow = '';
         }
     });
 })();
