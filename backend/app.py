@@ -161,10 +161,33 @@ def create_client():
     try:
         user_id = get_jwt_identity()
         data = request.json
-        query = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
+        
+        # Vérifier le type d'abonnement de l'utilisateur
+        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
+        abonnement = client_model.db.fetch_one(query_abo, (user_id,))
+        
+        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        
+        # Vérifier les limites pour l'offre Starter
+        if offre == 'starter':
+            query_count = "SELECT COUNT(*) as total FROM client WHERE id_user = %s"
+            result = client_model.db.fetch_one(query_count, (user_id,))
+            count_clients = result['total'] if result else 0
+            
+            if count_clients >= 10:
+                return jsonify({
+                    'success': False, 
+                    'message': '❌ Limite de 10 clients atteinte. Passez à l\'offre Pro pour ajouter plus de clients.'
+                }), 403
+        
+        # Créer le client
+        query = "INSERT INTO client (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
         client_model.db.execute_query(query, (data['nom'], data['telephone'], data['email'], data['adresse'], user_id))
+        
         return jsonify({'success': True, 'message': 'Client créé'})
+        
     except Exception as e:
+        print(f"❌ Erreur création client: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/clients/<int:id_client>', methods=['PUT'])
@@ -218,9 +241,30 @@ def create_projet():
     try:
         user_id = get_jwt_identity()
         data = request.json
-        query = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
+        
+        # Vérifier le type d'abonnement
+        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
+        abonnement = projet_model.db.fetch_one(query_abo, (user_id,))
+        
+        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        
+        # Vérifier les limites pour l'offre Starter
+        if offre == 'starter':
+            query_count = "SELECT COUNT(*) as total FROM projet WHERE id_user = %s"
+            result = projet_model.db.fetch_one(query_count, (user_id,))
+            count_projets = result['total'] if result else 0
+            
+            if count_projets >= 10:
+                return jsonify({
+                    'success': False, 
+                    'message': '❌ Limite de 10 projets atteinte. Passez à l\'offre Pro pour ajouter plus de projets.'
+                }), 403
+        
+        query = "INSERT INTO projet (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
         projet_model.db.execute_query(query, (data['nom_projet'], data['description'], data['localisation'], user_id))
+        
         return jsonify({'success': True, 'message': 'Projet créé'})
+        
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -267,13 +311,35 @@ def get_devis():
 @jwt_required()
 def create_devis():
     try:
+        user_id = get_jwt_identity()
         data = request.json
+        
+        # Vérifier le type d'abonnement
+        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
+        abonnement = devis_model.db.fetch_one(query_abo, (user_id,))
+        
+        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        
+        # Vérifier les limites pour l'offre Starter
+        if offre == 'starter':
+            query_count = "SELECT COUNT(*) as total FROM devis WHERE id_user = %s"
+            result = devis_model.db.fetch_one(query_count, (user_id,))
+            count_devis = result['total'] if result else 0
+            
+            if count_devis >= 20:
+                return jsonify({
+                    'success': False, 
+                    'message': '❌ Limite de 20 devis atteinte. Passez à l\'offre Pro pour créer plus de devis.'
+                }), 403
+        
         id_devis = devis_model.create(
             data['id_client'], data['id_user'], data['id_projet'], data['lignes']
         )
+        
         if id_devis:
             return jsonify({'success': True, 'id_devis': id_devis})
         return jsonify({'success': False, 'message': 'Erreur'}), 500
+        
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 

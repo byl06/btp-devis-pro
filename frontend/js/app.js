@@ -2273,6 +2273,36 @@ async backupData() {
     }
 }
 
+
+async getAbonnement() {
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        if (data.success) {
+            return { type_abonnement: data.type };
+        }
+        return { type_abonnement: 'starter' };
+    } catch (error) {
+        console.error("Erreur getAbonnement:", error);
+        return { type_abonnement: 'starter' };
+    }
+}
+
+async getCurrentCounts() {
+    try {
+        const clients = await this.fetchClients();
+        const projets = await this.fetchProjets();
+        const devis = await this.fetchDevis();
+        return {
+            clients: clients.length,
+            projets: projets.length,
+            devis: devis.length
+        };
+    } catch (error) {
+        return { clients: 0, projets: 0, devis: 0 };
+    }
+}
+
 async restoreData() {
     const input = document.createElement('input');
     input.type = 'file';
