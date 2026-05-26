@@ -405,7 +405,7 @@ updateAdminMenu() {
 }
     
     async renderDevisList() {
-    const devis = await this.fetchDevis();
+    const devis = this.safeArray(await this.fetchDevis());
     
     // Stocker tous les devis pour le filtrage
     this.allDevis = devis;
@@ -547,7 +547,7 @@ async exportClientsToExcel() {
     
    async renderClients() {
     // Forcer un nouveau fetch (pas de cache)
-    const clients = await this.fetchClients();
+   const clients = this.safeArray(await this.fetchClients());
     console.log("🟢 Rendu des clients:", clients.length);
     
     if (clients.length === 0) {
@@ -604,7 +604,7 @@ async exportClientsToExcel() {
 
 
     async renderProjets() {
-        const projets = await this.fetchProjets();
+        const projets = this.safeArray(await this.fetchProjets());
         
         if (projets.length === 0) {
             return `<div class="glass-card"><p>Aucun projet</p><button class="btn-primary" onclick="app.openCreateProjetModal()">+ Ajouter un projet</button></div>`;
@@ -636,8 +636,8 @@ async exportClientsToExcel() {
         const userId = this.currentUser.id;
         console.log("Chargement factures pour user:", userId);
         
-        const response = await apiRequest(`/api/factures/${userId}`);
-        const factures = await response.json();
+        const response = await apiRequest(`/api/factures/${this.currentUser.id}`);
+        const factures = this.safeArray(await response.json());
         
         console.log("Factures reçues:", factures);
         
@@ -2382,7 +2382,7 @@ async renderAdmin() {
             return '<div class="glass-card" style="text-align:center; padding:3rem;">⛔ Accès non autorisé</div>';
         }
         
-        const abonnements = await this.fetchAbonnements();
+        const abonnements = this.safeArray(await this.fetchAbonnements());
         
         if (!abonnements || abonnements.length === 0) {
             return '<div class="glass-card" style="text-align:center; padding:3rem;">📭 Aucun utilisateur (hors admin) trouvé</div>';
@@ -2802,15 +2802,17 @@ async refreshClientsPage() {
 
 // Filtrage des devis
 filterDevis() {
-    // Vérifier que allDevis est bien un tableau
+    // Sécurisation mobile
     if (!this.allDevis || !Array.isArray(this.allDevis)) {
-        console.warn("allDevis n'est pas un tableau:", this.allDevis);
+        console.warn("allDevis n'est pas un tableau sur mobile");
+        this.allDevis = [];
+        const tbody = document.getElementById('devis-table-body');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7">Aucun devis trouvé</td></tr>';
         return;
     }
     
     let filtered = [...this.allDevis];
     
-    // Filtre par recherche (texte)
     const searchTerm = document.getElementById('search-devis')?.value.toLowerCase().trim() || '';
     if (searchTerm) {
         filtered = filtered.filter(d => {
@@ -2821,13 +2823,11 @@ filterDevis() {
         });
     }
     
-    // Filtre par statut
     const statusFilter = document.getElementById('filter-status')?.value || 'all';
     if (statusFilter !== 'all') {
         filtered = filtered.filter(d => d.statut === statusFilter);
     }
     
-    // Filtre par date
     const dateFilter = document.getElementById('filter-date')?.value || 'all';
     if (dateFilter !== 'all') {
         const days = parseInt(dateFilter);
@@ -2836,7 +2836,6 @@ filterDevis() {
         filtered = filtered.filter(d => new Date(d.date_creation) >= cutoffDate);
     }
     
-    // Mettre à jour l'affichage
     const tbody = document.getElementById('devis-table-body');
     const countDiv = document.getElementById('devis-count');
     
@@ -2846,8 +2845,6 @@ filterDevis() {
     if (countDiv) {
         countDiv.innerHTML = `${filtered.length} devis sur ${this.allDevis.length}`;
     }
-    
-    console.log(`🔍 Recherche: "${searchTerm}" -> ${filtered.length} résultats`);
 }
 
 async showSubscriptionBanner() {
@@ -2962,6 +2959,13 @@ async showSubscriptionBanner() {
     }
 }
 
+// Sécuriser les données - garantit que c'est toujours un tableau
+safeArray(data) {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') return Object.values(data);
+    return [];
+}
+
 async checkLimites(operation) {
     const user = this.currentUser;
     if (user.email === 'admin@btp.com') return true;
@@ -3013,6 +3017,8 @@ async checkLimites(operation) {
         console.error('Erreur checkLimites:', error);
         return true;
     }
+
+    
 }
 
 // Traduire les textes statiques
