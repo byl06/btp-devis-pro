@@ -342,14 +342,27 @@ body {
 }
 
 /* Responsive */
+.sidebar {
+    width: 280px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--glass-border);
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100vh;
+}
+
+/* Sur mobile, la sidebar est cachée par défaut */
 @media (max-width: 768px) {
     .sidebar {
-        transform: translateX(-100%);
-        position: fixed;
-        z-index: 100;
+        left: -280px;
+        transition: left 0.3s ease;
     }
-    .main-content {
-        margin-left: 0;
+    
+    .sidebar.open {
+        left: 0;
     }
 }
 
