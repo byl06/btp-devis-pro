@@ -1308,5 +1308,38 @@ body {
         min-width: 500px;
     }
 }
+
+/* SOLUTION FINALE POUR MENU HAMBURGER */
+@media (max-width: 768px) {
+    /* Forcer la couleur de fond de la sidebar */
+    .sidebar {
+        background: #0F172A !important;
+        backdrop-filter: none !important;
+        border-right: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    
+    /* Forcer l'affichage des éléments du menu */
+    .sidebar .logo,
+    .sidebar .nav-menu,
+    .sidebar .user-info {
+        display: flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    
+    .nav-item {
+        color: #E2E8F0 !important;
+        background: transparent !important;
+    }
+    
+    .nav-item.active {
+        background: linear-gradient(135deg, #1E3A8A, #7C3AED) !important;
+        color: white !important;
+    }
+    
+    .user-info {
+        border-top: 1px solid rgba(255,255,255,0.1) !important;
+    }
+}
 /* Ajouter FontAwesome si pas déjà présent */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
