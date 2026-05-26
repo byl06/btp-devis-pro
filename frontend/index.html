@@ -97,5 +97,59 @@
             }
         });
     </script>
+
+    <!-- Menu hamburger pour mobile -->
+<script>
+(function() {
+    // Créer l'overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+    
+    // Fonction pour ouvrir/fermer le menu
+    window.toggleMobileMenu = function() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar) {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+    };
+    
+    // Fermer le menu quand on clique sur l'overlay
+    overlay.addEventListener('click', function() {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+    });
+    
+    // Fermer le menu quand on clique sur un lien (navigation)
+    document.addEventListener('click', function(e) {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        const menuBtn = document.querySelector('.mobile-menu-btn');
+        
+        if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('open')) {
+            // Si on clique sur un lien dans le menu
+            if (e.target.closest('.nav-item')) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        }
+    });
+    
+    // Reinitialiser le menu quand la fenêtre redimensionne
+    window.addEventListener('resize', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (window.innerWidth > 768 && sidebar) {
+            sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('active');
+        }
+    });
+})();
+</script>
 </body>
 </html>

@@ -1043,5 +1043,189 @@ body {
 .mobile-menu-btn {
     display: none;
 }
+
+/* ==================== MENU HAMBURGER MOBILE CORRIGÉ ==================== */
+
+/* Bouton menu mobile - toujours visible sur mobile */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1002;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border: none;
+    color: white;
+    padding: 12px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-btn:hover {
+    transform: scale(1.05);
+}
+
+/* Sidebar sur mobile */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+    }
+    
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        width: 280px;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.98);
+        backdrop-filter: blur(20px);
+        z-index: 1001;
+        transition: left 0.3s ease;
+        padding-top: 70px;
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+    
+    /* Overlay sombre quand menu ouvert */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        display: none;
+    }
+    
+    .sidebar-overlay.active {
+        display: block;
+    }
+    
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+        padding-top: 60px;
+    }
+    
+    .glass-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        margin-top: 0;
+    }
+    
+    /* Ajustement des boutons dans le header */
+    .glass-header .header-right {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    /* Grille des cartes */
+    .cards-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    /* Table scrollable */
+    .table-container {
+        overflow-x: auto;
+        border-radius: 16px;
+    }
+    
+    .data-table {
+        font-size: 0.75rem;
+        min-width: 600px;
+    }
+    
+    .data-table th, 
+    .data-table td {
+        padding: 10px 8px;
+    }
+    
+    /* Boutons dans les lignes */
+    .btn-icon {
+        padding: 6px 8px;
+        margin: 2px;
+    }
+    
+    /* Formulaires */
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+        padding: 1rem;
+    }
+    
+    .materiaux-item {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .materiaux-item input {
+        width: 100%;
+    }
+    
+    /* Barre de recherche */
+    .search-box input {
+        width: 180px;
+    }
+    
+    /* Filtres */
+    .filter-select {
+        font-size: 0.75rem;
+        padding: 6px 8px;
+    }
+}
+
+/* Petit mobile */
+@media (max-width: 480px) {
+    .main-content {
+        padding: 0.75rem;
+        padding-top: 55px;
+    }
+    
+    .glass-card {
+        padding: 1rem;
+    }
+    
+    .card-value {
+        font-size: 1.2rem;
+    }
+    
+    .card-title {
+        font-size: 0.75rem;
+    }
+    
+    .btn-primary, .btn-secondary {
+        padding: 8px 12px;
+        font-size: 0.75rem;
+    }
+    
+    h2 {
+        font-size: 1.2rem;
+    }
+    
+    h3 {
+        font-size: 1rem;
+    }
+    
+    .search-box input {
+        width: 140px;
+    }
+    
+    .data-table {
+        font-size: 0.7rem;
+        min-width: 500px;
+    }
+}
 /* Ajouter FontAwesome si pas déjà présent */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
