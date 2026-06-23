@@ -1173,52 +1173,58 @@ L'équipe BTP Pro"""
 def admin_get_abonnements():
     try:
         user_id = get_jwt_identity()
-        user = utilisateur_model.get_by_id(user_id)
+        
+        # Récupérer l'utilisateur avec la méthode find
+        user = utilisateur_model.db.find("utilisateur", "id_user", user_id)
+        user = user[0] if user else None
         
         if not user:
             return jsonify({'error': 'Utilisateur non trouvé'}), 404
         
-        if user['id_user'] != 1:
+        if user.get('id_user') != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
-        # Requête SANS jours_restants
-        query = """
-        SELECT u.id_user, u.nom, u.email, u.entreprise, u.telephone,
-               a.id_abonnement, a.statut, a.date_debut, a.date_fin, a.type_abonnement
-        FROM utilisateur u
-        LEFT JOIN abonnements a ON u.id_user = a.id_user
-        WHERE u.id_user != 1
-        ORDER BY u.id_user
-        """
-        abonnements = utilisateur_model.db.fetch_all(query)
+        # Récupérer tous les utilisateurs SAUF l'admin
+        all_users = utilisateur_model.db.find("utilisateur", "id_user", "neq.1")
+        result = []
         
-        # Convertir les dates en string pour JSON
-        for abo in abonnements:
-            if abo.get('date_debut'):
-                abo['date_debut'] = abo['date_debut'].isoformat() if hasattr(abo['date_debut'], 'isoformat') else str(abo['date_debut'])
-            if abo.get('date_fin'):
-                abo['date_fin'] = abo['date_fin'].isoformat() if hasattr(abo['date_fin'], 'isoformat') else str(abo['date_fin'])
-            if not abo.get('statut'):
-                abo['statut'] = 'inactif'
-            if not abo.get('type_abonnement'):
-                abo['type_abonnement'] = 'aucun'
-            # Ajouter jours_restants par défaut (0)
-            abo['jours_restants'] = 0
+        for u in all_users:
+            # Récupérer l'abonnement de l'utilisateur
+            abos = utilisateur_model.db.find("abonnements", "id_user", u.get('id_user'))
+            abo = abos[0] if abos else None
+            
+            result.append({
+                'id_user': u.get('id_user'),
+                'nom': u.get('nom', '-'),
+                'email': u.get('email', ''),
+                'entreprise': u.get('entreprise', '-'),
+                'telephone': u.get('telephone', '-'),
+                'id_abonnement': abo.get('id_abonnement') if abo else None,
+                'statut': abo.get('statut') if abo else 'inactif',
+                'date_debut': abo.get('date_debut') if abo else None,
+                'date_fin': abo.get('date_fin') if abo else None,
+                'type_abonnement': abo.get('type_abonnement') if abo else 'aucun',
+                'jours_restants': 0
+            })
         
-        return jsonify(abonnements)
+        return jsonify(result)
         
     except Exception as e:
         print(f"❌ Erreur admin: {e}")
-        return jsonify({'error': str(e)}), 500 
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/admin/abonnement/<int:id_user>/prolonger', methods=['POST'])
 @jwt_required()
 def admin_prolonger_abonnement(id_user):
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.get_by_id(admin_id)
+        admin = utilisateur_model.db.find("utilisateur", "id_user", admin_id)
+        admin = admin[0] if admin else None
         
-        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+        if not admin or (admin.get('email') != 'admin@btp.com' and admin.get('email') != 'bylgaitb@gmail.com'):
             return jsonify({'error': 'Non autorisé'}), 403
         
         data = request.json
@@ -1227,46 +1233,57 @@ def admin_prolonger_abonnement(id_user):
         methode = data.get('methode', 'virement')
         offreType = data.get('offreType', 'pro')
         
-        from datetime import datetime, timedelta
+        date_fin = datetime.now() + timedelta(days=jours)
+        date_fin_str = date_fin.isoformat()
+        now_str = datetime.now().isoformat()
         
-        check_query = "SELECT * FROM ABONNEMENTS WHERE id_user = %s"
-        abonnement = utilisateur_model.db.fetch_one(check_query, (id_user,))
+        # Vérifier si l'utilisateur a déjà un abonnement
+        existing = utilisateur_model.db.find("abonnements", "id_user", id_user)
         
-        if abonnement:
-            nouvelle_date = abonnement['date_fin'] + timedelta(days=jours)
-            query = """
-            UPDATE ABONNEMENTS 
-            SET date_fin = %s, statut = 'actif', type_abonnement = %s
-            WHERE id_user = %s
-            """
-            utilisateur_model.db.execute_query(query, (nouvelle_date, offreType, id_user))
+        if existing and len(existing) > 0:
+            # Mettre à jour
+            utilisateur_model.db.update("abonnements", id_user, {
+                "date_fin": date_fin_str,
+                "statut": "actif",
+                "type_abonnement": offreType
+            }, "id_user")
         else:
-            nouvelle_date = datetime.now() + timedelta(days=jours)
-            query = """
-            INSERT INTO ABONNEMENTS (id_user, statut, date_debut, date_fin, type_abonnement)
-            VALUES (%s, 'actif', %s, %s, %s)
-            """
-            utilisateur_model.db.execute_query(query, (id_user, datetime.now(), nouvelle_date, offreType))
+            # Créer
+            utilisateur_model.db.insert("abonnements", {
+                "id_user": id_user,
+                "statut": "actif",
+                "date_debut": now_str,
+                "date_fin": date_fin_str,
+                "type_abonnement": offreType
+            })
         
         # Notification
-        notification_message = f"✅ Abonnement {offreType} renouvelé pour {jours} jours. Échéance: {nouvelle_date.strftime('%d/%m/%Y')}"
-        notification_query = """
-        INSERT INTO notifications (id_user, message, type, date_creation)
-        VALUES (%s, %s, 'renouvellement', %s)
-        """
-        utilisateur_model.db.execute_query(notification_query, (id_user, notification_message, datetime.now()))
+        notification_message = f"✅ Abonnement {offreType} renouvelé pour {jours} jours. Échéance: {date_fin.strftime('%d/%m/%Y')}"
+        utilisateur_model.db.insert("notifications", {
+            "id_user": id_user,
+            "message": notification_message,
+            "type": "renouvellement",
+            "date_creation": now_str
+        })
         
         # Paiement
         import uuid
         reference = f"PAY_{id_user}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        paiement_query = """
-        INSERT INTO paiements (id_user, montant, date_paiement, reference_paiement, methode, statut)
-        VALUES (%s, %s, %s, %s, %s, 'valide')
-        """
-        utilisateur_model.db.execute_query(paiement_query, (id_user, montant, datetime.now(), reference, methode))
+        utilisateur_model.db.insert("paiements", {
+            "id_user": id_user,
+            "montant": montant,
+            "date_paiement": now_str,
+            "reference_paiement": reference,
+            "methode": methode,
+            "statut": "valide"
+        })
         
         return jsonify({'success': True, 'message': f'Abonnement {offreType} prolongé'})
+        
     except Exception as e:
+        print(f"❌ Erreur prolonger: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
 

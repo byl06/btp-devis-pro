@@ -218,16 +218,24 @@ class Database:
     
     def find(self, table, column, value):
         try:
-            response = requests.get(
-                f"{self.supabase_url}/rest/v1/{table}?{column}=eq.{value}",
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json()
+        # Gérer le cas neq (not equal)
+           if str(value).startswith("neq."):
+            operator = "neq"
+            val = value.split(".")[1]
+           else:
+            operator = "eq"
+            val = value
+        
+           response = requests.get(
+            f"{self.supabase_url}/rest/v1/{table}?{column}={operator}.{val}",
+            headers=self.headers
+        )
+           if response.status_code == 200:
+            return response.json()
             return []
         except Exception as e:
-            print(f"❌ Erreur find: {e}")
-            return []
+           print(f"❌ Erreur find: {e}")
+           return []
     
     def insert(self, table, data):
         try:
