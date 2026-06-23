@@ -7,11 +7,12 @@ import bcrypt
 class Database:
     def __init__(self):
         self.supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"  # ← Remplace par ta clé service_role
+        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"  # ← REMPLACE PAR TA VRAIE CLÉ
         self.headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"  # ← Important pour récupérer les données insérées
         }
         self.create_tables()
         print("✅ Connecté à Supabase (API REST)")
@@ -193,33 +194,21 @@ class Database:
             return []
         
         url = f"{self.supabase_url}/rest/v1/{table}"
-        filters = []
         
         # Extraire les filtres WHERE
-        # Pour les égalités (id_user = 1)
-        where_matches = re.findall(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
-        for column, value in where_matches:
-            filters.append(f"{column}=eq.{value}")
+        import re
+        where_match = re.search(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
+        if where_match:
+            column = where_match.group(1)
+            value = where_match.group(2)
+            url += f"?{column}=eq.{value}"
         
-        # Pour les inégalités (id_user != 1)
-        where_neq_matches = re.findall(r"WHERE\s+(\w+)\s*!=\s*(\d+)", query, re.IGNORECASE)
-        for column, value in where_neq_matches:
-            filters.append(f"{column}=neq.{value}")
-        
-        # Pour les LIKE
-        like_matches = re.findall(r"(\w+)\s+LIKE\s+'([^']+)'", query, re.IGNORECASE)
-        for column, value in like_matches:
-            filters.append(f"{column}=like.{value}")
-        
-        if filters:
-            url += "?" + "&".join(filters)
-        
-        # Extraire ORDER BY
+        # ORDER BY
         order_match = re.search(r"ORDER\s+BY\s+(\w+)\s*(DESC|ASC)?", query, re.IGNORECASE)
         if order_match:
             order_col = order_match.group(1)
             order_dir = order_match.group(2) if order_match.group(2) else "ASC"
-            if filters:
+            if where_match:
                 url += f"&order={order_col}.{order_dir}"
             else:
                 url += f"?order={order_col}.{order_dir}"
@@ -241,20 +230,8 @@ class Database:
     
     def find(self, table, column, value):
         try:
-            # Convertir en int si c'est un ID
-            if column == "id_user" or column == "id":
-                value = int(value)
-            
-            # Gérer le cas neq (not equal)
-            if str(value).startswith("neq."):
-                operator = "neq"
-                val = value.split(".")[1]
-            else:
-                operator = "eq"
-                val = value
-            
             response = requests.get(
-                f"{self.supabase_url}/rest/v1/{table}?{column}={operator}.{val}",
+                f"{self.supabase_url}/rest/v1/{table}?{column}=eq.{value}",
                 headers=self.headers
             )
             if response.status_code == 200:
@@ -266,11 +243,17 @@ class Database:
     
     def insert(self, table, data):
         try:
+            print(f"🔍 Insert dans {table}: {data}")
+            
             response = requests.post(
                 f"{self.supabase_url}/rest/v1/{table}",
                 headers=self.headers,
                 json=data
             )
+            
+            print(f"🔍 Status: {response.status_code}")
+            print(f"🔍 Réponse brute: {response.text}")
+            
             if response.status_code in [200, 201]:
                 return response.json()
             else:
