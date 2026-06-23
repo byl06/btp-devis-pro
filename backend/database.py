@@ -6,7 +6,7 @@ import bcrypt
 class Database:
     def __init__(self):
         self.supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"  # ← Remplace par ta clé service_role
+        self.supabase_key = "eyJhbGciOiJIUzI1NiIs..."  # ← Remplace par ta clé service_role
         self.headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}",
@@ -191,18 +191,14 @@ class Database:
                 )
     
     def execute_query(self, query, params=None):
-        # Convertir une requête SQL en opération REST
-        # Cette méthode est adaptée pour les INSERT/UPDATE/DELETE
         return None
     
     def fetch_all(self, query, params=None):
-        # Extraire le nom de la table depuis la requête SQL
         table = self._extract_table(query)
         if table:
-            response = requests.get(
-                f"{self.supabase_url}/rest/v1/{table}",
-                headers=self.headers
-            )
+            # Ajouter un filtre si présent
+            url = f"{self.supabase_url}/rest/v1/{table}"
+            response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
                 return response.json()
         return []
@@ -218,13 +214,63 @@ class Database:
                 return response.json()[0]
         return None
     
+    # ========== MÉTHODES CRUD ==========
+    
+    def insert(self, table, data):
+        try:
+            response = requests.post(
+                f"{self.supabase_url}/rest/v1/{table}",
+                headers=self.headers,
+                json=data
+            )
+            if response.status_code in [200, 201]:
+                return response.json()
+            else:
+                print(f"❌ Erreur insert {table}: {response.text}")
+                return None
+        except Exception as e:
+            print(f"❌ Erreur insert: {e}")
+            return None
+    
+    def update(self, table, id_value, data, id_column="id"):
+        try:
+            response = requests.patch(
+                f"{self.supabase_url}/rest/v1/{table}?{id_column}=eq.{id_value}",
+                headers=self.headers,
+                json=data
+            )
+            if response.status_code in [200, 204]:
+                return True
+            else:
+                print(f"❌ Erreur update {table}: {response.text}")
+                return False
+        except Exception as e:
+            print(f"❌ Erreur update: {e}")
+            return False
+    
+    def delete(self, table, id_value, id_column="id"):
+        try:
+            response = requests.delete(
+                f"{self.supabase_url}/rest/v1/{table}?{id_column}=eq.{id_value}",
+                headers=self.headers
+            )
+            if response.status_code in [200, 204]:
+                return True
+            else:
+                print(f"❌ Erreur delete {table}: {response.text}")
+                return False
+        except Exception as e:
+            print(f"❌ Erreur delete: {e}")
+            return False
+    
     def _extract_table(self, query):
-        # Extraction simple du nom de table depuis une requête SQL
         query_lower = query.lower()
         if "from" in query_lower:
             parts = query_lower.split("from")
             if len(parts) > 1:
                 table_part = parts[1].strip().split()[0]
+                # Enlever les guillemets ou backticks si présents
+                table_part = table_part.strip('"').strip("'").strip('`')
                 return table_part
         return None
     
