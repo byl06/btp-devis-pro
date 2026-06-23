@@ -1,5 +1,6 @@
 import requests
 import json
+import re
 from datetime import datetime, timedelta
 import bcrypt
 
@@ -16,7 +17,6 @@ class Database:
         print("✅ Connecté à Supabase (API REST)")
     
     def create_tables(self):
-        # Créer les tables via l'API SQL de Supabase
         sql_script = """
         CREATE TABLE IF NOT EXISTS utilisateur (
             id_user SERIAL PRIMARY KEY,
@@ -116,7 +116,6 @@ class Database:
         );
         """
         
-        # Exécuter le script SQL via l'API
         response = requests.post(
             f"{self.supabase_url}/rest/v1/rpc/exec_sql",
             headers=self.headers,
@@ -128,18 +127,15 @@ class Database:
         else:
             print(f"⚠️ Erreur création tables: {response.text}")
         
-        # Créer l'admin si la table est vide
         self._create_admin_if_empty()
     
     def _create_admin_if_empty(self):
-        # Vérifier si l'admin existe
         response = requests.get(
             f"{self.supabase_url}/rest/v1/utilisateur?email=eq.bylgaitb@gmail.com&select=id_user",
             headers=self.headers
         )
         
         if response.status_code == 200 and not response.json():
-            # Créer l'admin
             password = "000000"
             hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             
@@ -162,7 +158,6 @@ class Database:
             if response.status_code in [200, 201]:
                 print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
                 
-                # Créer l'abonnement
                 date_fin = datetime.now() + timedelta(days=365*100)
                 abo_data = {
                     "id_user": 1,
@@ -177,7 +172,6 @@ class Database:
                     json=abo_data
                 )
                 
-                # Créer les settings
                 settings_data = {
                     "id_user": 1,
                     "company_name": "BTP Devis Pro",
@@ -195,26 +189,45 @@ class Database:
     
     def fetch_all(self, query, params=None):
         table = self._extract_table(query)
-        if table:
-            # Ajouter un filtre si présent
-            url = f"{self.supabase_url}/rest/v1/{table}"
+        if not table:
+            return []
+        
+        url = f"{self.supabase_url}/rest/v1/{table}"
+        
+        # Extraire les filtres WHERE de la requête
+        where_match = re.search(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
+        if where_match:
+            column = where_match.group(1)
+            value = where_match.group(2)
+            url += f"?{column}=eq.{value}"
+        
+        try:
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
                 return response.json()
-        return []
+            else:
+                print(f"❌ Erreur fetch_all {table}: {response.text}")
+                return []
+        except Exception as e:
+            print(f"❌ Erreur fetch_all: {e}")
+            return []
     
     def fetch_one(self, query, params=None):
-        table = self._extract_table(query)
-        if table:
+        results = self.fetch_all(query, params)
+        return results[0] if results else None
+    
+    def find(self, table, column, value):
+        try:
             response = requests.get(
-                f"{self.supabase_url}/rest/v1/{table}",
+                f"{self.supabase_url}/rest/v1/{table}?{column}=eq.{value}",
                 headers=self.headers
             )
-            if response.status_code == 200 and response.json():
-                return response.json()[0]
-        return None
-    
-    # ========== MÉTHODES CRUD ==========
+            if response.status_code == 200:
+                return response.json()
+            return []
+        except Exception as e:
+            print(f"❌ Erreur find: {e}")
+            return []
     
     def insert(self, table, data):
         try:
@@ -269,7 +282,6 @@ class Database:
             parts = query_lower.split("from")
             if len(parts) > 1:
                 table_part = parts[1].strip().split()[0]
-                # Enlever les guillemets ou backticks si présents
                 table_part = table_part.strip('"').strip("'").strip('`')
                 return table_part
         return None

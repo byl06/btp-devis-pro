@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import Database
 import bcrypt
 import requests
@@ -27,7 +27,7 @@ class Utilisateur:
         return self.db.insert("utilisateur", data)
     
     def get_by_email(self, email):
-        result = self.db.fetch_all(f"SELECT * FROM utilisateur WHERE email = '{email}'")
+        result = self.db.find("utilisateur", "email", email)
         return result[0] if result else None
     
     def verify_password(self, plain_password, hashed_password):
@@ -51,7 +51,7 @@ class Utilisateur:
         return None
     
     def get_by_id(self, id_user):
-        result = self.db.fetch_all(f"SELECT id_user, nom, email, entreprise, telephone FROM utilisateur WHERE id_user = {id_user}")
+        result = self.db.find("utilisateur", "id_user", id_user)
         return result[0] if result else None
 
 class Client:
@@ -69,10 +69,10 @@ class Client:
         return self.db.insert("client", data)
     
     def get_all(self, id_user):
-        return self.db.fetch_all(f"SELECT * FROM client WHERE id_user = {id_user} ORDER BY nom")
+        return self.db.find("client", "id_user", id_user)
     
     def get_by_id(self, id_client):
-        result = self.db.fetch_all(f"SELECT * FROM client WHERE id_client = {id_client}")
+        result = self.db.find("client", "id_client", id_client)
         return result[0] if result else None
     
     def update(self, id_client, nom, telephone, email, adresse):
@@ -101,10 +101,10 @@ class Projet:
         return self.db.insert("projet", data)
     
     def get_all(self, id_user):
-        return self.db.fetch_all(f"SELECT * FROM projet WHERE id_user = {id_user} ORDER BY nom_projet")
+        return self.db.find("projet", "id_user", id_user)
     
     def get_by_id(self, id_projet):
-        result = self.db.fetch_all(f"SELECT * FROM projet WHERE id_projet = {id_projet}")
+        result = self.db.find("projet", "id_projet", id_projet)
         return result[0] if result else None
     
     def update(self, id_projet, nom_projet, description, localisation):
@@ -127,7 +127,6 @@ class Devis:
             total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
             total = total_materiaux * 1.2
             
-            # Créer le devis
             devis_data = {
                 "date_creation": datetime.now().isoformat(),
                 "total": total,
@@ -144,12 +143,10 @@ class Devis:
             elif result and isinstance(result, dict):
                 id_devis = result.get('id_devis')
             else:
-                # Récupérer le dernier ID
                 devis_list = self.db.fetch_all("SELECT id_devis FROM devis ORDER BY id_devis DESC LIMIT 1")
                 id_devis = devis_list[0]['id_devis'] if devis_list else None
             
             if id_devis:
-                # Insérer les lignes
                 for ligne in lignes:
                     total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
                     ligne_data = {
@@ -169,32 +166,15 @@ class Devis:
             return None
     
     def get_by_user(self, id_user):
-        devis = self.db.fetch_all(f"""
-            SELECT d.*, c.nom as client_nom, p.nom_projet
-            FROM devis d
-            JOIN client c ON d.id_client = c.id_client
-            JOIN projet p ON d.id_projet = p.id_projet
-            WHERE d.id_user = {id_user}
-            ORDER BY d.date_creation DESC
-        """)
-        return devis
+        return self.db.find("devis", "id_user", id_user)
     
     def get_details(self, id_devis):
-        devis = self.db.fetch_all(f"""
-            SELECT d.*, c.nom as client_nom, c.email as client_email, 
-                   c.telephone as client_telephone, c.adresse as client_adresse,
-                   p.nom_projet, p.description as projet_description, p.localisation
-            FROM devis d
-            JOIN client c ON d.id_client = c.id_client
-            JOIN projet p ON d.id_projet = p.id_projet
-            WHERE d.id_devis = {id_devis}
-        """)
-        
-        if devis and len(devis) > 0:
-            result = devis[0]
-            lignes = self.db.fetch_all(f"SELECT * FROM ligne_devis WHERE id_devis = {id_devis}")
-            result['lignes'] = lignes
-            return result
+        result = self.db.find("devis", "id_devis", id_devis)
+        if result and len(result) > 0:
+            devis = result[0]
+            lignes = self.db.find("ligne_devis", "id_devis", id_devis)
+            devis['lignes'] = lignes
+            return devis
         return None
     
     def update_status(self, id_devis, statut):
@@ -218,7 +198,7 @@ class Facture:
         return self.db.insert("facture", data)
     
     def get_by_devis(self, id_devis):
-        result = self.db.fetch_all(f"SELECT * FROM facture WHERE id_devis = {id_devis}")
+        result = self.db.find("facture", "id_devis", id_devis)
         return result[0] if result else None
     
     def update_status(self, id_facture, statut):
@@ -229,7 +209,7 @@ class Abonnement:
         self.db = Database()
     
     def get_by_user(self, id_user):
-        result = self.db.fetch_all(f"SELECT * FROM abonnements WHERE id_user = {id_user}")
+        result = self.db.find("abonnements", "id_user", id_user)
         return result[0] if result else None
     
     def create_trial(self, id_user):
@@ -248,7 +228,7 @@ class Settings:
         self.db = Database()
     
     def get_by_user(self, id_user):
-        result = self.db.fetch_all(f"SELECT * FROM settings WHERE id_user = {id_user}")
+        result = self.db.find("settings", "id_user", id_user)
         return result[0] if result else None
     
     def create_default(self, id_user):
