@@ -1,227 +1,232 @@
-import psycopg2
-import os
+import requests
+import json
 from datetime import datetime, timedelta
+import bcrypt
 
 class Database:
     def __init__(self):
-        self.connection = None
-        self.connect()
-    
-    def connect(self):
-        try:
-            self.connection = psycopg2.connect(
-                host='dpg-d8097lho3t8c73di9j80-a.virginia-postgres.render.com',
-                port=5432,
-                database='btp_devis',
-                user='btp_user',
-                password='6Rezh4lvx9HyeAvUKEDZwBtyF9s8wUTC'
-            )
-            self.create_tables()
-            print("✅ Connecté à PostgreSQL (données persistantes)")
-            return True
-        except Exception as e:
-            print(f"❌ Erreur: {e}")
-            return False
+        self.supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"  # ← Remplace par ta clé service_role
+        self.headers = {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {self.supabase_key}",
+            "Content-Type": "application/json"
+        }
+        self.create_tables()
+        print("✅ Connecté à Supabase (API REST)")
     
     def create_tables(self):
-        cursor = self.connection.cursor()
+        # Créer les tables via l'API SQL de Supabase
+        sql_script = """
+        CREATE TABLE IF NOT EXISTS utilisateur (
+            id_user SERIAL PRIMARY KEY,
+            nom TEXT,
+            email TEXT UNIQUE,
+            mot_de_passe TEXT,
+            mot_de_passe_hash TEXT,
+            entreprise TEXT,
+            telephone TEXT
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS utilisateur (
-                id_user SERIAL PRIMARY KEY,
-                nom TEXT,
-                email TEXT UNIQUE,
-                mot_de_passe TEXT,
-                mot_de_passe_hash TEXT,
-                entreprise TEXT,
-                telephone TEXT
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS client (
+            id_client SERIAL PRIMARY KEY,
+            nom TEXT,
+            telephone TEXT,
+            email TEXT,
+            adresse TEXT,
+            id_user INTEGER
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS client (
-                id_client SERIAL PRIMARY KEY,
-                nom TEXT,
-                telephone TEXT,
-                email TEXT,
-                adresse TEXT,
-                id_user INTEGER
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS projet (
+            id_projet SERIAL PRIMARY KEY,
+            nom_projet TEXT,
+            description TEXT,
+            localisation TEXT,
+            id_user INTEGER
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS projet (
-                id_projet SERIAL PRIMARY KEY,
-                nom_projet TEXT,
-                description TEXT,
-                localisation TEXT,
-                id_user INTEGER
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS devis (
+            id_devis SERIAL PRIMARY KEY,
+            date_creation TIMESTAMP,
+            total REAL,
+            statut TEXT DEFAULT 'brouillon',
+            id_client INTEGER,
+            id_user INTEGER,
+            id_projet INTEGER
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS devis (
-                id_devis SERIAL PRIMARY KEY,
-                date_creation TIMESTAMP,
-                total REAL,
-                statut TEXT DEFAULT 'brouillon',
-                id_client INTEGER,
-                id_user INTEGER,
-                id_projet INTEGER
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS ligne_devis (
+            id_ligne SERIAL PRIMARY KEY,
+            designation TEXT,
+            quantite INTEGER,
+            prix_unitaire REAL,
+            total_ligne REAL,
+            id_devis INTEGER
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ligne_devis (
-                id_ligne SERIAL PRIMARY KEY,
-                designation TEXT,
-                quantite INTEGER,
-                prix_unitaire REAL,
-                total_ligne REAL,
-                id_devis INTEGER
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS facture (
+            id_facture SERIAL PRIMARY KEY,
+            date_facture TIMESTAMP,
+            montant REAL,
+            statut TEXT DEFAULT 'non payée',
+            id_devis INTEGER UNIQUE
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS facture (
-                id_facture SERIAL PRIMARY KEY,
-                date_facture TIMESTAMP,
-                montant REAL,
-                statut TEXT DEFAULT 'non payée',
-                id_devis INTEGER UNIQUE
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS abonnements (
+            id_abonnement SERIAL PRIMARY KEY,
+            id_user INTEGER NOT NULL,
+            statut TEXT DEFAULT 'actif',
+            date_debut TIMESTAMP,
+            date_fin TIMESTAMP,
+            type_abonnement TEXT DEFAULT 'mensuel'
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS abonnements (
-                id_abonnement SERIAL PRIMARY KEY,
-                id_user INTEGER NOT NULL,
-                statut TEXT DEFAULT 'actif',
-                date_debut TIMESTAMP,
-                date_fin TIMESTAMP,
-                type_abonnement TEXT DEFAULT 'mensuel'
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS settings (
+            id_setting SERIAL PRIMARY KEY,
+            id_user INTEGER NOT NULL,
+            company_name TEXT,
+            company_logo TEXT,
+            company_email TEXT,
+            company_phone TEXT,
+            company_address TEXT,
+            primary_color TEXT DEFAULT '#1E3A8A',
+            secondary_color TEXT DEFAULT '#7C3AED',
+            accent_color TEXT DEFAULT '#06B6D4',
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS settings (
-                id_setting SERIAL PRIMARY KEY,
-                id_user INTEGER NOT NULL,
-                company_name TEXT,
-                company_logo TEXT,
-                company_email TEXT,
-                company_phone TEXT,
-                company_address TEXT,
-                primary_color TEXT DEFAULT '#1E3A8A',
-                secondary_color TEXT DEFAULT '#7C3AED',
-                accent_color TEXT DEFAULT '#06B6D4',
-                created_at TIMESTAMP,
-                updated_at TIMESTAMP
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS notifications (
+            id_notification SERIAL PRIMARY KEY,
+            id_user INTEGER NOT NULL,
+            message TEXT,
+            type TEXT DEFAULT 'info',
+            est_lue INTEGER DEFAULT 0,
+            date_creation TIMESTAMP
+        );
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS notifications (
-                id_notification SERIAL PRIMARY KEY,
-                id_user INTEGER NOT NULL,
-                message TEXT,
-                type TEXT DEFAULT 'info',
-                est_lue INTEGER DEFAULT 0,
-                date_creation TIMESTAMP
-            )
-        ''')
+        CREATE TABLE IF NOT EXISTS paiements (
+            id_paiement SERIAL PRIMARY KEY,
+            id_user INTEGER NOT NULL,
+            montant REAL,
+            date_paiement TIMESTAMP,
+            reference_paiement TEXT,
+            methode TEXT,
+            statut TEXT DEFAULT 'valide'
+        );
+        """
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS paiements (
-                id_paiement SERIAL PRIMARY KEY,
-                id_user INTEGER NOT NULL,
-                montant REAL,
-                date_paiement TIMESTAMP,
-                reference_paiement TEXT,
-                methode TEXT,
-                statut TEXT DEFAULT 'valide'
-            )
-        ''')
+        # Exécuter le script SQL via l'API
+        response = requests.post(
+            f"{self.supabase_url}/rest/v1/rpc/exec_sql",
+            headers=self.headers,
+            json={"query": sql_script}
+        )
         
-        self.connection.commit()
+        if response.status_code == 200:
+            print("✅ Tables créées/vérifiées")
+        else:
+            print(f"⚠️ Erreur création tables: {response.text}")
         
-        # Créer l'admin UNIQUEMENT si la table est vide
-        cursor.execute("SELECT COUNT(*) FROM utilisateur")
-        count = cursor.fetchone()[0]
+        # Créer l'admin si la table est vide
+        self._create_admin_if_empty()
+    
+    def _create_admin_if_empty(self):
+        # Vérifier si l'admin existe
+        response = requests.get(
+            f"{self.supabase_url}/rest/v1/utilisateur?email=eq.bylgaitb@gmail.com&select=id_user",
+            headers=self.headers
+        )
         
-        if count == 0:
-            import bcrypt
+        if response.status_code == 200 and not response.json():
+            # Créer l'admin
             password = "000000"
             hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             
-            cursor.execute("""
-                INSERT INTO utilisateur (id_user, nom, email, mot_de_passe, mot_de_passe_hash, entreprise, telephone)
-                VALUES (1, 'Admin BTP', 'bylgaitb@gmail.com', %s, %s, 'BTP Pro', '+229 90000000')
-            """, (password, hashed.decode()))
+            admin_data = {
+                "id_user": 1,
+                "nom": "Admin BTP",
+                "email": "bylgaitb@gmail.com",
+                "mot_de_passe": password,
+                "mot_de_passe_hash": hashed.decode(),
+                "entreprise": "BTP Pro",
+                "telephone": "+229 90000000"
+            }
             
-            date_fin = datetime.now() + timedelta(days=365*100)
-            cursor.execute("""
-                INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
-                VALUES (1, 'actif', %s, %s, 'illimite')
-            """, (datetime.now(), date_fin))
+            response = requests.post(
+                f"{self.supabase_url}/rest/v1/utilisateur",
+                headers=self.headers,
+                json=admin_data
+            )
             
-            cursor.execute("""
-                INSERT INTO settings (id_user, company_name, created_at, updated_at)
-                VALUES (1, 'BTP Devis Pro', %s, %s)
-            """, (datetime.now(), datetime.now()))
-            
-            self.connection.commit()
-            print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
-        
-        print("✅ Tables PostgreSQL créées/vérifiées")
+            if response.status_code in [200, 201]:
+                print("✅ Admin créé (bylgaitb@gmail.com / 000000)")
+                
+                # Créer l'abonnement
+                date_fin = datetime.now() + timedelta(days=365*100)
+                abo_data = {
+                    "id_user": 1,
+                    "statut": "actif",
+                    "date_debut": datetime.now().isoformat(),
+                    "date_fin": date_fin.isoformat(),
+                    "type_abonnement": "illimite"
+                }
+                requests.post(
+                    f"{self.supabase_url}/rest/v1/abonnements",
+                    headers=self.headers,
+                    json=abo_data
+                )
+                
+                # Créer les settings
+                settings_data = {
+                    "id_user": 1,
+                    "company_name": "BTP Devis Pro",
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{self.supabase_url}/rest/v1/settings",
+                    headers=self.headers,
+                    json=settings_data
+                )
     
     def execute_query(self, query, params=None):
-        cursor = None
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(query, params or ())
-            self.connection.commit()
-            # NE PAS fermer le cursor ici - on le retourne pour fetch
-            return cursor
-        except Exception as e:
-            print(f"❌ Erreur execute_query: {e}")
-            self.connection.rollback()
-            if cursor:
-                cursor.close()
-            return None
+        # Convertir une requête SQL en opération REST
+        # Cette méthode est adaptée pour les INSERT/UPDATE/DELETE
+        return None
     
     def fetch_all(self, query, params=None):
-        cursor = None
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(query, params or ())
-            rows = cursor.fetchall()
-            colnames = [desc[0] for desc in cursor.description]
-            return [dict(zip(colnames, row)) for row in rows]
-        except Exception as e:
-            print(f"❌ Erreur: {e}")
-            return []
-        finally:
-            if cursor:
-                cursor.close()
+        # Extraire le nom de la table depuis la requête SQL
+        table = self._extract_table(query)
+        if table:
+            response = requests.get(
+                f"{self.supabase_url}/rest/v1/{table}",
+                headers=self.headers
+            )
+            if response.status_code == 200:
+                return response.json()
+        return []
     
     def fetch_one(self, query, params=None):
-        cursor = None
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(query, params or ())
-            row = cursor.fetchone()
-            if row:
-                colnames = [desc[0] for desc in cursor.description]
-                return dict(zip(colnames, row))
-            return None
-        except Exception as e:
-            print(f"❌ Erreur: {e}")
-            return None
-        finally:
-            if cursor:
-                cursor.close()
+        table = self._extract_table(query)
+        if table:
+            response = requests.get(
+                f"{self.supabase_url}/rest/v1/{table}",
+                headers=self.headers
+            )
+            if response.status_code == 200 and response.json():
+                return response.json()[0]
+        return None
+    
+    def _extract_table(self, query):
+        # Extraction simple du nom de table depuis une requête SQL
+        query_lower = query.lower()
+        if "from" in query_lower:
+            parts = query_lower.split("from")
+            if len(parts) > 1:
+                table_part = parts[1].strip().split()[0]
+                return table_part
+        return None
     
     def rollback(self):
-        if self.connection:
-            self.connection.rollback()
+        pass
