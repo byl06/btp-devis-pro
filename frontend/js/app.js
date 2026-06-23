@@ -2208,32 +2208,63 @@ async marquerNotificationLue(id) {
 
 async checkLimites(operation) {
     const user = this.currentUser;
-    if (user.email === 'admin@btp.com') return true;
     
-    const abonnement = await this.getAbonnement();
-    const offre = abonnement?.type_abonnement || 'starter';
-    
-    const limites = {
-        starter: { clients: 10, projets: 10, devis: 20 },
-        pro: { clients: 999999, projets: 999999, devis: 999999 },
-        annuel: { clients: 999999, projets: 999999, devis: 999999 }
-    };
-    
-    const counts = await this.getCurrentCounts();
-    
-    if (operation === 'client' && counts.clients >= limites[offre].clients) {
-        Toast.warning(`Limite de clients atteinte (${limites[offre].clients}). Passez à l'offre Pro !`);
-        return false;
+    // Admin = illimité
+    if (user && (user.email === 'admin@btp.com' || user.email === 'bylgaitb@gmail.com')) {
+        console.log("👑 Admin détecté - pas de limites");
+        return true;
     }
-    if (operation === 'projet' && counts.projets >= limites[offre].projets) {
-        Toast.warning(`Limite de projets atteinte (${limites[offre].projets}). Passez à l'offre Pro !`);
-        return false;
+    
+    // Récupérer l'abonnement via l'API
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        
+        if (!data.success || data.statut !== 'actif') {
+            Toast.warning('Abonnement inactif. Contactez l\'administrateur.');
+            return false;
+        }
+        
+        const offre = data.type || 'starter';
+        
+        const limites = {
+            starter: { clients: 10, projets: 10, devis: 20 },
+            pro: { clients: 999999, projets: 999999, devis: 999999 },
+            annuel: { clients: 999999, projets: 999999, devis: 999999 },
+            essai: { clients: 999999, projets: 999999, devis: 999999 },
+            illimite: { clients: 999999, projets: 999999, devis: 999999 }
+        };
+        
+        // Compter les éléments actuels
+        const clients = await this.fetchClients();
+        const projets = await this.fetchProjets();
+        const devis = await this.fetchDevis();
+        
+        const counts = {
+            clients: clients.length,
+            projets: projets.length,
+            devis: devis.length
+        };
+        
+        if (operation === 'client' && counts.clients >= limites[offre].clients) {
+            Toast.warning(`Limite de clients atteinte (${limites[offre].clients}). Passez à l'offre Pro !`);
+            return false;
+        }
+        if (operation === 'projet' && counts.projets >= limites[offre].projets) {
+            Toast.warning(`Limite de projets atteinte (${limites[offre].projets}). Passez à l'offre Pro !`);
+            return false;
+        }
+        if (operation === 'devis' && counts.devis >= limites[offre].devis) {
+            Toast.warning(`Limite de devis atteinte (${limites[offre].devis}). Passez à l'offre Pro !`);
+            return false;
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Erreur checkLimites:', error);
+        return true;
     }
-    if (operation === 'devis' && counts.devis >= limites[offre].devis) {
-        Toast.warning(`Limite de devis atteinte (${limites[offre].devis}). Passez à l'offre Pro !`);
-        return false;
-    }
-    return true;
 }
 
 // ==================== BACKUP & RESTORE ====================

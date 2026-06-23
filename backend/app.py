@@ -782,26 +782,50 @@ def generate_pdf(id_devis):
 def get_abonnement_statut():
     try:
         user_id = get_jwt_identity()
-        abonnement = abonnement_model.get_by_user(user_id)
-        print(f"🔍 Abonnement trouvé: {abonnement}")
+        user_id = int(user_id)
         
-        if abonnement:
-            # Convertir la date string en datetime
-            from datetime import datetime
-            if isinstance(abonnement['date_fin'], str):
-                date_fin = datetime.fromisoformat(abonnement['date_fin'].replace('Z', '+00:00'))
-            else:
-                date_fin = abonnement['date_fin']
-            
-            jours_restants = (date_fin - datetime.now()).days
+        # 🔥 FORCER L'ADMIN À ÊTRE ILLIMITÉ
+        if user_id == 1:
             return jsonify({
                 'success': True,
-                'statut': abonnement['statut'],
-                'type': abonnement['type_abonnement'],
-                'date_fin': abonnement['date_fin'],
-                'jours_restants': max(0, jours_restants)
+                'statut': 'actif',
+                'type': 'illimite',
+                'date_fin': (datetime.now() + timedelta(days=365*100)).isoformat(),
+                'jours_restants': 365*100
             })
+        
+        # Pour les autres utilisateurs, on cherche dans Supabase
+        try:
+            import requests
+            supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+            supabase_key = "TA_VERITABLE_CLE_SERVICE_ROLE"  # ← Remplace par ta clé
+            
+            response = requests.get(
+                f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}",
+                headers={
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            if response.status_code == 200:
+                abonnements = response.json()
+                if abonnements and len(abonnements) > 0:
+                    abo = abonnements[0]
+                    date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
+                    jours_restants = (date_fin - datetime.now()).days
+                    return jsonify({
+                        'success': True,
+                        'statut': abo.get('statut', 'actif'),
+                        'type': abo.get('type_abonnement', 'starter'),
+                        'date_fin': abo.get('date_fin'),
+                        'jours_restants': max(0, jours_restants)
+                    })
+        except Exception as e:
+            print(f"Erreur requête Supabase: {e}")
+        
         return jsonify({'success': False, 'statut': 'inactif'})
+        
     except Exception as e:
         print(f"❌ Erreur: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
