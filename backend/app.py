@@ -1173,10 +1173,15 @@ L'équipe BTP Pro"""
 def admin_get_abonnements():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)  # ← Convertir en entier
+        print(f"🔍 user_id: {user_id}")
         
-        # Récupérer l'utilisateur avec la méthode find
-        user = utilisateur_model.db.find("utilisateur", "id_user", user_id)
+        # Récupérer l'utilisateur avec fetch_all (plus fiable)
+        query = f"SELECT * FROM utilisateur WHERE id_user = {user_id}"
+        user = utilisateur_model.db.fetch_all(query)
         user = user[0] if user else None
+        
+        print(f"🔍 Utilisateur trouvé: {user}")
         
         if not user:
             return jsonify({'error': 'Utilisateur non trouvé'}), 404
@@ -1185,12 +1190,14 @@ def admin_get_abonnements():
             return jsonify({'error': 'Non autorisé'}), 403
         
         # Récupérer tous les utilisateurs SAUF l'admin
-        all_users = utilisateur_model.db.find("utilisateur", "id_user", "neq.1")
+        query_all = "SELECT * FROM utilisateur WHERE id_user != 1 ORDER BY id_user"
+        all_users = utilisateur_model.db.fetch_all(query_all)
         result = []
         
         for u in all_users:
-            # Récupérer l'abonnement de l'utilisateur
-            abos = utilisateur_model.db.find("abonnements", "id_user", u.get('id_user'))
+            # Récupérer l'abonnement
+            query_abo = f"SELECT * FROM abonnements WHERE id_user = {u.get('id_user')}"
+            abos = utilisateur_model.db.fetch_all(query_abo)
             abo = abos[0] if abos else None
             
             result.append({

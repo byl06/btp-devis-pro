@@ -193,13 +193,36 @@ class Database:
             return []
         
         url = f"{self.supabase_url}/rest/v1/{table}"
+        filters = []
         
-        # Extraire les filtres WHERE de la requête
-        where_match = re.search(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
-        if where_match:
-            column = where_match.group(1)
-            value = where_match.group(2)
-            url += f"?{column}=eq.{value}"
+        # Extraire les filtres WHERE
+        # Pour les égalités (id_user = 1)
+        where_matches = re.findall(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
+        for column, value in where_matches:
+            filters.append(f"{column}=eq.{value}")
+        
+        # Pour les inégalités (id_user != 1)
+        where_neq_matches = re.findall(r"WHERE\s+(\w+)\s*!=\s*(\d+)", query, re.IGNORECASE)
+        for column, value in where_neq_matches:
+            filters.append(f"{column}=neq.{value}")
+        
+        # Pour les LIKE
+        like_matches = re.findall(r"(\w+)\s+LIKE\s+'([^']+)'", query, re.IGNORECASE)
+        for column, value in like_matches:
+            filters.append(f"{column}=like.{value}")
+        
+        if filters:
+            url += "?" + "&".join(filters)
+        
+        # Extraire ORDER BY
+        order_match = re.search(r"ORDER\s+BY\s+(\w+)\s*(DESC|ASC)?", query, re.IGNORECASE)
+        if order_match:
+            order_col = order_match.group(1)
+            order_dir = order_match.group(2) if order_match.group(2) else "ASC"
+            if filters:
+                url += f"&order={order_col}.{order_dir}"
+            else:
+                url += f"?order={order_col}.{order_dir}"
         
         try:
             response = requests.get(url, headers=self.headers)
@@ -218,24 +241,28 @@ class Database:
     
     def find(self, table, column, value):
         try:
-        # Gérer le cas neq (not equal)
-           if str(value).startswith("neq."):
-            operator = "neq"
-            val = value.split(".")[1]
-           else:
-            operator = "eq"
-            val = value
-        
-           response = requests.get(
-            f"{self.supabase_url}/rest/v1/{table}?{column}={operator}.{val}",
-            headers=self.headers
-        )
-           if response.status_code == 200:
-            return response.json()
+            # Convertir en int si c'est un ID
+            if column == "id_user" or column == "id":
+                value = int(value)
+            
+            # Gérer le cas neq (not equal)
+            if str(value).startswith("neq."):
+                operator = "neq"
+                val = value.split(".")[1]
+            else:
+                operator = "eq"
+                val = value
+            
+            response = requests.get(
+                f"{self.supabase_url}/rest/v1/{table}?{column}={operator}.{val}",
+                headers=self.headers
+            )
+            if response.status_code == 200:
+                return response.json()
             return []
         except Exception as e:
-           print(f"❌ Erreur find: {e}")
-           return []
+            print(f"❌ Erreur find: {e}")
+            return []
     
     def insert(self, table, data):
         try:
