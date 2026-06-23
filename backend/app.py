@@ -149,11 +149,19 @@ def admin_add_trial(id_user):
 def get_clients():
     try:
         user_id = get_jwt_identity()
-        query = "SELECT * FROM CLIENT WHERE id_user = %s OR id_user IS NULL ORDER BY nom"
-        clients = client_model.db.fetch_all(query, (user_id,))
+        user_id = int(user_id)
+        print(f"🔍 Récupération clients pour user_id: {user_id}")
+        
+        # Utiliser la méthode get_all du modèle Client
+        clients = client_model.get_all(user_id)
+        print(f"🔍 Clients trouvés: {len(clients)}")
         return jsonify(clients)
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Erreur get_clients: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([]), 500
 
 @app.route('/api/clients', methods=['POST'])
 @jwt_required()
