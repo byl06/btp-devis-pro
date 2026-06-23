@@ -209,7 +209,10 @@ class Abonnement:
         self.db = Database()
     
     def get_by_user(self, id_user):
-        result = self.db.find("abonnements", "id_user", id_user)
+        # Requête directe avec fetch_all pour être sûr
+        query = f"SELECT * FROM abonnements WHERE id_user = {id_user}"
+        result = self.db.fetch_all(query)
+        print(f"🔍 Abonnement get_by_user({id_user}): {result}")
         return result[0] if result else None
     
     def create_trial(self, id_user):
