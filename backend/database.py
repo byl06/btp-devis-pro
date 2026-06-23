@@ -7,7 +7,7 @@ import bcrypt
 class Database:
     def __init__(self):
         self.supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIs..."  # ← Remplace par ta clé service_role
+        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"  # ← Remplace par ta clé service_role
         self.headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}",
