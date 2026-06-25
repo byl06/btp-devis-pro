@@ -151,7 +151,38 @@ def admin_add_trial(id_user):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 # ==================== CLIENTS ====================
-
+@app.route('/api/clients', methods=['GET'])
+@jwt_required()
+def get_clients():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/client?select=*",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            all_clients = response.json()
+            clients = [c for c in all_clients if c.get('id_user') == user_id]
+            return jsonify(clients)
+        else:
+            return jsonify([]), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur get_clients: {e}")
+        return jsonify([]), 500
 
 @app.route('/api/clients', methods=['POST'])
 @jwt_required()
