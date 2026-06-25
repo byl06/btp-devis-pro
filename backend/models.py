@@ -69,7 +69,9 @@ class Client:
         return self.db.insert("client", data)
     
     def get_all(self, id_user):
-        return self.db.find("client", "id_user", id_user)
+    # Utiliser fetch_all avec une requête SQL directe
+     query = f"SELECT * FROM client WHERE id_user = {id_user} ORDER BY nom"
+     return self.db.fetch_all(query)
     
     def get_by_id(self, id_client):
         result = self.db.find("client", "id_client", id_client)

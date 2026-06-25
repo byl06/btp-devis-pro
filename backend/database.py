@@ -228,17 +228,9 @@ class Database:
         return results[0] if results else None
     
     def find(self, table, column, value):
-        try:
-            response = requests.get(
-                f"{self.supabase_url}/rest/v1/{table}?{column}=eq.{value}",
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json()
-            return []
-        except Exception as e:
-            print(f"❌ Erreur find: {e}")
-            return []
+    # Utiliser fetch_all avec une requête SQL
+     query = f"SELECT * FROM {table} WHERE {column} = {value}"
+     return self.fetch_all(query)
     
     def insert(self, table, data):
         try:
