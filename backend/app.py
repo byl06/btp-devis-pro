@@ -151,47 +151,55 @@ def admin_add_trial(id_user):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 # ==================== CLIENTS ====================
-@app.route('/api/clients', methods=['GET'])
+@app.route('/api/clients', methods=['POST'])
 @jwt_required()
-def get_clients():
+def create_client():
     try:
         user_id = get_jwt_identity()
         user_id = int(user_id)
-        print(f"🔍 Récupération clients pour user_id: {user_id}")
+        data = request.json
+        
+        print(f"🔍 Création client pour user_id: {user_id}")
+        print(f"🔍 Données reçues: {data}")
         
         import requests
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        # Version CORRECTE des headers
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,  # ← AJOUTER CETTE LIGNE !
-            "Content-Type": "application/json"
+        client_data = {
+            "nom": data.get('nom'),
+            "telephone": data.get('telephone'),
+            "email": data.get('email'),
+            "adresse": data.get('adresse'),
+            "id_user": user_id
         }
         
-        response = requests.get(
-            f"{supabase_url}/rest/v1/client?select=*",
-            headers=headers
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/client",
+            headers=headers,
+            json=client_data
         )
         
         print(f"🔍 Status Supabase: {response.status_code}")
         print(f"🔍 Réponse brute: {response.text}")
         
-        if response.status_code == 200:
-            all_clients = response.json()
-            clients = [c for c in all_clients if c.get('id_user') == user_id]
-            print(f"🔍 Clients trouvés: {len(clients)}")
-            return jsonify(clients)
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Client créé'})
         else:
-            print(f"❌ Erreur Supabase: {response.text}")
-            return jsonify([]), 500
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
     except Exception as e:
-        print(f"❌ Erreur get_clients: {e}")
+        print(f"❌ Erreur create_client: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify([]), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/clients', methods=['POST'])
 @jwt_required()
@@ -278,32 +286,48 @@ def get_projets():
 def create_projet():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         
-        # Vérifier le type d'abonnement
-        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
-        abonnement = projet_model.db.fetch_one(query_abo, (user_id,))
+        print(f"🔍 Création projet pour user_id: {user_id}")
+        print(f"🔍 Données reçues: {data}")
         
-        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        # Vérifier les limites pour l'offre Starter
-        if offre == 'starter':
-            query_count = "SELECT COUNT(*) as total FROM projet WHERE id_user = %s"
-            result = projet_model.db.fetch_one(query_count, (user_id,))
-            count_projets = result['total'] if result else 0
-            
-            if count_projets >= 10:
-                return jsonify({
-                    'success': False, 
-                    'message': '❌ Limite de 10 projets atteinte. Passez à l\'offre Pro pour ajouter plus de projets.'
-                }), 403
+        projet_data = {
+            "nom_projet": data.get('nom_projet'),
+            "description": data.get('description'),
+            "localisation": data.get('localisation'),
+            "id_user": user_id
+        }
         
-        query = "INSERT INTO projet (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
-        projet_model.db.execute_query(query, (data['nom_projet'], data['description'], data['localisation'], user_id))
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
         
-        return jsonify({'success': True, 'message': 'Projet créé'})
+        response = requests.post(
+            f"{supabase_url}/rest/v1/projet",
+            headers=headers,
+            json=projet_data
+        )
+        
+        print(f"🔍 Status Supabase: {response.status_code}")
+        print(f"🔍 Réponse brute: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Projet créé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
     except Exception as e:
+        print(f"❌ Erreur create_projet: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/projets/<int:id_projet>', methods=['PUT'])
@@ -350,35 +374,93 @@ def get_devis():
 def create_devis():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         
-        # Vérifier le type d'abonnement
-        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
-        abonnement = devis_model.db.fetch_one(query_abo, (user_id,))
+        print(f"🔍 Création devis pour user_id: {user_id}")
+        print(f"🔍 Données reçues: {data}")
         
-        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        import requests
+        from datetime import datetime
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        # Vérifier les limites pour l'offre Starter
-        if offre == 'starter':
-            query_count = "SELECT COUNT(*) as total FROM devis WHERE id_user = %s"
-            result = devis_model.db.fetch_one(query_count, (user_id,))
-            count_devis = result['total'] if result else 0
-            
-            if count_devis >= 20:
-                return jsonify({
-                    'success': False, 
-                    'message': '❌ Limite de 20 devis atteinte. Passez à l\'offre Pro pour créer plus de devis.'
-                }), 403
+        # Calculer le total
+        lignes = data.get('lignes', [])
+        total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
+        total = total_materiaux * 1.2
         
-        id_devis = devis_model.create(
-            data['id_client'], data['id_user'], data['id_projet'], data['lignes']
+        # Insérer le devis
+        devis_data = {
+            "date_creation": datetime.now().isoformat(),
+            "total": total,
+            "statut": "brouillon",
+            "id_client": data.get('id_client'),
+            "id_user": user_id,
+            "id_projet": data.get('id_projet')
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/devis",
+            headers=headers,
+            json=devis_data
         )
         
-        if id_devis:
-            return jsonify({'success': True, 'id_devis': id_devis})
-        return jsonify({'success': False, 'message': 'Erreur'}), 500
+        print(f"🔍 Status Supabase devis: {response.status_code}")
+        print(f"🔍 Réponse brute devis: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            # Récupérer l'ID du devis créé
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                id_devis = result[0].get('id_devis')
+            elif isinstance(result, dict):
+                id_devis = result.get('id_devis')
+            else:
+                # Récupérer le dernier ID
+                get_response = requests.get(
+                    f"{supabase_url}/rest/v1/devis?select=id_devis&order=id_devis.desc&limit=1",
+                    headers=headers
+                )
+                if get_response.status_code == 200 and get_response.json():
+                    id_devis = get_response.json()[0].get('id_devis')
+                else:
+                    id_devis = None
+            
+            # Insérer les lignes du devis
+            if id_devis:
+                for ligne in lignes:
+                    total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
+                    ligne_data = {
+                        "designation": ligne.get('designation'),
+                        "quantite": ligne.get('quantite'),
+                        "prix_unitaire": ligne.get('prix_unitaire'),
+                        "total_ligne": total_ligne,
+                        "id_devis": id_devis
+                    }
+                    requests.post(
+                        f"{supabase_url}/rest/v1/ligne_devis",
+                        headers=headers,
+                        json=ligne_data
+                    )
+                
+                return jsonify({'success': True, 'id_devis': id_devis})
+            else:
+                return jsonify({'success': False, 'message': 'Devis créé mais ID non récupéré'}), 500
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
     except Exception as e:
+        print(f"❌ Erreur create_devis: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/devis/<int:id_devis>', methods=['GET'])
