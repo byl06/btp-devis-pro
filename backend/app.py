@@ -87,12 +87,17 @@ def register():
 def login():
     try:
         data = request.json
-        user = utilisateur_model.authenticate(data['email'], data['mot_de_passe'])
+        email = data.get('email')
+        mot_de_passe = data.get('mot_de_passe')
+        
+        print(f"🔐 Login reçu: {email}")
+        print(f"🔐 Mot de passe: {mot_de_passe}")
+        
+        user = utilisateur_model.authenticate(email, mot_de_passe)
+        
         if user:
-            # Convertir l'ID en string (important pour JWT)
             user_id = str(user['id_user'])
             token = create_access_token(identity=user_id)
-            
             return jsonify({
                 'success': True,
                 'token': token,
@@ -106,6 +111,8 @@ def login():
         return jsonify({'success': False, 'message': 'Identifiants incorrects'}), 401
     except Exception as e:
         print(f"❌ Erreur login: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 

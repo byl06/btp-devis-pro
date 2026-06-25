@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import email
 from database import Database
 import bcrypt
 import requests
@@ -38,17 +39,40 @@ class Utilisateur:
         return bcrypt.checkpw(plain_password, hashed_password)
     
     def authenticate(self, email, mot_de_passe):
+        print(f"🔐 Tentative login pour: {email}")
+        
         user = self.get_by_email(email)
-        if user:
-            stored_hash = user.get('mot_de_passe_hash')
-            if stored_hash:
-                if isinstance(stored_hash, str):
-                    stored_hash = stored_hash.encode('utf-8')
-                if isinstance(mot_de_passe, str):
-                    mot_de_passe = mot_de_passe.encode('utf-8')
-                if bcrypt.checkpw(mot_de_passe, stored_hash):
-                    return user
-        return None
+        if not user:
+            print("❌ Utilisateur non trouvé")
+            return None
+        
+        stored_hash = user.get('mot_de_passe_hash')
+        print(f"🔑 Hash stocké: {stored_hash}")
+        print(f"🔑 Type du hash: {type(stored_hash)}")
+        
+        if not stored_hash:
+            print("❌ Pas de hash stocké")
+            return None
+        
+        # Convertir en bytes
+        if isinstance(stored_hash, str):
+            stored_hash = stored_hash.encode('utf-8')
+        if isinstance(mot_de_passe, str):
+            mot_de_passe = mot_de_passe.encode('utf-8')
+        
+        print(f"🔑 Mot de passe testé: {mot_de_passe}")
+        
+        try:
+            result = bcrypt.checkpw(mot_de_passe, stored_hash)
+            print(f"✅ Résultat bcrypt: {result}")
+            if result:
+                return user
+            else:
+                print("❌ Mot de passe incorrect")
+                return None
+        except Exception as e:
+            print(f"❌ Erreur bcrypt: {e}")
+            return None
     
     def get_by_id(self, id_user):
         result = self.db.find("utilisateur", "id_user", id_user)
