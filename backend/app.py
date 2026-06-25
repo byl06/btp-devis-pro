@@ -151,55 +151,7 @@ def admin_add_trial(id_user):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 # ==================== CLIENTS ====================
-@app.route('/api/clients', methods=['POST'])
-@jwt_required()
-def create_client():
-    try:
-        user_id = get_jwt_identity()
-        user_id = int(user_id)
-        data = request.json
-        
-        print(f"🔍 Création client pour user_id: {user_id}")
-        print(f"🔍 Données reçues: {data}")
-        
-        import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
-        
-        client_data = {
-            "nom": data.get('nom'),
-            "telephone": data.get('telephone'),
-            "email": data.get('email'),
-            "adresse": data.get('adresse'),
-            "id_user": user_id
-        }
-        
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        }
-        
-        response = requests.post(
-            f"{supabase_url}/rest/v1/client",
-            headers=headers,
-            json=client_data
-        )
-        
-        print(f"🔍 Status Supabase: {response.status_code}")
-        print(f"🔍 Réponse brute: {response.text}")
-        
-        if response.status_code in [200, 201]:
-            return jsonify({'success': True, 'message': 'Client créé'})
-        else:
-            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
-        
-    except Exception as e:
-        print(f"❌ Erreur create_client: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @app.route('/api/clients', methods=['POST'])
 @jwt_required()
