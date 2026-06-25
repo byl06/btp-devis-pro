@@ -159,10 +159,29 @@ def get_clients():
         user_id = int(user_id)
         print(f"🔍 Récupération clients pour user_id: {user_id}")
         
-        # Utiliser la méthode get_all du modèle Client
-        clients = client_model.get_all(user_id)
-        print(f"🔍 Clients trouvés: {len(clients)}")
-        return jsonify(clients)
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/client?select=*",
+            headers={
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        print(f"🔍 Status Supabase: {response.status_code}")
+        print(f"🔍 Réponse brute: {response.text}")
+        
+        if response.status_code == 200:
+            all_clients = response.json()
+            clients = [c for c in all_clients if c.get('id_user') == user_id]
+            print(f"🔍 Clients trouvés: {len(clients)}")
+            return jsonify(clients)
+        else:
+            print(f"❌ Erreur Supabase: {response.text}")
+            return jsonify([]), 500
         
     except Exception as e:
         print(f"❌ Erreur get_clients: {e}")
