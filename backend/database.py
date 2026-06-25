@@ -198,24 +198,31 @@ class Database:
         table = self._extract_table(query)
         if not table:
             return []
-
+        
         url = f"{self.supabase_url}/rest/v1/{table}"
-
+        filters = []
+        
+        # Extraire les filtres WHERE (ex: id_user = 1)
+        import re
         where_match = re.search(r"WHERE\s+(\w+)\s*=\s*(\d+)", query, re.IGNORECASE)
         if where_match:
             column = where_match.group(1)
             value = where_match.group(2)
-            url += f"?{column}=eq.{value}"
-
+            filters.append(f"{column}=eq.{value}")
+        
+        # ORDER BY - Supabase attend un format spécifique
         order_match = re.search(r"ORDER\s+BY\s+(\w+)\s*(DESC|ASC)?", query, re.IGNORECASE)
         if order_match:
             order_col = order_match.group(1)
-            order_dir = order_match.group(2) if order_match.group(2) else "ASC"
-            if where_match:
-                url += f"&order={order_col}.{order_dir}"
+            order_dir = order_match.group(2) if order_match.group(2) else "asc"
+            if order_dir.lower() == "desc":
+                filters.append(f"order={order_col}.desc")
             else:
-                url += f"?order={order_col}.{order_dir}"
-
+                filters.append(f"order={order_col}")
+        
+        if filters:
+            url += "?" + "&".join(filters)
+        
         try:
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
@@ -232,22 +239,37 @@ class Database:
         return results[0] if results else None
 
     def find(self, table, column, value):
-        query = f"SELECT * FROM {table} WHERE {column} = {value}"
-        return self.fetch_all(query)
+        # Convertir en int si c'est un ID
+        if column == "id_user" or column == "id":
+            try:
+                value = int(value)
+            except:
+                pass
+        
+        url = f"{self.supabase_url}/rest/v1/{table}?{column}=eq.{value}"
+        
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                return response.json()
+            return []
+        except Exception as e:
+            print(f"❌ Erreur find: {e}")
+            return []
 
     def insert(self, table, data):
         try:
             print(f"🔍 Insert dans {table}: {data}")
-
+            
             response = requests.post(
                 f"{self.supabase_url}/rest/v1/{table}",
                 headers=self.headers,
                 json=data
             )
-
+            
             print(f"🔍 Status: {response.status_code}")
             print(f"🔍 Réponse brute: {response.text}")
-
+            
             if response.status_code in [200, 201]:
                 return response.json()
             else:
