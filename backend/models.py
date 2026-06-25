@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import email
 from database import Database
 import bcrypt
 import requests
@@ -93,9 +92,24 @@ class Client:
         return self.db.insert("client", data)
     
     def get_all(self, id_user):
-    # Utiliser fetch_all avec une requête SQL directe
-     query = f"SELECT * FROM client WHERE id_user = {id_user} ORDER BY nom"
-     return self.db.fetch_all(query)
+        # Requête directe vers Supabase via l'API REST
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/client?select=*",
+            headers={
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if response.status_code == 200:
+            all_clients = response.json()
+            # Filtrer par id_user
+            return [c for c in all_clients if c.get('id_user') == id_user]
+        return []
     
     def get_by_id(self, id_client):
         result = self.db.find("client", "id_client", id_client)
@@ -127,7 +141,22 @@ class Projet:
         return self.db.insert("projet", data)
     
     def get_all(self, id_user):
-        return self.db.find("projet", "id_user", id_user)
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/projet?select=*",
+            headers={
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if response.status_code == 200:
+            all_projets = response.json()
+            return [p for p in all_projets if p.get('id_user') == id_user]
+        return []
     
     def get_by_id(self, id_projet):
         result = self.db.find("projet", "id_projet", id_projet)
@@ -235,11 +264,26 @@ class Abonnement:
         self.db = Database()
     
     def get_by_user(self, id_user):
-        # Requête directe avec fetch_all pour être sûr
-        query = f"SELECT * FROM abonnements WHERE id_user = {id_user}"
-        result = self.db.fetch_all(query)
-        print(f"🔍 Abonnement get_by_user({id_user}): {result}")
-        return result[0] if result else None
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?select=*",
+            headers={
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if response.status_code == 200:
+            all_abos = response.json()
+            for abo in all_abos:
+                if abo.get('id_user') == id_user:
+                    print(f"🔍 Abonnement get_by_user({id_user}): {abo}")
+                    return abo
+        print(f"🔍 Abonnement get_by_user({id_user}): None")
+        return None
     
     def create_trial(self, id_user):
         date_fin = datetime.now() + timedelta(days=14)
