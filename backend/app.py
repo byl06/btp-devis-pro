@@ -163,12 +163,16 @@ def get_clients():
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
+        # Version CORRECTE des headers
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,  # ← AJOUTER CETTE LIGNE !
+            "Content-Type": "application/json"
+        }
+        
         response = requests.get(
             f"{supabase_url}/rest/v1/client?select=*",
-            headers={
-                "Authorization": f"Bearer {supabase_key}",
-                "Content-Type": "application/json"
-            }
+            headers=headers
         )
         
         print(f"🔍 Status Supabase: {response.status_code}")
