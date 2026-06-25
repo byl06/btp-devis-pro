@@ -268,16 +268,33 @@ def delete_client(id_client):
 def get_projets():
     try:
         user_id = get_jwt_identity()
-        query = """
-        SELECT DISTINCT p.* FROM PROJET p
-        LEFT JOIN DEVIS d ON p.id_projet = d.id_projet
-        WHERE d.id_user = %s OR d.id_user IS NULL
-        ORDER BY p.nom_projet
-        """
-        projets = projet_model.db.fetch_all(query, (user_id,))
-        return jsonify(projets)
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/projet?select=*",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            all_projets = response.json()
+            projets = [p for p in all_projets if p.get('id_user') == user_id]
+            return jsonify(projets)
+        else:
+            return jsonify([]), 500
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Erreur get_projets: {e}")
+        return jsonify([]), 500
 
 @app.route('/api/projets', methods=['POST'])
 @jwt_required()
