@@ -189,34 +189,49 @@ def get_clients():
 def create_client():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         
-        # Vérifier le type d'abonnement de l'utilisateur
-        query_abo = "SELECT type_abonnement FROM abonnements WHERE id_user = %s"
-        abonnement = client_model.db.fetch_one(query_abo, (user_id,))
+        print(f"🔍 Création client pour user_id: {user_id}")
+        print(f"🔍 Données reçues: {data}")
         
-        offre = abonnement['type_abonnement'] if abonnement else 'starter'
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        # Vérifier les limites pour l'offre Starter
-        if offre == 'starter':
-            query_count = "SELECT COUNT(*) as total FROM client WHERE id_user = %s"
-            result = client_model.db.fetch_one(query_count, (user_id,))
-            count_clients = result['total'] if result else 0
-            
-            if count_clients >= 10:
-                return jsonify({
-                    'success': False, 
-                    'message': '❌ Limite de 10 clients atteinte. Passez à l\'offre Pro pour ajouter plus de clients.'
-                }), 403
+        client_data = {
+            "nom": data.get('nom'),
+            "telephone": data.get('telephone'),
+            "email": data.get('email'),
+            "adresse": data.get('adresse'),
+            "id_user": user_id
+        }
         
-        # Créer le client
-        query = "INSERT INTO client (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
-        client_model.db.execute_query(query, (data['nom'], data['telephone'], data['email'], data['adresse'], user_id))
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
         
-        return jsonify({'success': True, 'message': 'Client créé'})
+        response = requests.post(
+            f"{supabase_url}/rest/v1/client",
+            headers=headers,
+            json=client_data
+        )
+        
+        print(f"🔍 Status Supabase: {response.status_code}")
+        print(f"🔍 Réponse brute: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Client créé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
     except Exception as e:
-        print(f"❌ Erreur création client: {e}")
+        print(f"❌ Erreur create_client: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/clients/<int:id_client>', methods=['PUT'])
