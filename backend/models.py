@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from unittest import result
 from database import Database
 import bcrypt
 import requests
@@ -9,22 +10,24 @@ class Utilisateur:
     
     def create(self, nom, email, mot_de_passe, entreprise, telephone):
         if isinstance(mot_de_passe, str):
-            mot_de_passe_bytes = mot_de_passe.encode('utf-8')
+         mot_de_passe_bytes = mot_de_passe.encode('utf-8')
         else:
-            mot_de_passe_bytes = mot_de_passe
+         mot_de_passe_bytes = mot_de_passe
         salt = bcrypt.gensalt()
         mot_de_passe_hash = bcrypt.hashpw(mot_de_passe_bytes, salt)
         hash_str = mot_de_passe_hash.decode('utf-8')
-        
+    
         data = {
-            "nom": nom,
-            "email": email,
-            "mot_de_passe": mot_de_passe,
-            "mot_de_passe_hash": hash_str,
-            "entreprise": entreprise,
-            "telephone": telephone
-        }
-        return self.db.insert("utilisateur", data)
+        "nom": nom,
+        "email": email,
+        "mot_de_passe": mot_de_passe,
+        "mot_de_passe_hash": hash_str,
+        "entreprise": entreprise,
+        "telephone": telephone
+ }
+        result = self.db.insert("utilisateur", data)
+        print(f"🔍 Résultat création utilisateur: {result}")
+        return result
     
     def get_by_email(self, email):
         result = self.db.find("utilisateur", "email", email)

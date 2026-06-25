@@ -64,23 +64,40 @@ def register():
             data['entreprise'], data['telephone']
         )
         
+        # Vérifier si result est une liste ou un dict
         if result:
             # Récupérer l'ID du nouvel utilisateur
-            user_id = result.lastrowid
+            if isinstance(result, list) and len(result) > 0:
+                user_id = result[0].get('id_user')
+            elif isinstance(result, dict):
+                user_id = result.get('id_user')
+            else:
+                # Si on n'a pas d'ID, récupérer le dernier utilisateur créé
+                user = utilisateur_model.get_by_email(data['email'])
+                if user:
+                    user_id = user.get('id_user')
+                else:
+                    return jsonify({'success': False, 'message': 'Erreur lors de la récupération'}), 500
             
-            # Créer un abonnement essai de 14 jours
-            from datetime import datetime, timedelta
-            date_fin_essai = datetime.now() + timedelta(days=14)
-            
-            query = """
-            INSERT INTO ABONNEMENTS (id_user, statut, date_debut, date_fin, type_abonnement)
-            VALUES (%s, 'actif', %s, %s, 'essai')
-            """
-            utilisateur_model.db.execute_query(query, (user_id, datetime.now(), date_fin_essai))
-            
-            return jsonify({'success': True, 'message': 'Inscription réussie ! Période d\'essai de 14 jours.'})
-        return jsonify({'success': False, 'message': 'Erreur'}), 500
+            if user_id:
+                # Créer un abonnement essai de 14 jours
+                from datetime import datetime, timedelta
+                date_fin_essai = datetime.now() + timedelta(days=14)
+                
+                query = """
+                INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
+                VALUES (%s, 'actif', %s, %s, 'essai')
+                """
+                utilisateur_model.db.execute_query(query, (user_id, datetime.now(), date_fin_essai))
+                
+                return jsonify({'success': True, 'message': 'Inscription réussie ! Période d\'essai de 14 jours.'})
+        
+        return jsonify({'success': False, 'message': 'Erreur lors de l\'inscription'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur register: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
