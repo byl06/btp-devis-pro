@@ -579,25 +579,52 @@ async exportClientsToExcel() {
     console.log("🟢 Rendu des clients:", clients);
     console.log("Premier client:", clients[0]);
     
+    // Toujours afficher le bouton Ajouter
+    const addButtonHtml = `
+        <button class="btn-primary" onclick="app.openCreateClientModal()">
+            <i class="fas fa-plus"></i> Ajouter
+        </button>
+    `;
+    
     if (!clients || clients.length === 0) {
-        return `<div class="glass-card">Aucun client</div>`;
+        return `
+            <div>
+                <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+                    ${addButtonHtml}
+                </div>
+                <div class="glass-card" style="text-align:center; padding:2rem;">
+                    <p>Aucun client</p>
+                </div>
+            </div>
+        `;
     }
     
     return `
         <div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
                 <h3>Mes clients (${clients.length})</h3>
-                <button class="btn-primary" onclick="app.openCreateClientModal()">+ Ajouter</button>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-secondary" onclick="app.exportClientsToExcel()" style="background:#10B981; border-color:#10B981;">
+                        <i class="fas fa-file-excel"></i> Export Excel
+                    </button>
+                    ${addButtonHtml}
+                </div>
             </div>
             <div class="cards-grid">
                 ${clients.map(c => `
                     <div class="glass-card">
-                        <div class="card-title">${c.nom || c.client_nom || 'Sans nom'}</div>
-                        <p><i class="fas fa-envelope"></i> ${c.email || c.client_email || '-'}</p>
-                        <p><i class="fas fa-phone"></i> ${c.telephone || c.client_telephone || '-'}</p>
-                        <div style="margin-top:1rem;">
-                            <button class="btn-icon" onclick="app.editClient(${c.id_client || c.id})"><i class="fas fa-edit"></i></button>
-                            <button class="btn-icon" onclick="app.deleteClient(${c.id_client || c.id})"><i class="fas fa-trash"></i></button>
+                        <div class="card-icon"><i class="fas fa-user"></i></div>
+                        <div class="card-title">${c.nom}</div>
+                        <p style="word-break: break-all;">
+                            <i class="fas fa-envelope"></i> ${c.email || '-'}
+                        </p>
+                        <p><i class="fas fa-phone"></i> ${c.telephone || '-'}</p>
+                        <p style="word-break: break-word;">
+                            <i class="fas fa-map-marker-alt"></i> ${c.adresse || '-'}
+                        </p>
+                        <div style="margin-top:1rem; display:flex; gap:0.5rem">
+                            <button class="btn-icon" onclick="app.editClient(${c.id_client})"><i class="fas fa-edit"></i></button>
+                            <button class="btn-icon" onclick="app.deleteClient(${c.id_client})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                 `).join('')}
@@ -605,7 +632,6 @@ async exportClientsToExcel() {
         </div>
     `;
 }
-
 
     async renderProjets() {
         const projets = this.safeArray(await this.fetchProjets());
@@ -2945,7 +2971,13 @@ async showSubscriptionBanner() {
         const response = await apiRequest('/api/abonnement/statut');
         const data = await response.json();
         
-        console.log("Données complètes:", data);
+        console.log("📊 Données abonnement:", data);
+        
+        // Si c'est l'admin illimité, ne pas afficher le bandeau
+        if (data.success && data.type === 'illimite') {
+            console.log("👑 Admin illimité - pas de bandeau");
+            return;
+        }
         
         if (!data.success || data.statut !== 'actif') {
             console.log("❌ Pas d'abonnement actif");
@@ -2956,7 +2988,6 @@ async showSubscriptionBanner() {
         const oldBanner = document.getElementById('subscription-banner');
         if (oldBanner) oldBanner.remove();
         
-        // 👇 ICI LA CORRECTION : on utilise directement data.type
         const offre = data.type || 'starter';
         const joursRestants = data.jours_restants || 0;
         const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString() : 'inconnue';
@@ -3046,7 +3077,7 @@ async showSubscriptionBanner() {
         }
         
     } catch (error) {
-        console.error("❌ Erreur:", error);
+        console.error("❌ Erreur showSubscriptionBanner:", error);
     }
 }
 
@@ -3059,24 +3090,35 @@ safeArray(data) {
 
 async checkLimites(operation) {
     const user = this.currentUser;
-    if (user.email === 'admin@btp.com') return true;
     
+    // Admin = illimité
+    if (user && (user.email === 'admin@btp.com' || user.email === 'bylgaitb@gmail.com')) {
+        console.log("👑 Admin détecté - pas de limites");
+        return true;
+    }
+    
+    // Récupérer l'abonnement
     try {
         const response = await apiRequest('/api/abonnement/statut');
         const data = await response.json();
+        console.log("🔍 checkLimites - abonnement:", data);
         
+        // Si pas d'abonnement actif, on autorise quand même l'affichage
+        // mais on bloque la création
         if (!data.success || data.statut !== 'actif') {
-            Toast.warning('Abonnement inactif. Contactez l\'administrateur.');
-            return false;
+            console.log("⚠️ Abonnement inactif - affichage autorisé, création bloquée");
+            // Retourner true pour afficher le bouton, mais bloquer la création ailleurs
+            return true;
         }
         
-        const offre = data.type_abonnement || 'starter';
+        const offre = data.type || 'starter';
         
         const limites = {
             starter: { clients: 10, projets: 10, devis: 20 },
             pro: { clients: 999999, projets: 999999, devis: 999999 },
             annuel: { clients: 999999, projets: 999999, devis: 999999 },
-            essai: { clients: 999999, projets: 999999, devis: 999999 }
+            essai: { clients: 999999, projets: 999999, devis: 999999 },
+            illimite: { clients: 999999, projets: 999999, devis: 999999 }
         };
         
         // Compter les éléments actuels
@@ -3104,12 +3146,11 @@ async checkLimites(operation) {
         }
         
         return true;
+        
     } catch (error) {
         console.error('Erreur checkLimites:', error);
-        return true;
+        return true; // Autoriser par défaut en cas d'erreur
     }
-
-    
 }
 
 // Traduire les textes statiques
