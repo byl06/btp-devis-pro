@@ -817,13 +817,13 @@ async ajouterEssai(id_user) {
             const response = await apiRequest(`/api/admin/abonnement/${id_user}/trial`, { method: 'POST' });
             const result = await response.json();
             if (result.success) {
-                Toast.success('14 jours d\'essai ajoutés avec succès !');
+                Toast.success('✅ 14 jours d\'essai ajoutés avec succès !');
                 this.loadPage('admin');
             } else {
-                Toast.error(result.error);
+                Toast.error(result.error || 'Erreur lors de l\'ajout');
             }
         } catch (error) {
-            Toast.error('Erreur lors de l\'ajout');
+            Toast.error('❌ Erreur de connexion');
         }
     }
 }
@@ -2615,7 +2615,19 @@ async fetchAbonnements() {
 }
 
 async prolongerAbonnement(id_user, jours, montant, offreType) {
-    const methode = prompt(`💰 Confirmation paiement\n\nClient: ID ${id_user}\nOffre: ${offreType}\nDurée: ${jours} jours\nMontant: ${montant.toLocaleString()} FCFA\n\nMéthode de paiement reçue ?\n- Virement\n- Mobile Money\n- Espèces`, 'virement');
+    const methode = prompt(
+        `💰 Confirmation paiement\n\n` +
+        `Client: ID ${id_user}\n` +
+        `Offre: ${offreType}\n` +
+        `Durée: ${jours} jours\n` +
+        `Montant: ${montant.toLocaleString()} FCFA\n\n` +
+        `Méthode de paiement reçue ?\n` +
+        `- Virement\n` +
+        `- Mobile Money\n` +
+        `- Espèces`,
+        'virement'
+    );
+    
     if (!methode) return;
     
     if (confirm(`✅ Confirmer le paiement de ${montant.toLocaleString()} FCFA pour l'offre ${offreType} ?`)) {
@@ -2626,17 +2638,16 @@ async prolongerAbonnement(id_user, jours, montant, offreType) {
             });
             const result = await response.json();
             if (result.success) {
-                alert(`✅ Abonnement ${offreType} prolongé de ${jours} jours !`);
+                Toast.success(`✅ Abonnement ${offreType} prolongé de ${jours} jours !`);
                 this.loadPage('admin');
             } else {
-                alert('❌ ' + result.error);
+                Toast.error(result.error || 'Erreur');
             }
         } catch (error) {
-            alert('❌ Erreur');
+            Toast.error('❌ Erreur de connexion');
         }
     }
 }
-
 
 // Afficher le bandeau d'abonnement dans le dashboard
 translatePage() {

@@ -138,34 +138,62 @@ def login():
 def admin_add_trial(id_user):
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.get_by_id(admin_id)
+        admin_id = int(admin_id)
         
-        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+        # Vérifier que c'est l'admin (ID = 1)
+        if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
         from datetime import datetime, timedelta
         date_fin = datetime.now() + timedelta(days=14)
         
-        # Vérifier si l'utilisateur a déjà un abonnement
-        check_query = "SELECT * FROM abonnements WHERE id_user = %s"
-        existing = utilisateur_model.db.fetch_one(check_query, (id_user,))
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        if existing:
-            query = """
-            UPDATE abonnements 
-            SET date_fin = %s, statut = 'actif', type_abonnement = 'essai'
-            WHERE id_user = %s
-            """
-            utilisateur_model.db.execute_query(query, (date_fin, id_user))
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier si l'utilisateur a déjà un abonnement
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+            headers=headers
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            # Mettre à jour
+            update_data = {
+                "statut": "actif",
+                "date_fin": date_fin.isoformat(),
+                "type_abonnement": "essai"
+            }
+            requests.patch(
+                f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+                headers=headers,
+                json=update_data
+            )
         else:
-            query = """
-            INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
-            VALUES (%s, 'actif', %s, %s, 'essai')
-            """
-            utilisateur_model.db.execute_query(query, (id_user, datetime.now(), date_fin))
+            # Créer
+            abo_data = {
+                "id_user": id_user,
+                "statut": "actif",
+                "date_debut": datetime.now().isoformat(),
+                "date_fin": date_fin.isoformat(),
+                "type_abonnement": "essai"
+            }
+            requests.post(
+                f"{supabase_url}/rest/v1/abonnements",
+                headers=headers,
+                json=abo_data
+            )
         
         return jsonify({'success': True, 'message': '14 jours d\'essai ajoutés'})
+        
     except Exception as e:
+        print(f"❌ Erreur trial: {e}")
         return jsonify({'error': str(e)}), 500
 # ==================== CLIENTS ====================
 @app.route('/api/clients', methods=['GET'])
@@ -936,8 +964,9 @@ def get_abonnement_statut():
         user_id = get_jwt_identity()
         user_id = int(user_id)
         
-        # 🔥 FORCER L'ADMIN À ÊTRE ILLIMITÉ
+        # Si c'est l'admin, retourne illimité
         if user_id == 1:
+            from datetime import datetime, timedelta
             return jsonify({
                 'success': True,
                 'statut': 'actif',
@@ -946,35 +975,34 @@ def get_abonnement_statut():
                 'jours_restants': 365*100
             })
         
-        # Pour les autres utilisateurs, on cherche dans Supabase
-        try:
-            import requests
-            supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-            supabase_key = "TA_VERITABLE_CLE_SERVICE_ROLE"  # ← Remplace par ta clé
-            
-            response = requests.get(
-                f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}",
-                headers={
-                    "Authorization": f"Bearer {supabase_key}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200:
-                abonnements = response.json()
-                if abonnements and len(abonnements) > 0:
-                    abo = abonnements[0]
-                    date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
-                    jours_restants = (date_fin - datetime.now()).days
-                    return jsonify({
-                        'success': True,
-                        'statut': abo.get('statut', 'actif'),
-                        'type': abo.get('type_abonnement', 'starter'),
-                        'date_fin': abo.get('date_fin'),
-                        'jours_restants': max(0, jours_restants)
-                    })
-        except Exception as e:
-            print(f"Erreur requête Supabase: {e}")
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if response.status_code == 200 and response.json():
+            abo = response.json()[0]
+            if abo.get('statut') == 'actif':
+                from datetime import datetime
+                date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
+                jours_restants = (date_fin - datetime.now()).days
+                return jsonify({
+                    'success': True,
+                    'statut': abo.get('statut'),
+                    'type': abo.get('type_abonnement'),
+                    'date_fin': abo.get('date_fin'),
+                    'jours_restants': max(0, jours_restants)
+                })
         
         return jsonify({'success': False, 'statut': 'inactif'})
         
@@ -1349,53 +1377,53 @@ L'équipe BTP Pro"""
 def admin_get_abonnements():
     try:
         user_id = get_jwt_identity()
-        user_id = int(user_id)  # ← Convertir en entier
-        print(f"🔍 user_id: {user_id}")
+        user_id = int(user_id)
         
-        # Récupérer l'utilisateur avec fetch_all (plus fiable)
-        query = f"SELECT * FROM utilisateur WHERE id_user = {user_id}"
-        user = utilisateur_model.db.fetch_all(query)
-        user = user[0] if user else None
-        
-        print(f"🔍 Utilisateur trouvé: {user}")
-        
-        if not user:
-            return jsonify({'error': 'Utilisateur non trouvé'}), 404
-        
-        if user.get('id_user') != 1:
+        # Vérifier que c'est l'admin (ID = 1)
+        if user_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
-        # Récupérer tous les utilisateurs SAUF l'admin
-        query_all = "SELECT * FROM utilisateur WHERE id_user != 1 ORDER BY id_user"
-        all_users = utilisateur_model.db.fetch_all(query_all)
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer tous les utilisateurs
+        response = requests.get(f"{supabase_url}/rest/v1/utilisateur?select=*", headers=headers)
         result = []
         
-        for u in all_users:
-            # Récupérer l'abonnement
-            query_abo = f"SELECT * FROM abonnements WHERE id_user = {u.get('id_user')}"
-            abos = utilisateur_model.db.fetch_all(query_abo)
-            abo = abos[0] if abos else None
-            
-            result.append({
-                'id_user': u.get('id_user'),
-                'nom': u.get('nom', '-'),
-                'email': u.get('email', ''),
-                'entreprise': u.get('entreprise', '-'),
-                'telephone': u.get('telephone', '-'),
-                'id_abonnement': abo.get('id_abonnement') if abo else None,
-                'statut': abo.get('statut') if abo else 'inactif',
-                'date_debut': abo.get('date_debut') if abo else None,
-                'date_fin': abo.get('date_fin') if abo else None,
-                'type_abonnement': abo.get('type_abonnement') if abo else 'aucun',
-                'jours_restants': 0
-            })
+        if response.status_code == 200:
+            all_users = response.json()
+            for u in all_users:
+                if u.get('id_user') != 1:  # Exclure l'admin
+                    # Récupérer l'abonnement
+                    abo_response = requests.get(
+                        f"{supabase_url}/rest/v1/abonnements?id_user=eq.{u.get('id_user')}",
+                        headers=headers
+                    )
+                    abo = abo_response.json()[0] if abo_response.status_code == 200 and abo_response.json() else None
+                    
+                    result.append({
+                        'id_user': u.get('id_user'),
+                        'nom': u.get('nom', '-'),
+                        'email': u.get('email', ''),
+                        'entreprise': u.get('entreprise', '-'),
+                        'telephone': u.get('telephone', '-'),
+                        'statut': abo.get('statut') if abo else 'inactif',
+                        'date_fin': abo.get('date_fin') if abo else None,
+                        'type_abonnement': abo.get('type_abonnement') if abo else 'aucun',
+                        'jours_restants': 0
+                    })
         
         return jsonify(result)
         
     except Exception as e:
         print(f"❌ Erreur admin: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -1404,69 +1432,85 @@ def admin_get_abonnements():
 def admin_prolonger_abonnement(id_user):
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.db.find("utilisateur", "id_user", admin_id)
-        admin = admin[0] if admin else None
+        admin_id = int(admin_id)
         
-        if not admin or (admin.get('email') != 'admin@btp.com' and admin.get('email') != 'bylgaitb@gmail.com'):
+        # Vérifier que c'est l'admin (ID = 1)
+        if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
         data = request.json
         jours = data.get('jours', 30)
         montant = data.get('montant', 0)
         methode = data.get('methode', 'virement')
-        offreType = data.get('offreType', 'pro')
+        offreType = data.get('offreType', 'starter')
         
+        from datetime import datetime, timedelta
         date_fin = datetime.now() + timedelta(days=jours)
-        date_fin_str = date_fin.isoformat()
-        now_str = datetime.now().isoformat()
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
         
         # Vérifier si l'utilisateur a déjà un abonnement
-        existing = utilisateur_model.db.find("abonnements", "id_user", id_user)
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+            headers=headers
+        )
         
-        if existing and len(existing) > 0:
+        if check_response.status_code == 200 and check_response.json():
             # Mettre à jour
-            utilisateur_model.db.update("abonnements", id_user, {
-                "date_fin": date_fin_str,
+            update_data = {
                 "statut": "actif",
+                "date_fin": date_fin.isoformat(),
                 "type_abonnement": offreType
-            }, "id_user")
+            }
+            requests.patch(
+                f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+                headers=headers,
+                json=update_data
+            )
         else:
             # Créer
-            utilisateur_model.db.insert("abonnements", {
+            abo_data = {
                 "id_user": id_user,
                 "statut": "actif",
-                "date_debut": now_str,
-                "date_fin": date_fin_str,
+                "date_debut": datetime.now().isoformat(),
+                "date_fin": date_fin.isoformat(),
                 "type_abonnement": offreType
-            })
+            }
+            requests.post(
+                f"{supabase_url}/rest/v1/abonnements",
+                headers=headers,
+                json=abo_data
+            )
         
-        # Notification
-        notification_message = f"✅ Abonnement {offreType} renouvelé pour {jours} jours. Échéance: {date_fin.strftime('%d/%m/%Y')}"
-        utilisateur_model.db.insert("notifications", {
-            "id_user": id_user,
-            "message": notification_message,
-            "type": "renouvellement",
-            "date_creation": now_str
-        })
-        
-        # Paiement
+        # Enregistrer le paiement
         import uuid
         reference = f"PAY_{id_user}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        utilisateur_model.db.insert("paiements", {
+        paiement_data = {
             "id_user": id_user,
             "montant": montant,
-            "date_paiement": now_str,
+            "date_paiement": datetime.now().isoformat(),
             "reference_paiement": reference,
             "methode": methode,
             "statut": "valide"
-        })
+        }
+        requests.post(
+            f"{supabase_url}/rest/v1/paiements",
+            headers=headers,
+            json=paiement_data
+        )
         
-        return jsonify({'success': True, 'message': f'Abonnement {offreType} prolongé'})
+        return jsonify({'success': True, 'message': f'Abonnement {offreType} prolongé de {jours} jours'})
         
     except Exception as e:
         print(f"❌ Erreur prolonger: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
 
