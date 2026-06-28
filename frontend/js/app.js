@@ -2,6 +2,8 @@
 // Configuration API - détection automatique
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_URL = isLocal ? 'http://localhost:5000' : 'https://btp-devis-pro-1.onrender.com';
+const WHATSAPP_NUMBER = "2290143733706";
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 // Récupérer le token
 const token = localStorage.getItem('token');
@@ -3051,52 +3053,70 @@ async showSubscriptionBanner() {
         let buttonHtml = '';
         if (offre === 'essai') {
             buttonHtml = `
-                <button onclick="app.showPricingModal()" style="
-                    background: rgba(255,255,255,0.2);
-                    border: 1px solid rgba(255,255,255,0.3);
-                    color: white;
-                    padding: 8px 20px;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    font-size: 0.85rem;
-                " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                    🚀 S'abonner
-                </button>
-            `;
+    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20m%27abonner%20apr%C3%A8s%20mon%20essai%20gratuit" 
+       target="_blank" 
+       style="
+           background: rgba(255,255,255,0.2);
+           border: 1px solid rgba(255,255,255,0.3);
+           color: white;
+           padding: 8px 20px;
+           border-radius: 8px;
+           font-weight: 600;
+           cursor: pointer;
+           transition: all 0.3s ease;
+           font-size: 0.85rem;
+           text-decoration: none;
+           display: inline-block;
+       " 
+       onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+        🚀 S'abonner
+    </a>
+`;
         } else if (isExpiringSoon) {
             buttonHtml = `
-                <button onclick="app.showPricingModal()" style="
-                    background: #F59E0B;
-                    border: none;
-                    color: #1A1A18;
-                    padding: 8px 20px;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    font-size: 0.85rem;
-                " onmouseover="this.style.background='#D97706'" onmouseout="this.style.background='#F59E0B'">
-                    🔄 Renouveler
-                </button>
-            `;
+    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20renouveler%20mon%20abonnement" 
+       target="_blank" 
+       style="
+           background: #F59E0B;
+           border: none;
+           color: #1A1A18;
+           padding: 8px 20px;
+           border-radius: 8px;
+           font-weight: 600;
+           cursor: pointer;
+           transition: all 0.3s ease;
+           font-size: 0.85rem;
+           text-decoration: none;
+           display: inline-block;
+       " 
+       onmouseover="this.style.background='#D97706'" 
+       onmouseout="this.style.background='#F59E0B'">
+        🔄 Renouveler
+    </a>
+`;
         } else {
             buttonHtml = `
-                <button onclick="app.showPricingModal()" style="
-                    background: rgba(255,255,255,0.15);
-                    border: 1px solid rgba(255,255,255,0.25);
-                    color: white;
-                    padding: 8px 18px;
-                    border-radius: 8px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    font-size: 0.8rem;
-                " onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-                    Changer d'offre
-                </button>
-            `;
+    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20changer%20d%27offre" 
+       target="_blank" 
+       style="
+           background: rgba(255,255,255,0.15);
+           border: 1px solid rgba(255,255,255,0.25);
+           color: white;
+           padding: 8px 18px;
+           border-radius: 8px;
+           font-weight: 500;
+           cursor: pointer;
+           transition: all 0.3s ease;
+           font-size: 0.8rem;
+           text-decoration: none;
+           display: inline-block;
+       " 
+       onmouseover="this.style.background='rgba(255,255,255,0.25)'" 
+       onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+        Changer d'offre
+    </a>
+`;
         }
         
         banner.innerHTML = `
@@ -3163,6 +3183,9 @@ showSuspendedBanner() {
     const oldBanner = document.getElementById('subscription-banner');
     if (oldBanner) oldBanner.remove();
     
+    const WHATSAPP_URL = "https://wa.me/2290143733706";
+    const message = "Bonjour%20BTP%20Devis%20Pro%2C%20mon%20abonnement%20a%20%C3%A9t%C3%A9%20suspendu%2C%20je%20souhaite%20le%20r%C3%A9activer";
+    
     const banner = document.createElement('div');
     banner.id = 'subscription-banner';
     banner.style.cssText = `
@@ -3205,18 +3228,25 @@ showSuspendedBanner() {
             </div>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <button onclick="app.showPricingModal()" style="
-                background: rgba(255,255,255,0.2);
-                border: 1px solid rgba(255,255,255,0.3);
-                color: white;
-                padding: 8px 20px;
-                border-radius: 8px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+            <a href="${WHATSAPP_URL}?text=${message}" 
+               target="_blank" 
+               style="
+                   background: rgba(255,255,255,0.2);
+                   border: 1px solid rgba(255,255,255,0.3);
+                   color: white;
+                   padding: 8px 20px;
+                   border-radius: 8px;
+                   font-weight: 600;
+                   cursor: pointer;
+                   transition: all 0.3s ease;
+                   text-decoration: none;
+                   display: inline-block;
+                   font-size: 0.85rem;
+               " 
+               onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+               onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                 📞 Nous contacter
-            </button>
+            </a>
             <span onclick="this.closest('#subscription-banner').remove()" style="
                 cursor: pointer;
                 opacity: 0.5;
