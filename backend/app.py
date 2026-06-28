@@ -964,9 +964,10 @@ def get_abonnement_statut():
         user_id = get_jwt_identity()
         user_id = int(user_id)
         
-        # Si c'est l'admin, retourne illimité
+        from datetime import datetime
+        
+        # Admin illimité
         if user_id == 1:
-            from datetime import datetime, timedelta
             return jsonify({
                 'success': True,
                 'statut': 'actif',
@@ -992,16 +993,47 @@ def get_abonnement_statut():
         
         if response.status_code == 200 and response.json():
             abo = response.json()[0]
-            if abo.get('statut') == 'actif':
-                from datetime import datetime
-                date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
+            statut = abo.get('statut', 'inactif')
+            date_fin_str = abo.get('date_fin')
+            
+            # 🔥 VÉRIFIER SI LA DATE EST DÉPASSÉE
+            if date_fin_str and statut == 'actif':
+                date_fin = datetime.fromisoformat(date_fin_str.replace('Z', '+00:00'))
                 jours_restants = (date_fin - datetime.now()).days
+                
+                if jours_restants <= 0:
+                    # 🔥 L'abonnement est EXPIRÉ → on met à jour le statut
+                    statut = 'expiré'
+                    # Mettre à jour dans Supabase
+                    update_data = {"statut": "expiré"}
+                    requests.patch(
+                        f"{supabase_url}/rest/v1/abonnements?id_abonnement=eq.{abo.get('id_abonnement')}",
+                        headers=headers,
+                        json=update_data
+                    )
+                    return jsonify({
+                        'success': False,
+                        'statut': 'expiré',
+                        'message': 'Votre abonnement a expiré'
+                    })
+                else:
+                    return jsonify({
+                        'success': True,
+                        'statut': 'actif',
+                        'type': abo.get('type_abonnement', 'starter'),
+                        'date_fin': date_fin_str,
+                        'jours_restants': max(0, jours_restants)
+                    })
+            elif statut == 'suspendu':
                 return jsonify({
-                    'success': True,
-                    'statut': abo.get('statut'),
-                    'type': abo.get('type_abonnement'),
-                    'date_fin': abo.get('date_fin'),
-                    'jours_restants': max(0, jours_restants)
+                    'success': False,
+                    'statut': 'suspendu',
+                    'message': 'Votre abonnement est suspendu'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'statut': statut or 'inactif'
                 })
         
         return jsonify({'success': False, 'statut': 'inactif'})

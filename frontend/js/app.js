@@ -2273,11 +2273,33 @@ async checkLimites(operation) {
         const response = await apiRequest('/api/abonnement/statut');
         const data = await response.json();
         
-        if (!data.success || data.statut !== 'actif') {
-            Toast.warning('Abonnement inactif. Contactez l\'administrateur.');
+        console.log("🔍 checkLimites - data:", data);
+        
+        // 🔥 Gestion des différents statuts
+        if (!data.success) {
+            Toast.warning('⚠️ Abonnement non trouvé. Contactez l\'administrateur.');
             return false;
         }
         
+        // Statut : expiré
+        if (data.statut === 'expiré') {
+            Toast.error('⛔ Votre abonnement a expiré. Contactez l\'administrateur pour le renouveler.');
+            return false;
+        }
+        
+        // Statut : suspendu
+        if (data.statut === 'suspendu') {
+            Toast.error('⛔ Votre abonnement est suspendu. Contactez l\'administrateur.');
+            return false;
+        }
+        
+        // Statut : inactif ou autre
+        if (data.statut !== 'actif') {
+            Toast.warning('⚠️ Abonnement inactif. Contactez l\'administrateur.');
+            return false;
+        }
+        
+        // Si l'abonnement est actif, vérifier les limites
         const offre = data.type || 'starter';
         
         const limites = {
@@ -2300,22 +2322,23 @@ async checkLimites(operation) {
         };
         
         if (operation === 'client' && counts.clients >= limites[offre].clients) {
-            Toast.warning(`Limite de clients atteinte (${limites[offre].clients}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de clients atteinte (${limites[offre].clients}). Passez à l'offre Pro !`);
             return false;
         }
         if (operation === 'projet' && counts.projets >= limites[offre].projets) {
-            Toast.warning(`Limite de projets atteinte (${limites[offre].projets}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de projets atteinte (${limites[offre].projets}). Passez à l'offre Pro !`);
             return false;
         }
         if (operation === 'devis' && counts.devis >= limites[offre].devis) {
-            Toast.warning(`Limite de devis atteinte (${limites[offre].devis}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de devis atteinte (${limites[offre].devis}). Passez à l'offre Pro !`);
             return false;
         }
         
         return true;
         
     } catch (error) {
-        console.error('Erreur checkLimites:', error);
+        console.error('❌ Erreur checkLimites:', error);
+        // En cas d'erreur, on autorise par défaut pour éviter de bloquer l'utilisateur
         return true;
     }
 }
