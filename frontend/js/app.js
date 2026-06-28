@@ -2982,6 +2982,12 @@ async showSubscriptionBanner() {
             return;
         }
         
+        // Si abonnement suspendu
+        if (data.success && data.statut === 'suspendu') {
+            this.showSuspendedBanner();
+            return;
+        }
+        
         if (!data.success || data.statut !== 'actif') {
             console.log("❌ Pas d'abonnement actif");
             return;
@@ -2993,108 +2999,235 @@ async showSubscriptionBanner() {
         
         const offre = data.type || 'starter';
         const joursRestants = data.jours_restants || 0;
-        const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString() : 'inconnue';
+        const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString('fr-FR') : 'inconnue';
         
-        let bgColor = '';
-        let icon = '';
-        let message = '';
-        let buttonHtml = '';
+        // Configuration des couleurs et icônes
+        const configs = {
+            essai: { bg: 'linear-gradient(135deg, #1E3A8A, #7C3AED)', icon: 'fa-gift', label: 'Essai gratuit' },
+            starter: { bg: 'linear-gradient(135deg, #059669, #10B981)', icon: 'fa-leaf', label: 'Starter' },
+            pro: { bg: 'linear-gradient(135deg, #1E3A8A, #06B6D4)', icon: 'fa-crown', label: 'Pro' },
+            annuel: { bg: 'linear-gradient(135deg, #DC2626, #F59E0B)', icon: 'fa-gem', label: 'Annuel' }
+        };
         
-        // Essai gratuit
-        if (offre === 'essai' && joursRestants > 0) {
-            bgColor = 'linear-gradient(135deg, #1E3A8A, #7C3AED)';
-            icon = 'fa-gift';
-            message = `🎁 Période d'essai gratuite : plus que ${joursRestants} jour(s) !`;
-            buttonHtml = `<button class="btn-primary" onclick="app.showPricingModal()" style="background:#10B981;">S'abonner</button>`;
-        }
-        // Starter
-        else if (offre === 'starter') {
-            bgColor = 'linear-gradient(135deg, #059669, #10B981)';
-            icon = 'fa-leaf';
-            message = `🟢 Abonnement Starter actif - Expire le ${dateFin} (${joursRestants} jours restants)`;
-            buttonHtml = `<button class="btn-secondary" onclick="app.showPricingModal()">Changer d'offre</button>`;
-        }
-        // Pro
-        else if (offre === 'pro') {
-            bgColor = 'linear-gradient(135deg, #1E3A8A, #06B6D4)';
-            icon = 'fa-crown';
-            message = `🔵 Abonnement Pro actif - Expire le ${dateFin} (${joursRestants} jours restants)`;
-            buttonHtml = `<button class="btn-secondary" onclick="app.showPricingModal()">Changer d'offre</button>`;
-        }
-        // Annuel
-        else if (offre === 'annuel') {
-            bgColor = 'linear-gradient(135deg, #DC2626, #F59E0B)';
-            icon = 'fa-gem';
-            message = `🔴 Abonnement Annuel actif - Expire le ${dateFin} (${joursRestants} jours restants)`;
-            buttonHtml = `<button class="btn-secondary" onclick="app.showPricingModal()">Changer d'offre</button>`;
-        }
-        // Autre
-        else if (joursRestants > 0) {
-            bgColor = 'linear-gradient(135deg, #1E3A8A, #7C3AED)';
-            icon = 'fa-calendar-check';
-            message = `✅ Abonnement actif - Expire le ${dateFin} (${joursRestants} jours restants)`;
-            buttonHtml = `<button class="btn-secondary" onclick="app.showPricingModal()">Changer d'offre</button>`;
-        }
-        // Expiré
-        else {
-            bgColor = 'linear-gradient(135deg, #991B1B, #EF4444)';
-            icon = 'fa-exclamation-triangle';
-            message = `⛔ Votre abonnement est expiré. Renouvelez maintenant !`;
-            buttonHtml = `<button class="btn-primary" onclick="app.showPricingModal()" style="background:#F59E0B;">Renouveler</button>`;
-        }
+        const config = configs[offre] || configs.starter;
+        const isExpiringSoon = joursRestants < 7 && joursRestants > 0;
         
+        // Créer le bandeau
         const banner = document.createElement('div');
-banner.id = 'subscription-banner';
-banner.style.cssText = `
-    background: ${bgColor};
-    border-radius: 15px;
-    padding: 15px 20px;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-    animation: slideDown 0.5s ease;
-    position: relative;
-`;
-
-banner.innerHTML = `
-    <div>
-        <i class="fas ${icon}" style="margin-right: 10px;"></i>
-        <strong>${message}</strong>
-    </div>
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-        ${buttonHtml}
-        <span onclick="this.closest('#subscription-banner').remove()" style="cursor:pointer; opacity:0.6; font-size:1.2rem; padding:0 5px;">✕</span>
-    </div>
-`;
+        banner.id = 'subscription-banner';
+        banner.style.cssText = `
+            background: ${config.bg};
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideDown 0.5s ease;
+            border: 1px solid rgba(255,255,255,0.15);
+        `;
         
-        // Insérer le bandeau
-        const cardsGrid = document.querySelector('.cards-grid');
-        if (cardsGrid && !document.getElementById('subscription-banner')) {
-            cardsGrid.parentNode.insertBefore(banner, cardsGrid);
+        // Message selon l'offre et les jours restants
+        let message = '';
+        let urgency = '';
+        
+        if (offre === 'essai') {
+            message = `🎁 Période d'essai gratuite : plus que ${joursRestants} jour${joursRestants > 1 ? 's' : ''} !`;
+        } else if (isExpiringSoon) {
+            message = `⚠️ Votre abonnement ${config.label} expire dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''} (le ${dateFin})`;
+            urgency = '⚠️';
+        } else {
+            message = `✅ Abonnement ${config.label} actif jusqu'au ${dateFin} (${joursRestants} jours restants)`;
+        }
+        
+        // Bouton selon l'offre
+        let buttonHtml = '';
+        if (offre === 'essai') {
+            buttonHtml = `
+                <button onclick="app.showPricingModal()" style="
+                    background: rgba(255,255,255,0.2);
+                    border: 1px solid rgba(255,255,255,0.3);
+                    color: white;
+                    padding: 8px 20px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-size: 0.85rem;
+                " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    🚀 S'abonner
+                </button>
+            `;
+        } else if (isExpiringSoon) {
+            buttonHtml = `
+                <button onclick="app.showPricingModal()" style="
+                    background: #F59E0B;
+                    border: none;
+                    color: #1A1A18;
+                    padding: 8px 20px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-size: 0.85rem;
+                " onmouseover="this.style.background='#D97706'" onmouseout="this.style.background='#F59E0B'">
+                    🔄 Renouveler
+                </button>
+            `;
+        } else {
+            buttonHtml = `
+                <button onclick="app.showPricingModal()" style="
+                    background: rgba(255,255,255,0.15);
+                    border: 1px solid rgba(255,255,255,0.25);
+                    color: white;
+                    padding: 8px 18px;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-size: 0.8rem;
+                " onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+                    Changer d'offre
+                </button>
+            `;
+        }
+        
+        banner.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                <div style="
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(255,255,255,0.15);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2rem;
+                    flex-shrink: 0;
+                ">
+                    <i class="fas ${config.icon}"></i>
+                </div>
+                <div>
+                    <div style="
+                        font-weight: 600;
+                        font-size: 0.95rem;
+                        color: white;
+                        line-height: 1.3;
+                    ">
+                        ${message}
+                    </div>
+                    <div style="
+                        font-size: 0.75rem;
+                        color: rgba(255,255,255,0.7);
+                        margin-top: 2px;
+                    ">
+                        ${offre === 'essai' ? 'Profitez de toutes les fonctionnalités' : 'Gérez vos devis en toute sérénité'}
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                ${buttonHtml}
+                <span onclick="this.closest('#subscription-banner').remove()" style="
+                    cursor: pointer;
+                    opacity: 0.5;
+                    font-size: 1.1rem;
+                    color: white;
+                    padding: 4px 8px;
+                    transition: opacity 0.2s;
+                " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">✕</span>
+            </div>
+        `;
+        
+        // Insérer le bandeau en haut de la page (après le header)
+        const contentArea = document.getElementById('content-area');
+        if (contentArea) {
+            contentArea.insertBefore(banner, contentArea.firstChild);
             console.log("✅ Bandeau ajouté");
-            setTimeout(() => {
-        const bannerEl = document.getElementById('subscription-banner');
-        if (bannerEl) {
-            bannerEl.style.transition = 'opacity 0.5s ease';
-            bannerEl.style.opacity = '0';
-            setTimeout(() => {
-                bannerEl.remove();
-            }, 500);
         }
-    }, 40000);
-        } else if (!document.getElementById('subscription-banner')) {
-            const contentArea = document.getElementById('content-area');
-            if (contentArea) {
-                contentArea.insertBefore(banner, contentArea.firstChild);
-                console.log("✅ Bandeau ajouté");
-            }
-        }
+        
+        // Le bandeau reste jusqu'à ce que l'utilisateur le ferme (pas de timeout automatique)
         
     } catch (error) {
         console.error("❌ Erreur showSubscriptionBanner:", error);
+    }
+}
+
+showSuspendedBanner() {
+    const oldBanner = document.getElementById('subscription-banner');
+    if (oldBanner) oldBanner.remove();
+    
+    const banner = document.createElement('div');
+    banner.id = 'subscription-banner';
+    banner.style.cssText = `
+        background: linear-gradient(135deg, #991B1B, #EF4444);
+        border-radius: 16px;
+        padding: 16px 24px;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        animation: slideDown 0.5s ease;
+        border: 1px solid rgba(255,255,255,0.15);
+    `;
+    
+    banner.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+            <div style="
+                width: 40px;
+                height: 40px;
+                background: rgba(255,255,255,0.15);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.2rem;
+                flex-shrink: 0;
+            ">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div>
+                <div style="font-weight: 600; font-size: 0.95rem; color: white;">
+                    ⛔ Abonnement suspendu
+                </div>
+                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">
+                    Contactez l'administrateur pour réactiver votre compte.
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button onclick="app.showPricingModal()" style="
+                background: rgba(255,255,255,0.2);
+                border: 1px solid rgba(255,255,255,0.3);
+                color: white;
+                padding: 8px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                📞 Nous contacter
+            </button>
+            <span onclick="this.closest('#subscription-banner').remove()" style="
+                cursor: pointer;
+                opacity: 0.5;
+                font-size: 1.1rem;
+                color: white;
+                padding: 4px 8px;
+                transition: opacity 0.2s;
+            " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">✕</span>
+        </div>
+    `;
+    
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+        contentArea.insertBefore(banner, contentArea.firstChild);
+        console.log("✅ Bandeau suspension ajouté");
     }
 }
 
