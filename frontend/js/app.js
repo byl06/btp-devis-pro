@@ -3044,28 +3044,31 @@ async showSubscriptionBanner() {
         }
         
         const banner = document.createElement('div');
-        banner.id = 'subscription-banner';
-        banner.style.cssText = `
-            background: ${bgColor};
-            border-radius: 15px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            animation: slideDown 0.5s ease;
-            
-        `;
-        
-        banner.innerHTML = `
-            <div>
-                <i class="fas ${icon}" style="margin-right: 10px;"></i>
-                <strong>${message}</strong>
-            </div>
-            ${buttonHtml}
-        `;
+banner.id = 'subscription-banner';
+banner.style.cssText = `
+    background: ${bgColor};
+    border-radius: 15px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    animation: slideDown 0.5s ease;
+    position: relative;
+`;
+
+banner.innerHTML = `
+    <div>
+        <i class="fas ${icon}" style="margin-right: 10px;"></i>
+        <strong>${message}</strong>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        ${buttonHtml}
+        <span onclick="this.closest('#subscription-banner').remove()" style="cursor:pointer; opacity:0.6; font-size:1.2rem; padding:0 5px;">✕</span>
+    </div>
+`;
         
         // Insérer le bandeau
         const cardsGrid = document.querySelector('.cards-grid');
