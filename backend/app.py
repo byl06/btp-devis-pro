@@ -323,28 +323,98 @@ def create_client():
 @jwt_required()
 def update_client(id_client):
     try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
-        query = """
-        UPDATE CLIENT 
-        SET nom = %s, telephone = %s, email = %s, adresse = %s
-        WHERE id_client = %s
-        """
-        result = client_model.db.execute_query(query, (
-            data['nom'], data['telephone'], data['email'], data['adresse'], id_client
-        ))
-        if result:
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le client appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}&select=id_user",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Client non trouvé'}), 404
+        
+        client = check_response.json()[0]
+        if client.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Mettre à jour le client
+        update_data = {
+            "nom": data.get('nom'),
+            "telephone": data.get('telephone'),
+            "email": data.get('email'),
+            "adresse": data.get('adresse')
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
             return jsonify({'success': True, 'message': 'Client modifié'})
-        return jsonify({'success': False, 'message': 'Erreur'}), 500
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur update_client: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
-
 @app.route('/api/clients/<int:id_client>', methods=['DELETE'])
 @jwt_required()
 def delete_client(id_client):
     try:
-        client_model.delete(id_client)
-        return jsonify({'success': True, 'message': 'Client supprimé'})
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le client appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}&select=id_user",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Client non trouvé'}), 404
+        
+        client = check_response.json()[0]
+        if client.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Supprimer le client
+        response = requests.delete(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}",
+            headers=headers
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Client supprimé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur delete_client: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==================== PROJETS ====================
@@ -427,28 +497,98 @@ def create_projet():
 @jwt_required()
 def update_projet(id_projet):
     try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
-        query = """
-        UPDATE PROJET 
-        SET nom_projet = %s, description = %s, localisation = %s
-        WHERE id_projet = %s
-        """
-        result = projet_model.db.execute_query(query, (
-            data['nom_projet'], data['description'], data['localisation'], id_projet
-        ))
-        if result:
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le projet appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}&select=id_user",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Projet non trouvé'}), 404
+        
+        projet = check_response.json()[0]
+        if projet.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Mettre à jour le projet
+        update_data = {
+            "nom_projet": data.get('nom_projet'),
+            "description": data.get('description'),
+            "localisation": data.get('localisation')
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
             return jsonify({'success': True, 'message': 'Projet modifié'})
-        return jsonify({'success': False, 'message': 'Erreur'}), 500
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur update_projet: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/projets/<int:id_projet>', methods=['DELETE'])
 @jwt_required()
 def delete_projet(id_projet):
     try:
-        projet_model.delete(id_projet)
-        return jsonify({'success': True, 'message': 'Projet supprimé'})
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le projet appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}&select=id_user",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Projet non trouvé'}), 404
+        
+        projet = check_response.json()[0]
+        if projet.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Supprimer le projet
+        response = requests.delete(
+            f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}",
+            headers=headers
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Projet supprimé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur delete_projet: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==================== DEVIS ====================
