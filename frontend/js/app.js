@@ -3014,213 +3014,13 @@ filterDevis() {
     }
 }
 
-async showSubscriptionBanner() {
-    console.log("🟢 showSubscriptionBanner appelée");
-    
-    try {
-        const response = await apiRequest('/api/abonnement/statut');
-        const data = await response.json();
-        
-        console.log("📊 Données abonnement:", data);
-        
-        // Si c'est l'admin illimité, ne pas afficher le bandeau
-        if (data.success && data.type === 'illimite') {
-            console.log("👑 Admin illimité - pas de bandeau");
-            return;
-        }
-        
-        // Si abonnement suspendu
-        if (data.success && data.statut === 'suspendu') {
-            this.showSuspendedBanner();
-            return;
-        }
-        
-        if (!data.success || data.statut !== 'actif') {
-            console.log("❌ Pas d'abonnement actif");
-            return;
-        }
-        
-        // Supprimer l'ancien bandeau
-        const oldBanner = document.getElementById('subscription-banner');
-        if (oldBanner) oldBanner.remove();
-        
-        const offre = data.type || 'starter';
-        const joursRestants = data.jours_restants || 0;
-        const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString('fr-FR') : 'inconnue';
-        
-        // Configuration des couleurs et icônes
-        const configs = {
-            essai: { bg: 'linear-gradient(135deg, #1E3A8A, #7C3AED)', icon: 'fa-gift', label: 'Essai gratuit' },
-            starter: { bg: 'linear-gradient(135deg, #059669, #10B981)', icon: 'fa-leaf', label: 'Starter' },
-            pro: { bg: 'linear-gradient(135deg, #1E3A8A, #06B6D4)', icon: 'fa-crown', label: 'Pro' },
-            annuel: { bg: 'linear-gradient(135deg, #DC2626, #F59E0B)', icon: 'fa-gem', label: 'Annuel' }
-        };
-        
-        const config = configs[offre] || configs.starter;
-        const isExpiringSoon = joursRestants < 7 && joursRestants > 0;
-        
-        // Créer le bandeau
-        const banner = document.createElement('div');
-        banner.id = 'subscription-banner';
-        banner.style.cssText = `
-            background: ${config.bg};
-            border-radius: 16px;
-            padding: 16px 24px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            animation: slideDown 0.5s ease;
-            border: 1px solid rgba(255,255,255,0.15);
-        `;
-        
-        // Message selon l'offre et les jours restants
-        let message = '';
-        let urgency = '';
-        
-        if (offre === 'essai') {
-            message = `🎁 Période d'essai gratuite : plus que ${joursRestants} jour${joursRestants > 1 ? 's' : ''} !`;
-        } else if (isExpiringSoon) {
-            message = `⚠️ Votre abonnement ${config.label} expire dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''} (le ${dateFin})`;
-            urgency = '⚠️';
-        } else {
-            message = `✅ Abonnement ${config.label} actif jusqu'au ${dateFin} (${joursRestants} jours restants)`;
-        }
-        
-        // Bouton selon l'offre
-        let buttonHtml = '';
-        if (offre === 'essai') {
-            buttonHtml = `
-    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20m%27abonner%20apr%C3%A8s%20mon%20essai%20gratuit" 
-       target="_blank" 
-       style="
-           background: rgba(255,255,255,0.2);
-           border: 1px solid rgba(255,255,255,0.3);
-           color: white;
-           padding: 8px 20px;
-           border-radius: 8px;
-           font-weight: 600;
-           cursor: pointer;
-           transition: all 0.3s ease;
-           font-size: 0.85rem;
-           text-decoration: none;
-           display: inline-block;
-       " 
-       onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
-       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-        🚀 S'abonner
-    </a>
-`;
-        } else if (isExpiringSoon) {
-            buttonHtml = `
-    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20renouveler%20mon%20abonnement" 
-       target="_blank" 
-       style="
-           background: #F59E0B;
-           border: none;
-           color: #1A1A18;
-           padding: 8px 20px;
-           border-radius: 8px;
-           font-weight: 600;
-           cursor: pointer;
-           transition: all 0.3s ease;
-           font-size: 0.85rem;
-           text-decoration: none;
-           display: inline-block;
-       " 
-       onmouseover="this.style.background='#D97706'" 
-       onmouseout="this.style.background='#F59E0B'">
-        🔄 Renouveler
-    </a>
-`;
-        } else {
-            buttonHtml = `
-    <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20changer%20d%27offre" 
-       target="_blank" 
-       style="
-           background: rgba(255,255,255,0.15);
-           border: 1px solid rgba(255,255,255,0.25);
-           color: white;
-           padding: 8px 18px;
-           border-radius: 8px;
-           font-weight: 500;
-           cursor: pointer;
-           transition: all 0.3s ease;
-           font-size: 0.8rem;
-           text-decoration: none;
-           display: inline-block;
-       " 
-       onmouseover="this.style.background='rgba(255,255,255,0.25)'" 
-       onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-        Changer d'offre
-    </a>
-`;
-        }
-        
-        banner.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                <div style="
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(255,255,255,0.15);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.2rem;
-                    flex-shrink: 0;
-                ">
-                    <i class="fas ${config.icon}"></i>
-                </div>
-                <div>
-                    <div style="
-                        font-weight: 600;
-                        font-size: 0.95rem;
-                        color: white;
-                        line-height: 1.3;
-                    ">
-                        ${message}
-                    </div>
-                    <div style="
-                        font-size: 0.75rem;
-                        color: rgba(255,255,255,0.7);
-                        margin-top: 2px;
-                    ">
-                        ${offre === 'essai' ? 'Profitez de toutes les fonctionnalités' : 'Gérez vos devis en toute sérénité'}
-                    </div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
-                ${buttonHtml}
-                <span onclick="this.closest('#subscription-banner').remove()" style="
-                    cursor: pointer;
-                    opacity: 0.5;
-                    font-size: 1.1rem;
-                    color: white;
-                    padding: 4px 8px;
-                    transition: opacity 0.2s;
-                " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">✕</span>
-            </div>
-        `;
-        
-        // Insérer le bandeau en haut de la page (après le header)
-        const contentArea = document.getElementById('content-area');
-        if (contentArea) {
-            contentArea.insertBefore(banner, contentArea.firstChild);
-            console.log("✅ Bandeau ajouté");
-        }
-        
-        // Le bandeau reste jusqu'à ce que l'utilisateur le ferme (pas de timeout automatique)
-        
-    } catch (error) {
-        console.error("❌ Erreur showSubscriptionBanner:", error);
-    }
-}
-
 showSuspendedBanner() {
+    // 🔥 L'admin ne voit pas ce bandeau
+    if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+        console.log("👑 Admin - pas de bandeau suspension");
+        return;
+    }
+    
     const oldBanner = document.getElementById('subscription-banner');
     if (oldBanner) oldBanner.remove();
     
@@ -3264,7 +3064,7 @@ showSuspendedBanner() {
                     ⛔ Abonnement suspendu
                 </div>
                 <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">
-                    Contactez l'administrateur pour réactiver votre compte.
+                    Vous ne pouvez pas créer de nouveaux clients, projets ou devis tant que votre abonnement est suspendu.
                 </div>
             </div>
         </div>
@@ -3316,28 +3116,44 @@ safeArray(data) {
 async checkLimites(operation) {
     const user = this.currentUser;
     
-    // Admin = illimité
+    // Admin = illimité (mais on vérifie quand même son statut)
     if (user && (user.email === 'admin@btp.com' || user.email === 'bylgaitb@gmail.com')) {
         console.log("👑 Admin détecté - pas de limites");
         return true;
     }
     
-    // Récupérer l'abonnement
     try {
         const response = await apiRequest('/api/abonnement/statut');
         const data = await response.json();
-        console.log("🔍 checkLimites - abonnement:", data);
         
-        // Si pas d'abonnement actif, on autorise quand même l'affichage
-        // mais on bloque la création
-        if (!data.success || data.statut !== 'actif') {
-            console.log("⚠️ Abonnement inactif - affichage autorisé, création bloquée");
-            // Retourner true pour afficher le bouton, mais bloquer la création ailleurs
-            return true;
+        console.log("🔍 checkLimites - data:", data);
+        
+        // ❌ PAS D'ABONNEMENT
+        if (!data.success) {
+            Toast.warning('⚠️ Aucun abonnement trouvé. Contactez l\'administrateur.');
+            return false;
         }
         
-        const offre = data.type || 'starter';
+        // ❌ ABONNEMENT EXPIRÉ
+        if (data.statut === 'expiré') {
+            Toast.error('⛔ Votre abonnement a expiré. Contactez l\'administrateur pour le renouveler.');
+            return false;
+        }
         
+        // ❌ ABONNEMENT SUSPENDU
+        if (data.statut === 'suspendu') {
+            Toast.error('⛔ Votre abonnement est suspendu. Vous ne pouvez pas effectuer cette action.');
+            return false;
+        }
+        
+        // ❌ ABONNEMENT INACTIF
+        if (data.statut !== 'actif') {
+            Toast.warning('⚠️ Abonnement inactif. Contactez l\'administrateur.');
+            return false;
+        }
+        
+        // ✅ ABONNEMENT ACTIF - Vérifier les limites
+        const offre = data.type || 'starter';
         const limites = {
             starter: { clients: 10, projets: 10, devis: 20 },
             pro: { clients: 999999, projets: 999999, devis: 999999 },
@@ -3346,7 +3162,6 @@ async checkLimites(operation) {
             illimite: { clients: 999999, projets: 999999, devis: 999999 }
         };
         
-        // Compter les éléments actuels
         const clients = await this.fetchClients();
         const projets = await this.fetchProjets();
         const devis = await this.fetchDevis();
@@ -3358,23 +3173,23 @@ async checkLimites(operation) {
         };
         
         if (operation === 'client' && counts.clients >= limites[offre].clients) {
-            Toast.warning(`Limite de clients atteinte (${limites[offre].clients}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de clients atteinte (${limites[offre].clients}).`);
             return false;
         }
         if (operation === 'projet' && counts.projets >= limites[offre].projets) {
-            Toast.warning(`Limite de projets atteinte (${limites[offre].projets}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de projets atteinte (${limites[offre].projets}).`);
             return false;
         }
         if (operation === 'devis' && counts.devis >= limites[offre].devis) {
-            Toast.warning(`Limite de devis atteinte (${limites[offre].devis}). Passez à l'offre Pro !`);
+            Toast.warning(`❌ Limite de devis atteinte (${limites[offre].devis}).`);
             return false;
         }
         
         return true;
         
     } catch (error) {
-        console.error('Erreur checkLimites:', error);
-        return true; // Autoriser par défaut en cas d'erreur
+        console.error('❌ Erreur checkLimites:', error);
+        return false; // 🔥 En cas d'erreur, on bloque pour sécurité
     }
 }
 
