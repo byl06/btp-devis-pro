@@ -2056,7 +2056,7 @@ async renderParametres() {
     </p>
 </div>
 
-// ========== CHANGER LE MOT DE PASSE ==========
+
 <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(6,182,212,0.2);">
     <h3><i class="fas fa-key" style="color:#06B6D4;"></i> Changer le mot de passe</h3>
     <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
