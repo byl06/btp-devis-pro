@@ -739,6 +739,96 @@ def check_email():
     except Exception as e:
         print(f"❌ Erreur check_email: {e}")
         return jsonify({'exists': False, 'error': str(e)}), 500
+    
+
+
+@app.route('/api/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        ancien_mot_de_passe = data.get('ancien_mot_de_passe')
+        nouveau_mot_de_passe = data.get('nouveau_mot_de_passe')
+        
+        if not ancien_mot_de_passe or not nouveau_mot_de_passe:
+            return jsonify({'success': False, 'message': 'Tous les champs sont requis'}), 400
+        
+        if len(nouveau_mot_de_passe) < 4:
+            return jsonify({'success': False, 'message': 'Le nouveau mot de passe doit contenir au moins 4 caractères'}), 400
+        
+        import requests
+        import bcrypt
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer l'utilisateur pour vérifier l'ancien mot de passe
+        response = requests.get(
+            f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}&select=mot_de_passe_hash",
+            headers=headers
+        )
+        
+        if response.status_code != 200 or not response.json():
+            return jsonify({'success': False, 'message': 'Utilisateur non trouvé'}), 404
+        
+        user = response.json()[0]
+        stored_hash = user.get('mot_de_passe_hash')
+        
+        # Vérifier l'ancien mot de passe
+        if isinstance(stored_hash, str):
+            stored_hash = stored_hash.encode('utf-8')
+        if isinstance(ancien_mot_de_passe, str):
+            ancien_mot_de_passe = ancien_mot_de_passe.encode('utf-8')
+        
+        if not bcrypt.checkpw(ancien_mot_de_passe, stored_hash):
+            return jsonify({'success': False, 'message': 'Ancien mot de passe incorrect'}), 401
+        
+        # Générer le hash du nouveau mot de passe
+        nouveau_hash = bcrypt.hashpw(nouveau_mot_de_passe.encode('utf-8'), bcrypt.gensalt())
+        
+        # Mettre à jour le mot de passe
+        update_data = {
+            "mot_de_passe": nouveau_mot_de_passe,
+            "mot_de_passe_hash": nouveau_hash.decode()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            # Ajouter une notification
+            notification_data = {
+                "id_user": user_id,
+                "message": "🔑 Votre mot de passe a été changé avec succès.",
+                "type": "info",
+                "date_creation": datetime.now().isoformat()
+            }
+            requests.post(
+                f"{supabase_url}/rest/v1/notifications",
+                headers=headers,
+                json=notification_data
+            )
+            
+            return jsonify({'success': True, 'message': 'Mot de passe changé avec succès'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur change_password: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 

@@ -214,6 +214,11 @@ updateAdminMenu() {
             e.preventDefault();
             await this.uploadLogo();
         }
+        // 🔥 AJOUT : Formulaire changer mot de passe
+        if (e.target.id === 'change-password-form') {
+            e.preventDefault();
+            await this.changePassword();
+        }
     });
     
     // ========== FILTRES POUR LA PAGE DEVIS ==========
@@ -2050,6 +2055,32 @@ async renderParametres() {
         <i class="fas fa-info-circle"></i> La sauvegarde contient tous vos clients, projets, devis, factures et paramètres.
     </p>
 </div>
+
+// ========== CHANGER LE MOT DE PASSE ==========
+<div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(6,182,212,0.2);">
+    <h3><i class="fas fa-key" style="color:#06B6D4;"></i> Changer le mot de passe</h3>
+    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+        Modifiez votre mot de passe pour sécuriser votre compte.
+    </p>
+    
+    <form id="change-password-form">
+        <div class="form-group">
+            <label>Ancien mot de passe</label>
+            <input type="password" id="old-password" class="form-control" placeholder="Votre mot de passe actuel" required>
+        </div>
+        <div class="form-group">
+            <label>Nouveau mot de passe</label>
+            <input type="password" id="new-password" class="form-control" placeholder="Nouveau mot de passe (min. 4 caractères)" required>
+        </div>
+        <div class="form-group">
+            <label>Confirmer le nouveau mot de passe</label>
+            <input type="password" id="confirm-password" class="form-control" placeholder="Confirmez le nouveau mot de passe" required>
+        </div>
+        <button type="submit" class="btn-primary" style="background: #06B6D4;">
+            <i class="fas fa-save"></i> Changer le mot de passe
+        </button>
+    </form>
+</div>
                 
                 <!-- ========== SECTION DÉCONNEXION STYLÉE ========== -->
                 <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(239,68,68,0.3);">
@@ -3354,6 +3385,52 @@ async checkLimites(operation) {
     } catch (error) {
         console.error('❌ Erreur checkLimites:', error);
         return false; // 🔥 En cas d'erreur, on bloque pour sécurité
+    }
+}
+
+async changePassword() {
+    const oldPassword = document.getElementById('old-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    
+    // Vérifications
+    if (newPassword !== confirmPassword) {
+        Toast.error('❌ Les nouveaux mots de passe ne correspondent pas');
+        return;
+    }
+    
+    if (newPassword.length < 4) {
+        Toast.error('❌ Le nouveau mot de passe doit contenir au moins 4 caractères');
+        return;
+    }
+    
+    if (oldPassword === newPassword) {
+        Toast.warning('⚠️ Le nouveau mot de passe doit être différent de l\'ancien');
+        return;
+    }
+    
+    try {
+        const response = await apiRequest('/api/change-password', {
+            method: 'POST',
+            body: JSON.stringify({
+                ancien_mot_de_passe: oldPassword,
+                nouveau_mot_de_passe: newPassword
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Mot de passe changé avec succès !');
+            // Réinitialiser les champs
+            document.getElementById('old-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } else {
+            Toast.error(result.message || '❌ Erreur lors du changement');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
     }
 }
 
