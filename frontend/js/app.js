@@ -133,6 +133,9 @@ class BTPDevisApp {
         this.updateUserInfo();
         
         this.showNotifications();
+        setTimeout(() => {
+        this.showSubscriptionBanner();
+    }, 1000);
     }
     
    updateUserInfo() {
