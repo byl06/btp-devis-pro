@@ -1625,6 +1625,8 @@ def admin_suspendre_abonnement(id_user):
         if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
+        from datetime import datetime
+        
         import requests
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
@@ -1657,18 +1659,22 @@ def admin_suspendre_abonnement(id_user):
             )
             
             if patch_response.status_code in [200, 204]:
-                # Ajouter une notification pour l'utilisateur
-                notification_data = {
-                    "id_user": id_user,
-                    "message": "⛔ Votre abonnement a été suspendu par l'administrateur. Contactez-nous pour plus d'informations.",
-                    "type": "suspension",
-                    "date_creation": datetime.now().isoformat()
-                }
-                requests.post(
-                    f"{supabase_url}/rest/v1/notifications",
-                    headers=headers,
-                    json=notification_data
-                )
+                # 🔥 Ajouter une notification UNIQUEMENT si l'utilisateur n'est PAS l'admin (id_user != 1)
+                if id_user != 1:
+                    notification_data = {
+                        "id_user": id_user,
+                        "message": "⛔ Votre abonnement a été suspendu par l'administrateur. Contactez-nous pour plus d'informations.",
+                        "type": "suspension",
+                        "date_creation": datetime.now().isoformat()
+                    }
+                    requests.post(
+                        f"{supabase_url}/rest/v1/notifications",
+                        headers=headers,
+                        json=notification_data
+                    )
+                    print(f"📬 Notification de suspension envoyée à l'utilisateur {id_user}")
+                else:
+                    print(f"👑 Admin {id_user} suspendu - pas de notification")
                 
                 return jsonify({'success': True, 'message': 'Abonnement suspendu'})
             else:
@@ -1678,6 +1684,8 @@ def admin_suspendre_abonnement(id_user):
         
     except Exception as e:
         print(f"❌ Erreur suspendre: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
 @app.route('/api/admin/abonnement/<int:id_user>/reactiver', methods=['POST'])

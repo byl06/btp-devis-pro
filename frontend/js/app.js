@@ -2179,21 +2179,56 @@ applyThemeColors(colors) {
 // Récupérer et afficher les notifications
 async fetchNotifications() {
     try {
+        // 🔥 L'admin ne récupère pas les notifications
+        if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+            return [];
+        }
+        
         const response = await apiRequest('/api/notifications');
         const data = await response.json();
-        return this.normalizeResponse(data);
+        console.log("📬 Notifications récupérées:", data);
+        return data;
     } catch (error) {
+        console.error("Erreur fetchNotifications:", error);
         return [];
     }
 }
 // Afficher les notifications au chargement
 async showNotifications() {
+    // 🔥 L'admin ne voit PAS les notifications
+    if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+        console.log("👑 Admin - pas de notifications");
+        return;
+    }
+    
+    // Récupérer le statut de l'abonnement pour filtrer
+    let abonnementStatut = 'actif';
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        abonnementStatut = data.statut || 'inactif';
+        console.log("🔍 Statut abonnement:", abonnementStatut);
+    } catch(e) {
+        console.error("Erreur récupération abonnement:", e);
+    }
+    
     const notifications = await this.fetchNotifications();
     
     if (notifications.length === 0) return;
     
-    // Afficher une par une avec un délai
+    // 🔥 Filtrer les notifications : ne montrer que celles du bon type
     for (const notif of notifications) {
+        // Ne pas montrer les notifications de suspension si l'utilisateur n'est PAS suspendu
+        if (notif.type === 'suspension' && abonnementStatut !== 'suspendu') {
+            console.log("⏭️ Notification de suspension ignorée (utilisateur non suspendu)");
+            continue;
+        }
+        // Ne pas montrer les notifications de renouvellement si l'utilisateur est suspendu
+        if (notif.type === 'renouvellement' && abonnementStatut === 'suspendu') {
+            console.log("⏭️ Notification de renouvellement ignorée (utilisateur suspendu)");
+            continue;
+        }
+        
         setTimeout(() => {
             this.showNotificationToast(notif);
         }, 1000);
@@ -2202,6 +2237,29 @@ async showNotifications() {
 
 // Afficher une notification toast
 showNotificationToast(notification) {
+    // 🔥 L'admin ne voit pas les notifications
+    if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+        return;
+    }
+    
+    // 🔥 Ne pas afficher les notifications de suspension si l'utilisateur n'est pas suspendu
+    // (on le vérifie à nouveau pour être sûr)
+    this.apiRequest('/api/abonnement/statut').then(response => response.json()).then(data => {
+        if (notification.type === 'suspension' && data.statut !== 'suspendu') {
+            console.log("⏭️ Notification de suspension ignorée (statut:", data.statut, ")");
+            return;
+        }
+        
+        // Afficher la notification
+        this._showToast(notification);
+    }).catch(() => {
+        // En cas d'erreur, on affiche quand même
+        this._showToast(notification);
+    });
+}
+
+// Méthode helper pour l'affichage
+_showToast(notification) {
     const toast = document.createElement('div');
     toast.className = 'notification-toast';
     toast.style.cssText = `
@@ -2219,34 +2277,30 @@ showNotificationToast(notification) {
         cursor: pointer;
     `;
     
+    const icon = notification.type === 'suspension' ? 'fa-exclamation-triangle' : 'fa-bell';
+    const bgColor = notification.type === 'suspension' ? 'linear-gradient(135deg, #991B1B, #EF4444)' : 'linear-gradient(135deg, #1E3A8A, #7C3AED)';
+    toast.style.background = bgColor;
+    
     toast.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px;">
-            <i class="fas fa-bell" style="font-size: 20px;"></i>
+            <i class="fas ${icon}" style="font-size: 20px;"></i>
             <div style="flex: 1;">
-                <strong style="display: block; margin-bottom: 5px;">Renouvellement d'abonnement</strong>
+                <strong style="display: block; margin-bottom: 5px;">
+                    ${notification.type === 'suspension' ? '⛔ Abonnement suspendu' : 'Renouvellement d\'abonnement'}
+                </strong>
                 <span style="font-size: 0.85rem;">${notification.message}</span>
             </div>
-            <i class="fas fa-times" style="cursor: pointer; opacity: 0.7;"></i>
+            <i class="fas fa-times" style="cursor: pointer; opacity: 0.7;" onclick="this.closest('.notification-toast').remove()"></i>
         </div>
     `;
     
     document.body.appendChild(toast);
     
-    // Fermeture manuelle
-    toast.querySelector('.fa-times').addEventListener('click', (e) => {
-        e.stopPropagation();
-        toast.remove();
-        this.marquerNotificationLue(notification.id_notification);
-    });
-    
     // Fermeture automatique après 8 secondes
     setTimeout(() => {
         if (toast.parentElement) {
             toast.style.animation = 'slideOutRight 0.5s ease';
-            setTimeout(() => {
-                toast.remove();
-                this.marquerNotificationLue(notification.id_notification);
-            }, 500);
+            setTimeout(() => toast.remove(), 500);
         }
     }, 8000);
 }
