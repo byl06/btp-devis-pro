@@ -3014,13 +3014,154 @@ filterDevis() {
     }
 }
 
+async showSubscriptionBanner() {
+    console.log("🟢 showSubscriptionBanner appelée");
+    
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        
+        console.log("📊 Données abonnement:", data);
+        
+        // 🔥 ADMIN : ne voit JAMAIS de bandeau
+        if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+            console.log("👑 Admin - pas de bandeau");
+            // Supprimer le bandeau s'il existe
+            const oldBanner = document.getElementById('subscription-banner');
+            if (oldBanner) oldBanner.remove();
+            return;
+        }
+        
+        // 🔥 Si l'abonnement est suspendu → afficher le bandeau de suspension
+        if (data.success && data.statut === 'suspendu') {
+            this.showSuspendedBanner();
+            return;
+        }
+        
+        // 🔥 Si l'abonnement est inactif ou expiré → pas de bandeau
+        if (!data.success || data.statut !== 'actif') {
+            console.log("❌ Pas d'abonnement actif");
+            const oldBanner = document.getElementById('subscription-banner');
+            if (oldBanner) oldBanner.remove();
+            return;
+        }
+        
+        // 🔥 ICI : abonnement actif → afficher le bandeau normal
+        // Supprimer l'ancien bandeau
+        const oldBanner = document.getElementById('subscription-banner');
+        if (oldBanner) oldBanner.remove();
+        
+        const offre = data.type || 'starter';
+        const joursRestants = data.jours_restants || 0;
+        const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString('fr-FR') : 'inconnue';
+        
+        // Configuration des couleurs et icônes
+        const configs = {
+            essai: { bg: 'linear-gradient(135deg, #1E3A8A, #7C3AED)', icon: 'fa-gift', label: 'Essai gratuit' },
+            starter: { bg: 'linear-gradient(135deg, #059669, #10B981)', icon: 'fa-leaf', label: 'Starter' },
+            pro: { bg: 'linear-gradient(135deg, #1E3A8A, #06B6D4)', icon: 'fa-crown', label: 'Pro' },
+            annuel: { bg: 'linear-gradient(135deg, #DC2626, #F59E0B)', icon: 'fa-gem', label: 'Annuel' }
+        };
+        
+        const config = configs[offre] || configs.starter;
+        const isExpiringSoon = joursRestants < 7 && joursRestants > 0;
+        
+        const banner = document.createElement('div');
+        banner.id = 'subscription-banner';
+        banner.style.cssText = `
+            background: ${config.bg};
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideDown 0.5s ease;
+            border: 1px solid rgba(255,255,255,0.15);
+        `;
+        
+        let message = '';
+        if (offre === 'essai') {
+            message = `🎁 Période d'essai gratuite : plus que ${joursRestants} jour${joursRestants > 1 ? 's' : ''} !`;
+        } else if (isExpiringSoon) {
+            message = `⚠️ Votre abonnement ${config.label} expire dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''} (le ${dateFin})`;
+        } else {
+            message = `✅ Abonnement ${config.label} actif jusqu'au ${dateFin} (${joursRestants} jours restants)`;
+        }
+        
+        const WHATSAPP_URL = "https://wa.me/2290143733706";
+        let buttonHtml = '';
+        if (offre === 'essai') {
+            buttonHtml = `
+                <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20m%27abonner%20apr%C3%A8s%20mon%20essai%20gratuit" 
+                   target="_blank" 
+                   style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 20px;border-radius:8px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;font-size:0.85rem;">
+                    🚀 S'abonner
+                </a>
+            `;
+        } else if (isExpiringSoon) {
+            buttonHtml = `
+                <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20renouveler%20mon%20abonnement" 
+                   target="_blank" 
+                   style="background:#F59E0B;border:none;color:#1A1A18;padding:8px 20px;border-radius:8px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;font-size:0.85rem;">
+                    🔄 Renouveler
+                </a>
+            `;
+        } else {
+            buttonHtml = `
+                <a href="${WHATSAPP_URL}?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20changer%20d%27offre" 
+                   target="_blank" 
+                   style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:white;padding:8px 18px;border-radius:8px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-block;font-size:0.8rem;">
+                    Changer d'offre
+                </a>
+            `;
+        }
+        
+        banner.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                <div style="width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">
+                    <i class="fas ${config.icon}"></i>
+                </div>
+                <div>
+                    <div style="font-weight:600;font-size:0.95rem;color:white;line-height:1.3;">${message}</div>
+                    <div style="font-size:0.75rem;color:rgba(255,255,255,0.7);margin-top:2px;">
+                        ${offre === 'essai' ? 'Profitez de toutes les fonctionnalités' : 'Gérez vos devis en toute sérénité'}
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                ${buttonHtml}
+                <span onclick="this.closest('#subscription-banner').remove()" style="cursor:pointer;opacity:0.5;font-size:1.1rem;color:white;padding:4px 8px;">✕</span>
+            </div>
+        `;
+        
+        const contentArea = document.getElementById('content-area');
+        if (contentArea) {
+            contentArea.insertBefore(banner, contentArea.firstChild);
+            console.log("✅ Bandeau ajouté");
+        }
+        
+    } catch (error) {
+        console.error("❌ Erreur showSubscriptionBanner:", error);
+    }
+}
+
 showSuspendedBanner() {
-    // 🔥 L'admin ne voit pas ce bandeau
+    console.log("🟢 showSuspendedBanner appelée");
+    
+    // 🔥 L'admin ne voit PAS ce bandeau
     if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
         console.log("👑 Admin - pas de bandeau suspension");
+        // Supprimer le bandeau s'il existe
+        const oldBanner = document.getElementById('subscription-banner');
+        if (oldBanner) oldBanner.remove();
         return;
     }
     
+    // Supprimer l'ancien bandeau
     const oldBanner = document.getElementById('subscription-banner');
     if (oldBanner) oldBanner.remove();
     
@@ -3046,56 +3187,25 @@ showSuspendedBanner() {
     
     banner.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-            <div style="
-                width: 40px;
-                height: 40px;
-                background: rgba(255,255,255,0.15);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.2rem;
-                flex-shrink: 0;
-            ">
+            <div style="width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div>
-                <div style="font-weight: 600; font-size: 0.95rem; color: white;">
+                <div style="font-weight:600;font-size:0.95rem;color:white;">
                     ⛔ Abonnement suspendu
                 </div>
-                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">
-                    Vous ne pouvez pas créer de nouveaux clients, projets ou devis tant que votre abonnement est suspendu.
+                <div style="font-size:0.75rem;color:rgba(255,255,255,0.7);">
+                    Vous ne pouvez pas créer de nouveaux clients, projets ou devis.
                 </div>
             </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
             <a href="${WHATSAPP_URL}?text=${message}" 
                target="_blank" 
-               style="
-                   background: rgba(255,255,255,0.2);
-                   border: 1px solid rgba(255,255,255,0.3);
-                   color: white;
-                   padding: 8px 20px;
-                   border-radius: 8px;
-                   font-weight: 600;
-                   cursor: pointer;
-                   transition: all 0.3s ease;
-                   text-decoration: none;
-                   display: inline-block;
-                   font-size: 0.85rem;
-               " 
-               onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
-               onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+               style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 20px;border-radius:8px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;font-size:0.85rem;">
                 📞 Nous contacter
             </a>
-            <span onclick="this.closest('#subscription-banner').remove()" style="
-                cursor: pointer;
-                opacity: 0.5;
-                font-size: 1.1rem;
-                color: white;
-                padding: 4px 8px;
-                transition: opacity 0.2s;
-            " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">✕</span>
+            <span onclick="this.closest('#subscription-banner').remove()" style="cursor:pointer;opacity:0.5;font-size:1.1rem;color:white;padding:4px 8px;">✕</span>
         </div>
     `;
     
