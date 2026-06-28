@@ -3084,7 +3084,7 @@ banner.innerHTML = `
                 bannerEl.remove();
             }, 500);
         }
-    }, 10000);
+    }, 40000);
         } else if (!document.getElementById('subscription-banner')) {
             const contentArea = document.getElementById('content-area');
             if (contentArea) {
