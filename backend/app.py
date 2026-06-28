@@ -13,6 +13,59 @@ from reportlab.lib.units import cm
 from flask import send_from_directory
 import os
 
+# ==================== UTILITAIRE VÉRIFICATION ABONNEMENT ====================
+def verifier_abonnement(user_id):
+    """Vérifie si l'utilisateur a un abonnement actif. Retourne (bool, message, headers, supabase_url)"""
+    from datetime import datetime
+    import requests
+    
+    supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+    
+    headers = {
+        "Authorization": f"Bearer {supabase_key}",
+        "apikey": supabase_key,
+        "Content-Type": "application/json"
+    }
+    
+    # Récupérer l'abonnement
+    abo_response = requests.get(
+        f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}",
+        headers=headers
+    )
+    
+    if abo_response.status_code == 200 and abo_response.json():
+        abo = abo_response.json()[0]
+        statut = abo.get('statut', 'inactif')
+        date_fin_str = abo.get('date_fin')
+        
+        # Suspendu
+        if statut == 'suspendu':
+            return False, '❌ Abonnement suspendu. Action bloquée.', headers, supabase_url
+        
+        # Expiré
+        if date_fin_str:
+            try:
+                date_fin = datetime.fromisoformat(date_fin_str.replace('Z', '+00:00'))
+                if date_fin < datetime.now():
+                    # Mettre à jour le statut à "expiré"
+                    requests.patch(
+                        f"{supabase_url}/rest/v1/abonnements?id_abonnement=eq.{abo.get('id_abonnement')}",
+                        headers=headers,
+                        json={"statut": "expiré"}
+                    )
+                    return False, '❌ Abonnement expiré. Action bloquée.', headers, supabase_url
+            except:
+                pass
+        
+        # Inactif
+        if statut != 'actif':
+            return False, '❌ Abonnement inactif. Action bloquée.', headers, supabase_url
+        
+        return True, 'OK', headers, supabase_url
+    else:
+        return False, '❌ Aucun abonnement trouvé. Action bloquée.', headers, supabase_url
+
 app = Flask(__name__)
 # Configuration SendGrid
 app.config['MAIL_SERVER'] = 'smtp.sendgrid.net'
@@ -237,13 +290,12 @@ def create_client():
         user_id = int(user_id)
         data = request.json
         
-        print(f"🔍 Création client pour user_id: {user_id}")
-        print(f"🔍 Données reçues: {data}")
+        # 🔥 Vérifier l'abonnement
+        ok, message, headers, supabase_url = verifier_abonnement(user_id)
+        if not ok:
+            return jsonify({'success': False, 'message': message}), 403
         
-        import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
-        
+        # Créer le client
         client_data = {
             "nom": data.get('nom'),
             "telephone": data.get('telephone'),
@@ -252,21 +304,11 @@ def create_client():
             "id_user": user_id
         }
         
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        }
-        
         response = requests.post(
             f"{supabase_url}/rest/v1/client",
             headers=headers,
             json=client_data
         )
-        
-        print(f"🔍 Status Supabase: {response.status_code}")
-        print(f"🔍 Réponse brute: {response.text}")
         
         if response.status_code in [200, 201]:
             return jsonify({'success': True, 'message': 'Client créé'})
@@ -275,8 +317,6 @@ def create_client():
         
     except Exception as e:
         print(f"❌ Erreur create_client: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/clients/<int:id_client>', methods=['PUT'])
@@ -349,25 +389,17 @@ def create_projet():
         user_id = int(user_id)
         data = request.json
         
-        print(f"🔍 Création projet pour user_id: {user_id}")
-        print(f"🔍 Données reçues: {data}")
+        # 🔥 Vérifier l'abonnement
+        ok, message, headers, supabase_url = verifier_abonnement(user_id)
+        if not ok:
+            return jsonify({'success': False, 'message': message}), 403
         
-        import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
-        
+        # Créer le projet
         projet_data = {
             "nom_projet": data.get('nom_projet'),
             "description": data.get('description'),
             "localisation": data.get('localisation'),
             "id_user": user_id
-        }
-        
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
         }
         
         response = requests.post(
@@ -376,13 +408,14 @@ def create_projet():
             json=projet_data
         )
         
-        print(f"🔍 Status Supabase: {response.status_code}")
-        print(f"🔍 Réponse brute: {response.text}")
-        
         if response.status_code in [200, 201]:
             return jsonify({'success': True, 'message': 'Projet créé'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur create_projet: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
         
     except Exception as e:
         print(f"❌ Erreur create_projet: {e}")
@@ -437,13 +470,12 @@ def create_devis():
         user_id = int(user_id)
         data = request.json
         
-        print(f"🔍 Création devis pour user_id: {user_id}")
-        print(f"🔍 Données reçues: {data}")
+        # 🔥 Vérifier l'abonnement
+        ok, message, headers, supabase_url = verifier_abonnement(user_id)
+        if not ok:
+            return jsonify({'success': False, 'message': message}), 403
         
-        import requests
         from datetime import datetime
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
         # Calculer le total
         lignes = data.get('lignes', [])
@@ -460,21 +492,11 @@ def create_devis():
             "id_projet": data.get('id_projet')
         }
         
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        }
-        
         response = requests.post(
             f"{supabase_url}/rest/v1/devis",
             headers=headers,
             json=devis_data
         )
-        
-        print(f"🔍 Status Supabase devis: {response.status_code}")
-        print(f"🔍 Réponse brute devis: {response.text}")
         
         if response.status_code in [200, 201]:
             # Récupérer l'ID du devis créé
