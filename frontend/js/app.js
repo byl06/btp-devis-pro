@@ -3056,6 +3056,7 @@ async showSubscriptionBanner() {
             flex-wrap: wrap;
             gap: 1rem;
             animation: slideDown 0.5s ease;
+            
         `;
         
         banner.innerHTML = `
@@ -3071,6 +3072,16 @@ async showSubscriptionBanner() {
         if (cardsGrid && !document.getElementById('subscription-banner')) {
             cardsGrid.parentNode.insertBefore(banner, cardsGrid);
             console.log("✅ Bandeau ajouté");
+            setTimeout(() => {
+        const bannerEl = document.getElementById('subscription-banner');
+        if (bannerEl) {
+            bannerEl.style.transition = 'opacity 0.5s ease';
+            bannerEl.style.opacity = '0';
+            setTimeout(() => {
+                bannerEl.remove();
+            }, 500);
+        }
+    }, 10000);
         } else if (!document.getElementById('subscription-banner')) {
             const contentArea = document.getElementById('content-area');
             if (contentArea) {
