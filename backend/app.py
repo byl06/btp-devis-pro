@@ -739,100 +739,154 @@ def restore_database():
     
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         backup_data = request.json
         
         print("=" * 60)
         print("🔵 RESTAURATION EN COURS...")
         
-        # Vider les tables (pas besoin de FOREIGN_KEY_CHECKS en SQLite)
-        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS")
-        devis_model.db.execute_query("DELETE FROM FACTURE")
-        devis_model.db.execute_query("DELETE FROM DEVIS")
-        devis_model.db.execute_query("DELETE FROM CLIENT")
-        devis_model.db.execute_query("DELETE FROM PROJET")
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        # Insérer les clients
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 🔥 VIDER LES TABLES
+        tables = ['ligne_devis', 'facture', 'devis', 'client', 'projet']
+        for table in tables:
+            requests.delete(
+                f"{supabase_url}/rest/v1/{table}",
+                headers=headers
+            )
+            print(f"   🗑️ Table {table} vidée")
+        
+        # 🔥 INSÉRER LES CLIENTS
         for client in backup_data.get('clients', []):
-            sql = "INSERT INTO CLIENT (nom, telephone, email, adresse, id_user) VALUES (%s, %s, %s, %s, %s)"
-            devis_model.db.execute_query(sql, (
-                client['nom'], 
-                client['telephone'], 
-                client['email'], 
-                client['adresse'],
-                user_id
-            ))
-            print(f"   ✅ Client inséré: {client['nom']}")
-
-        # Insérer les projets
-        for projet in backup_data.get('projets', []):
-            sql = "INSERT INTO PROJET (nom_projet, description, localisation, id_user) VALUES (%s, %s, %s, %s)"
-            devis_model.db.execute_query(sql, (
-                projet['nom_projet'], 
-                projet['description'], 
-                projet['localisation'],
-                user_id
-            ))
-            print(f"   ✅ Projet inséré: {projet['nom_projet']}")
-
-        # Insérer les devis
-        for devis_item in backup_data.get('devis', []):
-            sql = """
-            INSERT INTO DEVIS (date_creation, total, statut, id_client, id_user, id_projet) 
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            devis_model.db.execute_query(sql, (
-                devis_item['date_creation'],
-                devis_item['total'],
-                devis_item['statut'],
-                devis_item['id_client'],
-                user_id,
-                devis_item['id_projet']
-            ))
-            
-            # Récupérer l'ID du nouveau devis
-            cursor = devis_model.db.execute_query("SELECT last_insert_rowid()")
-            id_devis = cursor.lastrowid
-            
-            # Insérer les lignes
-            for ligne in devis_item.get('lignes', []):
-                sql_ligne = """
-                INSERT INTO LIGNE_DEVIS (designation, quantite, prix_unitaire, total_ligne, id_devis) 
-                VALUES (%s, %s, %s, %s, %s)
-                """
-                devis_model.db.execute_query(sql_ligne, (
-                    ligne['designation'],
-                    ligne['quantite'],
-                    ligne['prix_unitaire'],
-                    ligne['total_ligne'],
-                    id_devis
-                ))
+            client_data = {
+                "nom": client.get('nom'),
+                "telephone": client.get('telephone'),
+                "email": client.get('email'),
+                "adresse": client.get('adresse'),
+                "id_user": user_id
+            }
+            response = requests.post(
+                f"{supabase_url}/rest/v1/client",
+                headers=headers,
+                json=client_data
+            )
+            if response.status_code in [200, 201]:
+                print(f"   ✅ Client inséré: {client.get('nom')}")
+            else:
+                print(f"   ❌ Erreur client: {response.text}")
         
-        # Réinsérer les settings si nécessaire
+        # 🔥 INSÉRER LES PROJETS
+        for projet in backup_data.get('projets', []):
+            projet_data = {
+                "nom_projet": projet.get('nom_projet'),
+                "description": projet.get('description'),
+                "localisation": projet.get('localisation'),
+                "id_user": user_id
+            }
+            response = requests.post(
+                f"{supabase_url}/rest/v1/projet",
+                headers=headers,
+                json=projet_data
+            )
+            if response.status_code in [200, 201]:
+                print(f"   ✅ Projet inséré: {projet.get('nom_projet')}")
+            else:
+                print(f"   ❌ Erreur projet: {response.text}")
+        
+        # 🔥 INSÉRER LES DEVIS
+        for devis_item in backup_data.get('devis', []):
+            # Insérer le devis
+            devis_data = {
+                "date_creation": devis_item.get('date_creation'),
+                "total": devis_item.get('total'),
+                "statut": devis_item.get('statut', 'brouillon'),
+                "id_client": devis_item.get('id_client'),
+                "id_user": user_id,
+                "id_projet": devis_item.get('id_projet')
+            }
+            
+            response = requests.post(
+                f"{supabase_url}/rest/v1/devis",
+                headers=headers,
+                json=devis_data
+            )
+            
+            if response.status_code in [200, 201]:
+                # 🔥 Récupérer l'ID du devis créé
+                result = response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    id_devis = result[0].get('id_devis')
+                elif isinstance(result, dict):
+                    id_devis = result.get('id_devis')
+                else:
+                    # Récupérer le dernier ID
+                    get_response = requests.get(
+                        f"{supabase_url}/rest/v1/devis?select=id_devis&order=id_devis.desc&limit=1",
+                        headers=headers
+                    )
+                    if get_response.status_code == 200 and get_response.json():
+                        id_devis = get_response.json()[0].get('id_devis')
+                    else:
+                        id_devis = None
+                
+                print(f"   ✅ Devis inséré (ID: {id_devis})")
+                
+                # 🔥 INSÉRER LES LIGNES DU DEVIS
+                for ligne in devis_item.get('lignes', []):
+                    ligne_data = {
+                        "designation": ligne.get('designation'),
+                        "quantite": ligne.get('quantite'),
+                        "prix_unitaire": ligne.get('prix_unitaire'),
+                        "total_ligne": ligne.get('total_ligne'),
+                        "id_devis": id_devis
+                    }
+                    requests.post(
+                        f"{supabase_url}/rest/v1/ligne_devis",
+                        headers=headers,
+                        json=ligne_data
+                    )
+            else:
+                print(f"   ❌ Erreur devis: {response.text}")
+        
+        # 🔥 RESTAURER LES SETTINGS
         settings = backup_data.get('settings')
         if settings:
-            devis_model.db.execute_query("DELETE FROM SETTINGS WHERE id_user = %s", (user_id,))
-            sql_settings = """
-            INSERT INTO SETTINGS (id_user, company_name, company_logo, company_email, company_phone, 
-                                 company_address, primary_color, secondary_color, accent_color, created_at, updated_at) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            devis_model.db.execute_query(sql_settings, (
-                user_id,
-                settings.get('company_name', ''),
-                settings.get('company_logo', ''),
-                settings.get('company_email', ''),
-                settings.get('company_phone', ''),
-                settings.get('company_address', ''),
-                settings.get('primary_color', '#1E3A8A'),
-                settings.get('secondary_color', '#7C3AED'),
-                settings.get('accent_color', '#06B6D4'),
-                settings.get('created_at', datetime.now()),
-                datetime.now()
-            ))
-        
-        # Vérifier
-        result = devis_model.db.fetch_one("SELECT COUNT(*) as total FROM CLIENT")
-        print(f"📊 Clients après restauration: {result['total']}")
+            # Supprimer les anciens settings
+            requests.delete(
+                f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+                headers=headers
+            )
+            
+            settings_data = {
+                "id_user": user_id,
+                "company_name": settings.get('company_name', ''),
+                "company_logo": settings.get('company_logo', ''),
+                "company_email": settings.get('company_email', ''),
+                "company_phone": settings.get('company_phone', ''),
+                "company_address": settings.get('company_address', ''),
+                "primary_color": settings.get('primary_color', '#1E3A8A'),
+                "secondary_color": settings.get('secondary_color', '#7C3AED'),
+                "accent_color": settings.get('accent_color', '#06B6D4'),
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=settings_data
+            )
+            
+            if response.status_code in [200, 201]:
+                print("   ✅ Settings restaurés")
         
         print("🎉 RESTAURATION TERMINÉE !")
         print("=" * 60)
@@ -840,7 +894,9 @@ def restore_database():
         return jsonify({'success': True, 'message': 'Restauration réussie'})
         
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        print(f"❌ Erreur restauration: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ==================== FACTURES ====================
@@ -978,15 +1034,70 @@ def change_password():
 def generate_pdf(id_devis):
     try:
         user_id = get_jwt_identity()
-        devis = devis_model.get_details(id_devis)
-        if not devis:
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        import io
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib.utils import ImageReader
+        from reportlab.platypus import Image
+        import os
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Récupérer le devis
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
             return jsonify({'error': 'Devis non trouvé'}), 404
         
-        # Récupérer les paramètres de l'entreprise
-        settings_query = "SELECT * FROM SETTINGS WHERE id_user = %s"
-        settings = utilisateur_model.db.fetch_one(settings_query, (user_id,))
+        devis = devis_response.json()[0]
         
-        if not settings:
+        # 2. Récupérer le client
+        client_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+            headers=headers
+        )
+        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
+        
+        # 3. Récupérer le projet
+        projet_response = requests.get(
+            f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
+            headers=headers
+        )
+        projet = projet_response.json()[0] if projet_response.status_code == 200 and projet_response.json() else {}
+        
+        # 4. Récupérer les lignes
+        lignes_response = requests.get(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
+        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
+        
+        # 5. Récupérer les settings
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if settings_response.status_code == 200 and settings_response.json():
+            settings = settings_response.json()[0]
+        else:
             settings = {
                 'company_name': 'BTP Devis Pro',
                 'company_email': 'contact@btpdevispro.com',
@@ -998,21 +1109,29 @@ def generate_pdf(id_devis):
                 'accent_color': '#06B6D4'
             }
         
-        # Conversion des types Decimal en float
+        # Ajouter les infos au devis
+        devis['client_nom'] = client.get('nom', 'Non renseigné')
+        devis['client_email'] = client.get('email', '-')
+        devis['client_telephone'] = client.get('telephone', '-')
+        devis['client_adresse'] = client.get('adresse', '-')
+        devis['nom_projet'] = projet.get('nom_projet', 'Non renseigné')
+        devis['projet_description'] = projet.get('description', '-')
+        devis['localisation'] = projet.get('localisation', '-')
+        devis['lignes'] = lignes
+        
+        # Conversion des types
         for ligne in devis['lignes']:
             ligne['prix_unitaire'] = float(ligne['prix_unitaire']) if ligne['prix_unitaire'] else 0
             ligne['quantite'] = int(ligne['quantite']) if ligne['quantite'] else 0
             ligne['total_ligne'] = float(ligne['total_ligne']) if ligne['total_ligne'] else 0
         
-        # Création du PDF
+        # ========== CRÉATION DU PDF ==========
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, 
                                 rightMargin=2*cm, leftMargin=2*cm, 
                                 topMargin=2*cm, bottomMargin=2*cm)
         
         styles = getSampleStyleSheet()
-        
-        # Utiliser les couleurs personnalisées
         primary_color = settings.get('primary_color', '#1E3A8A')
         
         title_style = ParagraphStyle(
@@ -1041,12 +1160,7 @@ def generate_pdf(id_devis):
         
         story = []
         
-        # ========== EN-TÊTE AVEC LOGO ==========
-        from reportlab.lib.utils import ImageReader
-        from reportlab.platypus import Image
-        import os
-        
-        # Ajouter le logo s'il existe
+        # Logo
         if settings.get('company_logo'):
             logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
             if os.path.exists(logo_path):
@@ -1056,16 +1170,13 @@ def generate_pdf(id_devis):
                 except:
                     pass
         
-        # Ajouter le nom de l'entreprise
+        # En-tête
         company_name = settings.get('company_name', 'BTP Devis Pro')
         story.append(Paragraph(company_name, styles['Normal']))
         story.append(Spacer(1, 0.2*cm))
-        
-        # Titre DEVIS
         story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
         story.append(Spacer(1, 0.3*cm))
         
-        # Coordonnées de l'entreprise
         company_info = f"{settings.get('company_email', '')} | {settings.get('company_phone', '')}"
         story.append(Paragraph(company_info, subtitle_style))
         if settings.get('company_address'):
@@ -1075,12 +1186,12 @@ def generate_pdf(id_devis):
         story.append(Paragraph("<hr/>", styles['Normal']))
         story.append(Spacer(1, 0.3*cm))
         
-        # ========== INFORMATIONS DEVIS ==========
+        # Infos devis
         info_data = [
             ['Référence', f"DEVIS-{devis['id_devis']:06d}"],
-            ['Date d\'émission', devis['date_creation'].strftime('%d/%m/%Y')],
+            ['Date d\'émission', datetime.fromisoformat(devis['date_creation'].replace('Z', '+00:00')).strftime('%d/%m/%Y')],
             ['Validité', '30 jours'],
-            ['Statut', devis['statut'].upper()]
+            ['Statut', devis.get('statut', 'brouillon').upper()]
         ]
         
         info_table = Table(info_data, colWidths=[4*cm, 8*cm])
@@ -1095,7 +1206,7 @@ def generate_pdf(id_devis):
         story.append(info_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # ========== INFORMATIONS CLIENT ==========
+        # Infos client
         story.append(Paragraph("Informations Client", section_style))
         client_data = [
             ['Nom', devis['client_nom']],
@@ -1116,7 +1227,7 @@ def generate_pdf(id_devis):
         story.append(client_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # ========== INFORMATIONS PROJET ==========
+        # Infos projet
         story.append(Paragraph("Informations Projet", section_style))
         projet_data = [
             ['Nom du projet', devis['nom_projet']],
@@ -1136,7 +1247,7 @@ def generate_pdf(id_devis):
         story.append(projet_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # ========== TABLEAU DES MATÉRIAUX ==========
+        # Tableau des matériaux
         story.append(Paragraph("Détail des Travaux et Matériaux", section_style))
         
         data = [['Désignation', 'Quantité', 'Prix unitaire (FCFA)', 'Total (FCFA)']]
@@ -1183,7 +1294,7 @@ def generate_pdf(id_devis):
         story.append(table)
         story.append(Spacer(1, 0.8*cm))
         
-        # ========== CONDITIONS ET NOTES ==========
+        # Conditions
         story.append(Paragraph("Conditions et Modalités", section_style))
         
         conditions = [
@@ -1199,7 +1310,7 @@ def generate_pdf(id_devis):
         
         story.append(Spacer(1, 0.5*cm))
         
-                # ========== SIGNATURES ==========
+        # Signatures
         entreprise_name = settings.get("company_name", "l'entreprise")
         signature_data = [
             [f'Pour {entreprise_name}', 'Pour le client'],
@@ -1219,7 +1330,7 @@ def generate_pdf(id_devis):
         story.append(signature_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # ========== PIED DE PAGE ==========
+        # Pied de page
         story.append(Paragraph("<hr/>", styles['Normal']))
         footer_text = f"Devis généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
         story.append(Paragraph(footer_text, subtitle_style))
@@ -1363,25 +1474,54 @@ def get_settings():
 @jwt_required()
 def delete_devis(id_devis):
     try:
-        # Vérifier si le devis est supprimable (pas validé)
-        check_query = "SELECT statut FROM DEVIS WHERE id_devis = %s"
-        devis_check = devis_model.db.fetch_one(check_query, (id_devis,))
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
         
-        if not devis_check:
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis existe et appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,statut",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
             return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
         
-        if devis_check['statut'] == 'validé':
+        devis = check_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        if devis.get('statut') == 'validé':
             return jsonify({'success': False, 'message': 'Un devis validé ne peut pas être supprimé'}), 400
         
-        # Supprimer les lignes d'abord (clé étrangère)
-        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = %s", (id_devis,))
+        # Supprimer les lignes du devis d'abord (clé étrangère)
+        requests.delete(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
         
         # Supprimer le devis
-        devis_model.db.execute_query("DELETE FROM DEVIS WHERE id_devis = %s", (id_devis,))
+        response = requests.delete(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
         
-        return jsonify({'success': True, 'message': 'Devis supprimé'})
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Devis supprimé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
-        print(f"❌ Erreur suppression devis: {e}")
+        print(f"❌ Erreur delete_devis: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==================== ROUTES FACTURES ====================
@@ -1460,6 +1600,7 @@ def update_settings():
 def upload_logo():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         
         if 'logo' not in request.files:
             return jsonify({'success': False, 'message': 'Aucun fichier'}), 400
@@ -1473,17 +1614,67 @@ def upload_logo():
         ext = file.filename.rsplit('.', 1)[-1].lower()
         filename = f"logo_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
         
+        # 📁 Créer le dossier uploads s'il n'existe pas
         upload_folder = os.path.join(os.path.dirname(__file__), 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
         
+        # 💾 Sauvegarder le fichier
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
+        print(f"✅ Logo sauvegardé: {filepath}")
         
-        query = "UPDATE SETTINGS SET company_logo = %s, updated_at = %s WHERE id_user = %s"
-        utilisateur_model.db.execute_query(query, (filename, datetime.now(), user_id))
+        # 🔥 Mettre à jour dans Supabase
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        return jsonify({'success': True, 'logo': filename})
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier si settings existe
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            # Mettre à jour
+            update_data = {
+                "company_logo": filename,
+                "updated_at": datetime.now().isoformat()
+            }
+            response = requests.patch(
+                f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+                headers=headers,
+                json=update_data
+            )
+        else:
+            # Créer
+            settings_data = {
+                "id_user": user_id,
+                "company_logo": filename,
+                "company_name": "Mon Entreprise",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=settings_data
+            )
+        
+        if response.status_code in [200, 201, 204]:
+            return jsonify({'success': True, 'logo': filename})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur Supabase: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur upload logo: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # Route pour servir les logos
@@ -1532,43 +1723,85 @@ def get_factures(id_user):
 @jwt_required()
 def update_devis(id_devis):
     try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         
-        # Vérifier si le devis est modifiable
-        check_query = "SELECT statut FROM DEVIS WHERE id_devis = %s"
-        devis_check = devis_model.db.fetch_one(check_query, (id_devis,))
-        if devis_check and devis_check['statut'] == 'validé':
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis existe et appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,statut",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = check_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        if devis.get('statut') == 'validé':
             return jsonify({'success': False, 'message': 'Un devis validé ne peut pas être modifié'}), 400
         
         # Supprimer les anciennes lignes
-        devis_model.db.execute_query("DELETE FROM LIGNE_DEVIS WHERE id_devis = %s", (id_devis,))
+        requests.delete(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
         
         # Recalculer le total
-        total_materiaux = sum(ligne['quantite'] * ligne['prix_unitaire'] for ligne in data['lignes'])
+        lignes = data.get('lignes', [])
+        total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
         total = total_materiaux * 1.2
         
         # Mettre à jour le devis
-        query = """
-        UPDATE DEVIS 
-        SET id_client = %s, id_projet = %s, total = %s, date_creation = %s
-        WHERE id_devis = %s
-        """
-        devis_model.db.execute_query(query, (data['id_client'], data['id_projet'], total, datetime.now(), id_devis))
+        from datetime import datetime
+        update_data = {
+            "id_client": data.get('id_client'),
+            "id_projet": data.get('id_projet'),
+            "total": total,
+            "date_creation": datetime.now().isoformat()
+        }
         
-        # Réinsérer les nouvelles lignes
-        for ligne in data['lignes']:
-            total_ligne = ligne['quantite'] * ligne['prix_unitaire']
-            query_ligne = """
-            INSERT INTO LIGNE_DEVIS (designation, quantite, prix_unitaire, total_ligne, id_devis)
-            VALUES (%s, %s, %s, %s, %s)
-            """
-            devis_model.db.execute_query(query_ligne, (
-                ligne['designation'], ligne['quantite'], ligne['prix_unitaire'], total_ligne, id_devis
-            ))
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers,
+            json=update_data
+        )
         
-        return jsonify({'success': True, 'message': 'Devis modifié avec succès'})
+        if response.status_code in [200, 204]:
+            # Réinsérer les nouvelles lignes
+            for ligne in lignes:
+                total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
+                ligne_data = {
+                    "designation": ligne.get('designation'),
+                    "quantite": ligne.get('quantite'),
+                    "prix_unitaire": ligne.get('prix_unitaire'),
+                    "total_ligne": total_ligne,
+                    "id_devis": id_devis
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/ligne_devis",
+                    headers=headers,
+                    json=ligne_data
+                )
+            
+            return jsonify({'success': True, 'message': 'Devis modifié avec succès'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        print(f"❌ Erreur update_devis: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
     
 

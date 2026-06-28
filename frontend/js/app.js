@@ -2135,7 +2135,7 @@ async uploadLogo() {
     const fileInput = document.getElementById('company-logo');
     const file = fileInput.files[0];
     if (!file) {
-        alert('Veuillez sélectionner un fichier');
+        Toast.warning('Veuillez sélectionner un fichier');
         return;
     }
     
@@ -2150,14 +2150,18 @@ async uploadLogo() {
             body: formData
         });
         const result = await response.json();
+        
         if (result.success) {
-            alert('✅ Logo téléchargé avec succès !');
-            this.loadPage('parametres');
+            Toast.success('✅ Logo téléchargé avec succès !');
+            // 🔥 Forcer le rechargement de la page des paramètres
+            setTimeout(() => {
+                this.loadPage('parametres');
+            }, 500);
         } else {
-            alert('❌ ' + result.message);
+            Toast.error(result.message || 'Erreur lors du téléchargement');
         }
     } catch (error) {
-        alert('❌ Erreur lors du téléchargement');
+        Toast.error('❌ Erreur de connexion');
     }
 }
 
