@@ -706,7 +706,39 @@ def restore_database():
 # ==================== FACTURES ====================
 
 
-
+# ==================== MOT DE PASSE OUBLIÉ ====================
+@app.route('/api/check-email', methods=['POST'])
+def check_email():
+    try:
+        data = request.json
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'exists': False, 'error': 'Email requis'}), 400
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/utilisateur?email=eq.{email}&select=id_user",
+            headers=headers
+        )
+        
+        if response.status_code == 200 and response.json():
+            return jsonify({'exists': True})
+        else:
+            return jsonify({'exists': False})
+        
+    except Exception as e:
+        print(f"❌ Erreur check_email: {e}")
+        return jsonify({'exists': False, 'error': str(e)}), 500
 
 
 

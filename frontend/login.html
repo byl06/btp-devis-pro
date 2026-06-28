@@ -122,7 +122,13 @@
                 <button type="submit" class="btn-login">
                     <i class="fas fa-sign-in-alt"></i> Se connecter
                 </button>
+
             </form>
+            <div style="text-align: center; margin-top: 15px;">
+    <a href="#" onclick="demanderReinitialisation()" style="color: #06B6D4; text-decoration: none; font-size: 0.85rem;">
+        🔑 Mot de passe oublié ?
+    </a>
+</div>
             <div class="register-link">
                 Pas encore de compte ? <a href="register.html">Créer un compte</a>
             </div>
@@ -165,6 +171,34 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         alert('Erreur de connexion au serveur');
     }
 });
+
+// ==================== MOT DE PASSE OUBLIÉ ====================
+function demanderReinitialisation() {
+    const email = prompt("📧 Entrez votre adresse email :");
+    if (!email || email.trim() === '') return;
+    
+    const trimmedEmail = email.trim();
+    
+    // Vérifier que l'email existe dans la base
+    fetch('/api/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.exists) {
+            const whatsappUrl = `https://wa.me/2290143733706?text=Bonjour%20BTP%20Devis%20Pro%2C%20je%20souhaite%20r%C3%A9initialiser%20mon%20mot%20de%20passe%20pour%20le%20compte%20${encodeURIComponent(trimmedEmail)}`;
+            window.open(whatsappUrl, '_blank');
+            alert("✅ Un message a été envoyé à l'administrateur. Vous serez contacté rapidement.");
+        } else {
+            alert("❌ Aucun compte trouvé avec l'email : " + trimmedEmail);
+        }
+    })
+    .catch(() => {
+        alert("❌ Erreur de connexion. Réessayez.");
+    });
+}
 </script>
 </body>
 </html>
