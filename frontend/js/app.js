@@ -237,10 +237,14 @@ updateAdminMenu() {
         
         try {
             switch(page) {
-                case 'dashboard':
-                    pageTitle.textContent = 'Dashboard';
-                    contentArea.innerHTML = await this.renderDashboard();
-                    break;
+               case 'dashboard':
+    pageTitle.textContent = 'Dashboard';
+    contentArea.innerHTML = await this.renderDashboard();
+    // 🔥 Attendre un peu que le DOM soit prêt
+    setTimeout(() => {
+        this.showSubscriptionBanner();
+    }, 200);
+    break;
                 case 'devis':
                     pageTitle.textContent = 'Devis';
                     contentArea.innerHTML = await this.renderDevisList();
@@ -352,21 +356,18 @@ updateAdminMenu() {
     };
 }
     
-    async renderDashboard() {
+   async renderDashboard() {
     const stats = await this.getStats();
     const devisRaw = await this.fetchDevis();
     const devis = this.safeArray(devisRaw);
     
-    // Afficher le bandeau d'abonnement
-    await this.showSubscriptionBanner();
+    // 🔥 NE PAS appeler showSubscriptionBanner() ici
     
-    // Formater le chiffre d'affaires
     const formatCA = (value) => {
         if (!value || value === 0 || isNaN(value)) return '0 FCFA';
         return Math.round(value).toLocaleString('fr-FR') + ' FCFA';
     };
     
-    // Normaliser les devis pour le tableau
     const derniersDevis = devis.slice(0,5).map(d => ({
         id_devis: d.id_devis || d.id,
         client_nom: d.client_nom || d.nom || 'Client inconnu',
@@ -374,7 +375,7 @@ updateAdminMenu() {
         statut: d.statut || 'brouillon'
     }));
     
-    return `
+    const html = `
         <div class="page-content">
             <div class="cards-grid">
                 <div class="glass-card">
@@ -409,18 +410,21 @@ updateAdminMenu() {
                             <tr>
                                 <td>#${d.id_devis}</td>
                                 <td>${d.client_nom}</td>
-                                <td>${Math.round(d.total).toLocaleString('fr-FR')} FCFA</div>
-                                <td><span class="status-badge ${d.statut === 'validé' ? 'success' : 'warning'}">${d.statut}</span></div>
+                                <td>${Math.round(d.total).toLocaleString('fr-FR')} FCFA</td>
+                                <td><span class="status-badge ${d.statut === 'validé' ? 'success' : 'warning'}">${d.statut}</span></td>
                                 <td>
                                     <button class="btn-icon" onclick="app.viewDevis(${d.id_devis})"><i class="fas fa-eye"></i></button>
                                     <button class="btn-icon" onclick="app.downloadPDF(${d.id_devis})"><i class="fas fa-download"></i></button>
-                                </div>
+                                </td>
                             </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;">Aucun devis</td></tr>'}
                     </tbody>
                 </table>
             </div>
         </div>
     `;
+    
+    // 🔥 Retourner le HTML sans le bandeau
+    return html;
 }
     
     async renderDevisList() {
