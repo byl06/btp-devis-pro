@@ -1588,16 +1588,132 @@ def admin_changer_offre(id_user):
 def admin_suspendre_abonnement(id_user):
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.get_by_id(admin_id)
+        admin_id = int(admin_id)
         
-        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+        if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
-        query = "UPDATE ABONNEMENTS SET statut = 'suspendu' WHERE id_user = %s"
-        utilisateur_model.db.execute_query(query, (id_user,))
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        return jsonify({'success': True, 'message': 'Abonnement suspendu'})
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier si l'utilisateur a un abonnement
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+            headers=headers
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            existing = check_response.json()[0]
+            abo_id = existing.get('id_abonnement')
+            
+            # Mettre à jour le statut à "suspendu"
+            update_data = {
+                "statut": "suspendu"
+            }
+            
+            patch_response = requests.patch(
+                f"{supabase_url}/rest/v1/abonnements?id_abonnement=eq.{abo_id}",
+                headers=headers,
+                json=update_data
+            )
+            
+            if patch_response.status_code in [200, 204]:
+                # Ajouter une notification pour l'utilisateur
+                notification_data = {
+                    "id_user": id_user,
+                    "message": "⛔ Votre abonnement a été suspendu par l'administrateur. Contactez-nous pour plus d'informations.",
+                    "type": "suspension",
+                    "date_creation": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/notifications",
+                    headers=headers,
+                    json=notification_data
+                )
+                
+                return jsonify({'success': True, 'message': 'Abonnement suspendu'})
+            else:
+                return jsonify({'error': f'Erreur mise à jour: {patch_response.text}'}), 500
+        else:
+            return jsonify({'error': 'Aucun abonnement trouvé'}), 404
+        
     except Exception as e:
+        print(f"❌ Erreur suspendre: {e}")
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/admin/abonnement/<int:id_user>/reactiver', methods=['POST'])
+@jwt_required()
+def admin_reactiver_abonnement(id_user):
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        from datetime import datetime, timedelta
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{id_user}",
+            headers=headers
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            existing = check_response.json()[0]
+            abo_id = existing.get('id_abonnement')
+            
+            # Réactiver avec la date actuelle + 30 jours par défaut
+            date_fin = datetime.now() + timedelta(days=30)
+            
+            update_data = {
+                "statut": "actif",
+                "date_fin": date_fin.isoformat()
+            }
+            
+            patch_response = requests.patch(
+                f"{supabase_url}/rest/v1/abonnements?id_abonnement=eq.{abo_id}",
+                headers=headers,
+                json=update_data
+            )
+            
+            if patch_response.status_code in [200, 204]:
+                notification_data = {
+                    "id_user": id_user,
+                    "message": "✅ Votre abonnement a été réactivé par l'administrateur.",
+                    "type": "reactivation",
+                    "date_creation": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/notifications",
+                    headers=headers,
+                    json=notification_data
+                )
+                
+                return jsonify({'success': True, 'message': 'Abonnement réactivé'})
+            else:
+                return jsonify({'error': f'Erreur mise à jour: {patch_response.text}'}), 500
+        else:
+            return jsonify({'error': 'Aucun abonnement trouvé'}), 404
+        
+    except Exception as e:
+        print(f"❌ Erreur réactiver: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/export-abonnements', methods=['GET'])

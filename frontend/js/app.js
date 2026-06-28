@@ -746,6 +746,24 @@ async exportClientsToExcel() {
             </div>
         `;
     }
+
+
+    async reactiverAbonnement(id_user) {
+    if (confirm(`Réactiver l'abonnement de l'utilisateur ID ${id_user} ?`)) {
+        try {
+            const response = await apiRequest(`/api/admin/abonnement/${id_user}/reactiver`, { method: 'POST' });
+            const result = await response.json();
+            if (result.success) {
+                Toast.success('✅ Abonnement réactivé !');
+                this.loadPage('admin');
+            } else {
+                Toast.error(result.error || 'Erreur');
+            }
+        } catch (error) {
+            Toast.error('❌ Erreur de connexion');
+        }
+    }
+}
     
     // Actions rapides
    async viewDevis(id) {
@@ -2591,39 +2609,39 @@ async renderAdmin() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                                <!-- Bouton Essai 14 jours -->
-                                                <button class="btn-icon" onclick="app.ajouterEssai(${a.id_user})" title="14 jours d'essai" style="background: #8B5CF6;">
-                                                    <i class="fas fa-gift"></i>
-                                                </button>
-                                                <!-- Bouton Starter -->
-                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 15000, 'starter')" title="Starter +30j (15k)" style="background: #10B981;">
-                                                    <i class="fas fa-leaf"></i>
-                                                </button>
-                                                <!-- Bouton Pro -->
-                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 30000, 'pro')" title="Pro +30j (30k)" style="background: #3B82F6;">
-                                                    <i class="fas fa-crown"></i>
-                                                </button>
-                                                <!-- Bouton Annuel -->
-                                                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 365, 250000, 'annuel')" title="Annuel +1an (250k)" style="background: #F59E0B;">
-                                                    <i class="fas fa-gem"></i>
-                                                </button>
-                                                <!-- Changer offre -->
-                                                <select onchange="app.changerOffre(${a.id_user}, this.value)" class="filter-select" style="padding: 6px 10px; font-size: 0.75rem;">
-                                                    <option value="starter" ${a.type_abonnement === 'starter' ? 'selected' : ''}>🟢 Starter</option>
-                                                    <option value="pro" ${a.type_abonnement === 'pro' ? 'selected' : ''}>🔵 Pro</option>
-                                                    <option value="annuel" ${a.type_abonnement === 'annuel' ? 'selected' : ''}>🔴 Annuel</option>
-                                                </select>
-                                                <!-- Suspendre -->
-                                                <button class="btn-icon" onclick="app.suspendreAbonnement(${a.id_user})" title="Suspendre" style="background: #EF4444;">
-                                                    <i class="fas fa-pause-circle"></i>
-                                                </button>
-                                                <!-- Historique -->
-                                                <button class="btn-icon" onclick="app.voirPaiements(${a.id_user})" title="Historique" style="background: #6B7280;">
-                                                    <i class="fas fa-history"></i>
-                                                </button>
-                                            </div>
-                                        </td>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <!-- Bouton Essai 14 jours -->
+        <button class="btn-icon" onclick="app.ajouterEssai(${a.id_user})" title="14 jours d'essai" style="background: #8B5CF6;">
+            <i class="fas fa-gift"></i>
+        </button>
+        <!-- Bouton Starter -->
+        <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 15000, 'starter')" title="Starter +30j (15k)" style="background: #10B981;">
+            <i class="fas fa-leaf"></i>
+        </button>
+        <!-- Bouton Pro -->
+        <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 30, 30000, 'pro')" title="Pro +30j (30k)" style="background: #3B82F6;">
+            <i class="fas fa-crown"></i>
+        </button>
+        <!-- Bouton Annuel -->
+        <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, 365, 250000, 'annuel')" title="Annuel +1an (250k)" style="background: #F59E0B;">
+            <i class="fas fa-gem"></i>
+        </button>
+        <!-- Changer offre -->
+        <select onchange="app.changerOffre(${a.id_user}, this.value)" class="filter-select" style="padding: 6px 10px; font-size: 0.75rem;">
+            <option value="starter" ${a.type_abonnement === 'starter' ? 'selected' : ''}>🟢 Starter</option>
+            <option value="pro" ${a.type_abonnement === 'pro' ? 'selected' : ''}>🔵 Pro</option>
+            <option value="annuel" ${a.type_abonnement === 'annuel' ? 'selected' : ''}>🔴 Annuel</option>
+        </select>
+        <!-- Suspendre -->
+        <button class="btn-icon" onclick="app.suspendreAbonnement(${a.id_user})" title="Suspendre" style="background: #EF4444;">
+            <i class="fas fa-pause-circle"></i>
+        </button>
+        <!-- Historique -->
+        <button class="btn-icon" onclick="app.voirPaiements(${a.id_user})" title="Historique" style="background: #6B7280;">
+            <i class="fas fa-history"></i>
+        </button>
+    </div>
+</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
