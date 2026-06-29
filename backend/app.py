@@ -1781,10 +1781,62 @@ def create_facture(id_devis):
 @jwt_required()
 def pay_facture(id_facture):
     try:
-        query = "UPDATE FACTURE SET statut = 'payée' WHERE id_facture = %s"
-        facture_model.db.execute_query(query, (id_facture,))
-        return jsonify({'success': True, 'message': 'Facture payée'})
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Vérifier que la facture existe
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}&select=id_devis",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        id_devis = facture.get('id_devis')
+        
+        # 2. Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # 3. Mettre à jour le statut de la facture
+        update_data = {"statut": "payée"}
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Facture payée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur pay_facture: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/settings', methods=['PUT'])
