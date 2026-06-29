@@ -1978,46 +1978,71 @@ def get_factures(id_user):
             "Content-Type": "application/json"
         }
         
-        # Récupérer les factures avec les infos client
+        # 1. Récupérer TOUTES les factures
         response = requests.get(
-            f"{supabase_url}/rest/v1/facture?select=*,devis:devis_id(id_client,total,devis:devis_id(client:client_id(nom)))",
+            f"{supabase_url}/rest/v1/facture?select=*",
             headers=headers
         )
         
-        factures = []
-        if response.status_code == 200:
-            all_factures = response.json()
-            for f in all_factures:
-                # Vérifier que le devis appartient à l'utilisateur
-                devis_check = requests.get(
-                    f"{supabase_url}/rest/v1/devis?id_devis=eq.{f.get('id_devis')}&select=id_user",
+        if response.status_code != 200:
+            print(f"❌ Erreur: {response.text}")
+            return jsonify([]), 500
+        
+        all_factures = response.json()
+        print(f"🔍 Total factures en base: {len(all_factures)}")
+        
+        result = []
+        for facture in all_factures:
+            id_devis = facture.get('id_devis')
+            if not id_devis:
+                continue
+            
+            # 2. Récupérer le devis pour vérifier l'utilisateur
+            devis_response = requests.get(
+                f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,id_client",
+                headers=headers
+            )
+            
+            if devis_response.status_code != 200 or not devis_response.json():
+                print(f"⚠️ Devis {id_devis} non trouvé")
+                continue
+            
+            devis = devis_response.json()[0]
+            
+            # Vérifier que le devis appartient à l'utilisateur
+            if devis.get('id_user') != current_user:
+                print(f"⏭️ Devis {id_devis} appartient à un autre utilisateur")
+                continue
+            
+            # 3. Récupérer le nom du client
+            client_nom = "Inconnu"
+            id_client = devis.get('id_client')
+            if id_client:
+                client_response = requests.get(
+                    f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}&select=nom",
                     headers=headers
                 )
-                if devis_check.status_code == 200 and devis_check.json():
-                    devis_data = devis_check.json()[0]
-                    if devis_data.get('id_user') == current_user:
-                        # Récupérer le nom du client
-                        client_nom = "Inconnu"
-                        if f.get('devis') and f['devis'].get('client'):
-                            client_nom = f['devis']['client'].get('nom', 'Inconnu')
-                        
-                        factures.append({
-                            'id_facture': f.get('id_facture'),
-                            'id_devis': f.get('id_devis'),
-                            'date_facture': f.get('date_facture'),
-                            'montant': f.get('montant'),
-                            'statut': f.get('statut'),
-                            'client_nom': client_nom
-                        })
+                if client_response.status_code == 200 and client_response.json():
+                    client = client_response.json()[0]
+                    client_nom = client.get('nom', 'Inconnu')
+            
+            result.append({
+                'id_facture': facture.get('id_facture'),
+                'id_devis': id_devis,
+                'date_facture': facture.get('date_facture'),
+                'montant': facture.get('montant', 0),
+                'statut': facture.get('statut', 'non payée'),
+                'client_nom': client_nom
+            })
         
-        print(f"📋 {len(factures)} factures trouvées")
-        return jsonify(factures)
+        print(f"📋 {len(result)} factures trouvées pour l'utilisateur {current_user}")
+        return jsonify(result)
         
     except Exception as e:
         print(f"❌ Erreur get_factures: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify([]), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['PUT'])
 @jwt_required()
