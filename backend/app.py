@@ -117,33 +117,45 @@ def register():
             data['entreprise'], data['telephone']
         )
         
-        # Vérifier si result est une liste ou un dict
         if result:
-            # Récupérer l'ID du nouvel utilisateur
             if isinstance(result, list) and len(result) > 0:
                 user_id = result[0].get('id_user')
             elif isinstance(result, dict):
                 user_id = result.get('id_user')
             else:
-                # Si on n'a pas d'ID, récupérer le dernier utilisateur créé
                 user = utilisateur_model.get_by_email(data['email'])
-                if user:
-                    user_id = user.get('id_user')
-                else:
-                    return jsonify({'success': False, 'message': 'Erreur lors de la récupération'}), 500
+                user_id = user.get('id_user') if user else None
             
             if user_id:
-                # Créer un abonnement essai de 14 jours
                 from datetime import datetime, timedelta
                 date_fin_essai = datetime.now() + timedelta(days=14)
                 
-                query = """
-                INSERT INTO abonnements (id_user, statut, date_debut, date_fin, type_abonnement)
-                VALUES (%s, 'actif', %s, %s, 'essai')
-                """
-                utilisateur_model.db.execute_query(query, (user_id, datetime.now(), date_fin_essai))
+                import requests
+                supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+                supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
                 
-                return jsonify({'success': True, 'message': 'Inscription réussie ! Période d\'essai de 14 jours.'})
+                headers = {
+                    "Authorization": f"Bearer {supabase_key}",
+                    "apikey": supabase_key,
+                    "Content-Type": "application/json"
+                }
+                
+                abo_data = {
+                    "id_user": user_id,
+                    "statut": "actif",
+                    "date_debut": datetime.now().isoformat(),
+                    "date_fin": date_fin_essai.isoformat(),
+                    "type_abonnement": "essai"
+                }
+                
+                response = requests.post(
+                    f"{supabase_url}/rest/v1/abonnements",
+                    headers=headers,
+                    json=abo_data
+                )
+                
+                if response.status_code in [200, 201]:
+                    return jsonify({'success': True, 'message': 'Inscription réussie ! Période d\'essai de 14 jours.'})
         
         return jsonify({'success': False, 'message': 'Erreur lors de l\'inscription'}), 500
         
@@ -1635,20 +1647,44 @@ def start_trial():
 def get_settings():
     try:
         user_id = get_jwt_identity()
-        query = "SELECT * FROM SETTINGS WHERE id_user = %s"
-        settings = utilisateur_model.db.fetch_one(query, (user_id,))
+        user_id = int(user_id)
         
-        if not settings:
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if response.status_code == 200 and response.json():
+            settings = response.json()[0]
+        else:
+            # Créer des settings par défaut
             from datetime import datetime
-            query_insert = """
-            INSERT INTO SETTINGS (id_user, company_name, created_at, updated_at)
-            VALUES (%s, %s, %s, %s)
-            """
-            utilisateur_model.db.execute_query(query_insert, (user_id, 'Mon Entreprise', datetime.now(), datetime.now()))
-            settings = utilisateur_model.db.fetch_one(query, (user_id,))
+            settings_data = {
+                "id_user": user_id,
+                "company_name": "Mon Entreprise",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            post_response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=settings_data
+            )
+            settings = settings_data if post_response.status_code in [200, 201] else None
         
         return jsonify({'success': True, 'settings': settings})
     except Exception as e:
+        print(f"❌ Erreur get_settings: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['DELETE'])
@@ -1844,30 +1880,44 @@ def pay_facture(id_facture):
 def update_settings():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         from datetime import datetime
         
-        query = """
-        UPDATE SETTINGS 
-        SET company_name = %s, company_email = %s, company_phone = %s, 
-            company_address = %s, primary_color = %s, secondary_color = %s, 
-            accent_color = %s, updated_at = %s
-        WHERE id_user = %s
-        """
-        utilisateur_model.db.execute_query(query, (
-            data.get('company_name', ''),
-            data.get('company_email', ''),
-            data.get('company_phone', ''),
-            data.get('company_address', ''),
-            data.get('primary_color', '#1E3A8A'),
-            data.get('secondary_color', '#7C3AED'),
-            data.get('accent_color', '#06B6D4'),
-            datetime.now(),
-            user_id
-        ))
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
-        return jsonify({'success': True, 'message': 'Paramètres mis à jour'})
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {
+            "company_name": data.get('company_name', ''),
+            "company_email": data.get('company_email', ''),
+            "company_phone": data.get('company_phone', ''),
+            "company_address": data.get('company_address', ''),
+            "primary_color": data.get('primary_color', '#1E3A8A'),
+            "secondary_color": data.get('secondary_color', '#7C3AED'),
+            "accent_color": data.get('accent_color', '#06B6D4'),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Paramètres mis à jour'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur update_settings: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/settings/logo', methods=['POST'])
@@ -2445,13 +2495,28 @@ def admin_prolonger_abonnement(id_user):
 def get_notifications():
     try:
         user_id = get_jwt_identity()
-        query = """
-        SELECT * FROM notifications 
-        WHERE id_user = %s AND est_lue = 0
-        ORDER BY date_creation DESC
-        """
-        notifications = utilisateur_model.db.fetch_all(query, (user_id,))
-        return jsonify(notifications)
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/notifications?id_user=eq.{user_id}&est_lue=eq.0&order=date_creation.desc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([])
+        
     except Exception as e:
         print(f"❌ Erreur: {e}")
         return jsonify({'error': str(e)}), 500
@@ -2460,10 +2525,34 @@ def get_notifications():
 @jwt_required()
 def marquer_notification_lue(id_notification):
     try:
-        query = "UPDATE notifications SET est_lue = 1 WHERE id_notification = %s"
-        utilisateur_model.db.execute_query(query, (id_notification,))
-        return jsonify({'success': True})
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {"est_lue": 1}
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/notifications?id_notification=eq.{id_notification}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': response.text}), 500
+        
     except Exception as e:
+        print(f"❌ Erreur: {e}")
         return jsonify({'error': str(e)}), 500
     
 
@@ -2655,23 +2744,66 @@ def admin_reactiver_abonnement(id_user):
 def admin_export_abonnements():
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.get_by_id(admin_id)
+        admin_id = int(admin_id)
         
-        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+        if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
-        query = """
-        SELECT u.nom, u.email, u.entreprise, u.telephone,
-               a.type_abonnement, a.statut, a.date_debut, a.date_fin,
-               DATEDIFF(a.date_fin, NOW()) as jours_restants
-        FROM UTILISATEUR u
-        LEFT JOIN ABONNEMENTS a ON u.id_user = a.id_user
-        WHERE u.id_user != 1
-        ORDER BY u.nom
-        """
-        abonnements = utilisateur_model.db.fetch_all(query)
-        return jsonify(abonnements)
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer tous les utilisateurs
+        users_response = requests.get(
+            f"{supabase_url}/rest/v1/utilisateur?select=*",
+            headers=headers
+        )
+        
+        if users_response.status_code != 200:
+            return jsonify([]), 500
+        
+        all_users = users_response.json()
+        result = []
+        
+        for u in all_users:
+            if u.get('id_user') == 1:
+                continue
+            
+            # Récupérer l'abonnement
+            abo_response = requests.get(
+                f"{supabase_url}/rest/v1/abonnements?id_user=eq.{u.get('id_user')}",
+                headers=headers
+            )
+            abo = abo_response.json()[0] if abo_response.status_code == 200 and abo_response.json() else None
+            
+            from datetime import datetime
+            jours_restants = 0
+            if abo and abo.get('date_fin'):
+                date_fin = datetime.fromisoformat(abo['date_fin'].replace('Z', '+00:00'))
+                jours_restants = (date_fin - datetime.now()).days
+            
+            result.append({
+                'nom': u.get('nom', ''),
+                'email': u.get('email', ''),
+                'entreprise': u.get('entreprise', ''),
+                'telephone': u.get('telephone', ''),
+                'type_abonnement': abo.get('type_abonnement') if abo else '-',
+                'statut': abo.get('statut') if abo else '-',
+                'date_debut': abo.get('date_debut') if abo else None,
+                'date_fin': abo.get('date_fin') if abo else None,
+                'jours_restants': max(0, jours_restants)
+            })
+        
+        return jsonify(result)
+        
     except Exception as e:
+        print(f"❌ Erreur export: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/paiements/<int:id_user>', methods=['GET'])
@@ -2679,15 +2811,33 @@ def admin_export_abonnements():
 def admin_get_paiements(id_user):
     try:
         admin_id = get_jwt_identity()
-        admin = utilisateur_model.get_by_id(admin_id)
+        admin_id = int(admin_id)
         
-        if admin['email'] != 'admin@btp.com' and admin['email'] != 'bylgaitb@gmail.com':
+        if admin_id != 1:
             return jsonify({'error': 'Non autorisé'}), 403
         
-        query = "SELECT * FROM paiements WHERE id_user = %s ORDER BY date_paiement DESC"
-        paiements = utilisateur_model.db.fetch_all(query, (id_user,))
-        return jsonify(paiements)
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/paiements?id_user=eq.{id_user}&order=date_paiement.desc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([])
+        
     except Exception as e:
+        print(f"❌ Erreur paiements: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== TEST ====================
