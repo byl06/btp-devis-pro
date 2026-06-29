@@ -223,48 +223,64 @@ class Devis:
             print(f"❌ Erreur create_devis: {e}")
             return None
     
-    def get_by_user(self, id_user):
-        import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+def get_by_user(self, id_user):
+    import requests
+    supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
     
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json"
-        }
+    headers = {
+        "Authorization": f"Bearer {supabase_key}",
+        "apikey": supabase_key,
+        "Content-Type": "application/json"
+    }
     
-        print(f"🔍 Récupération des devis pour user_id: {id_user}")
+    print(f"🔍 get_by_user appelé avec id_user: {id_user}")
     
-    # Récupérer les devis avec les infos client et projet
-        response = requests.get(
-           f"{supabase_url}/rest/v1/devis?id_user=eq.{id_user}&select=*,client:client_id(nom),projet:projet_id(nom_projet)&order=id_devis.desc",
-           headers=headers
-        )
+    # 1. Récupérer les devis de l'utilisateur
+    response = requests.get(
+        f"{supabase_url}/rest/v1/devis?id_user=eq.{id_user}&order=id_devis.desc",
+        headers=headers
+    )
     
-        if response.status_code != 200:
-          print(f"❌ Erreur: {response.text}")
-          return []
+    print(f"🔍 Status devis: {response.status_code}")
     
-        devis_list = response.json()
-        print(f"🔍 Nombre de devis trouvés: {len(devis_list)}")
+    if response.status_code != 200:
+        print(f"❌ Erreur devis: {response.text}")
+        return []
     
-        result = []
-        for devis in devis_list:
-        # Extraire les noms des relations
-           client_nom = devis.get('client', {}).get('nom', 'Client inconnu') if devis.get('client') else 'Client inconnu'
-           projet_nom = devis.get('projet', {}).get('nom_projet', 'Projet inconnu') if devis.get('projet') else 'Projet inconnu'
+    devis_list = response.json()
+    print(f"🔍 Devis trouvés: {len(devis_list)}")
+    
+    result = []
+    for devis in devis_list:
+        # 2. Récupérer le client séparément
+        client_nom = "Client inconnu"
+        if devis.get('id_client'):
+            client_response = requests.get(
+                f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+                headers=headers
+            )
+            if client_response.status_code == 200 and client_response.json():
+                client = client_response.json()[0]
+                client_nom = client.get('nom', 'Client inconnu')
         
-        # Supprimer les objets imbriqués
-           devis.pop('client', None)
-           devis.pop('projet', None)
+        # 3. Récupérer le projet séparément
+        projet_nom = "Projet inconnu"
+        if devis.get('id_projet'):
+            projet_response = requests.get(
+                f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
+                headers=headers
+            )
+            if projet_response.status_code == 200 and projet_response.json():
+                projet = projet_response.json()[0]
+                projet_nom = projet.get('nom_projet', 'Projet inconnu')
         
-           devis['client_nom'] = client_nom
-           devis['nom_projet'] = projet_nom
-           result.append(devis)
+        devis['client_nom'] = client_nom
+        devis['nom_projet'] = projet_nom
+        result.append(devis)
     
-        print(f"✅ {len(result)} devis retournés")
-        return result  # ← CE RETURN DOIT ÊTRE ICI, EN DEHORS DE LA BOUCLE
+    print(f"✅ {len(result)} devis retournés")
+    return result
     
     def get_details(self, id_devis):
         result = self.db.find("devis", "id_devis", id_devis)
