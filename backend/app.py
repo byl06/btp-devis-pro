@@ -803,60 +803,58 @@ def restore_database():
             else:
                 print(f"   ❌ Erreur projet: {response.text}")
         
-        # 🔥 INSÉRER LES DEVIS
-        for devis_item in backup_data.get('devis', []):
-            # Insérer le devis
-            devis_data = {
-                "date_creation": devis_item.get('date_creation'),
-                "total": devis_item.get('total'),
-                "statut": devis_item.get('statut', 'brouillon'),
-                "id_client": devis_item.get('id_client'),
-                "id_user": user_id,
-                "id_projet": devis_item.get('id_projet')
-            }
-            
-            response = requests.post(
-                f"{supabase_url}/rest/v1/devis",
-                headers=headers,
-                json=devis_data
-            )
-            
-            if response.status_code in [200, 201]:
-                # 🔥 Récupérer l'ID du devis créé
-                result = response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    id_devis = result[0].get('id_devis')
-                elif isinstance(result, dict):
-                    id_devis = result.get('id_devis')
-                else:
-                    # Récupérer le dernier ID
-                    get_response = requests.get(
-                        f"{supabase_url}/rest/v1/devis?select=id_devis&order=id_devis.desc&limit=1",
-                        headers=headers
-                    )
-                    if get_response.status_code == 200 and get_response.json():
-                        id_devis = get_response.json()[0].get('id_devis')
-                    else:
-                        id_devis = None
-                
-                print(f"   ✅ Devis inséré (ID: {id_devis})")
-                
-                # 🔥 INSÉRER LES LIGNES DU DEVIS
-                for ligne in devis_item.get('lignes', []):
-                    ligne_data = {
-                        "designation": ligne.get('designation'),
-                        "quantite": ligne.get('quantite'),
-                        "prix_unitaire": ligne.get('prix_unitaire'),
-                        "total_ligne": ligne.get('total_ligne'),
-                        "id_devis": id_devis
+        # 🔥 INSÉRER LES DEVIS (avec gestion du cas sans devis)
+        print("📥 Insertion des devis...")
+        devis_list = backup_data.get('devis', [])
+        if devis_list:
+            for devis_item in devis_list:
+                try:
+                    devis_data = {
+                        "date_creation": devis_item.get('date_creation'),
+                        "total": devis_item.get('total'),
+                        "statut": devis_item.get('statut', 'brouillon'),
+                        "id_client": devis_item.get('id_client'),
+                        "id_user": user_id,
+                        "id_projet": devis_item.get('id_projet')
                     }
-                    requests.post(
-                        f"{supabase_url}/rest/v1/ligne_devis",
+                    
+                    response = requests.post(
+                        f"{supabase_url}/rest/v1/devis",
                         headers=headers,
-                        json=ligne_data
+                        json=devis_data
                     )
-            else:
-                print(f"   ❌ Erreur devis: {response.text}")
+                    
+                    if response.status_code in [200, 201]:
+                        result = response.json()
+                        if isinstance(result, list) and len(result) > 0:
+                            id_devis = result[0].get('id_devis')
+                        elif isinstance(result, dict):
+                            id_devis = result.get('id_devis')
+                        else:
+                            id_devis = None
+                        
+                        print(f"   ✅ Devis inséré (ID: {id_devis})")
+                        
+                        # Insérer les lignes
+                        for ligne in devis_item.get('lignes', []):
+                            ligne_data = {
+                                "designation": ligne.get('designation'),
+                                "quantite": ligne.get('quantite'),
+                                "prix_unitaire": ligne.get('prix_unitaire'),
+                                "total_ligne": ligne.get('total_ligne'),
+                                "id_devis": id_devis
+                            }
+                            requests.post(
+                                f"{supabase_url}/rest/v1/ligne_devis",
+                                headers=headers,
+                                json=ligne_data
+                            )
+                    else:
+                        print(f"   ❌ Erreur devis: {response.text}")
+                except Exception as e:
+                    print(f"   ❌ Exception devis: {e}")
+        else:
+            print("   ℹ️ Aucun devis à restaurer")
         
         # 🔥 RESTAURER LES SETTINGS
         settings = backup_data.get('settings')
