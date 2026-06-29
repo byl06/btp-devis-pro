@@ -773,9 +773,100 @@ def create_devis():
 @jwt_required()
 def get_devis_detail(id_devis):
     try:
-        devis = devis_model.get_details(id_devis)
-        return jsonify(devis)
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        print(f"🔍 Récupération détail devis {id_devis} pour user {user_id}")
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Récupérer le devis
+        response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
+        
+        if response.status_code != 200 or not response.json():
+            return jsonify({'error': 'Devis non trouvé'}), 404
+        
+        devis = response.json()[0]
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        if devis.get('id_user') != user_id:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        # 2. Récupérer le client
+        client_nom = "Client inconnu"
+        client_email = ""
+        client_telephone = ""
+        client_adresse = ""
+        if devis.get('id_client'):
+            client_response = requests.get(
+                f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+                headers=headers
+            )
+            if client_response.status_code == 200 and client_response.json():
+                client = client_response.json()[0]
+                client_nom = client.get('nom', 'Client inconnu')
+                client_email = client.get('email', '')
+                client_telephone = client.get('telephone', '')
+                client_adresse = client.get('adresse', '')
+        
+        # 3. Récupérer le projet
+        projet_nom = "Projet inconnu"
+        projet_description = ""
+        localisation = ""
+        if devis.get('id_projet'):
+            projet_response = requests.get(
+                f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
+                headers=headers
+            )
+            if projet_response.status_code == 200 and projet_response.json():
+                projet = projet_response.json()[0]
+                projet_nom = projet.get('nom_projet', 'Projet inconnu')
+                projet_description = projet.get('description', '')
+                localisation = projet.get('localisation', '')
+        
+        # 4. Récupérer les lignes
+        lignes_response = requests.get(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
+        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
+        
+        # 5. Construire le résultat
+        result = {
+            'id_devis': devis.get('id_devis'),
+            'date_creation': devis.get('date_creation'),
+            'total': devis.get('total', 0),
+            'statut': devis.get('statut', 'brouillon'),
+            'id_client': devis.get('id_client'),
+            'id_user': devis.get('id_user'),
+            'id_projet': devis.get('id_projet'),
+            'client_nom': client_nom,
+            'client_email': client_email,
+            'client_telephone': client_telephone,
+            'client_adresse': client_adresse,
+            'nom_projet': projet_nom,
+            'projet_description': projet_description,
+            'localisation': localisation,
+            'lignes': lignes
+        }
+        
+        print(f"✅ Détail devis {id_devis} retourné")
+        return jsonify(result)
+        
     except Exception as e:
+        print(f"❌ Erreur get_devis_detail: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
