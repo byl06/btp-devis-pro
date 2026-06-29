@@ -610,6 +610,9 @@ def create_devis():
         user_id = int(user_id)
         data = request.json
         
+        print(f"🔍 Création devis pour user_id: {user_id}")
+        print(f"🔍 Données reçues: {data}")
+        
         # 🔥 Vérifier l'abonnement
         ok, message, headers, supabase_url = verifier_abonnement(user_id)
         if not ok:
@@ -632,32 +635,45 @@ def create_devis():
             "id_projet": data.get('id_projet')
         }
         
+        print(f"🔍 Données devis à insérer: {devis_data}")
+        
         response = requests.post(
             f"{supabase_url}/rest/v1/devis",
             headers=headers,
             json=devis_data
         )
         
+        print(f"🔍 Status Supabase devis: {response.status_code}")
+        print(f"🔍 Réponse brute devis: {response.text}")
+        
         if response.status_code in [200, 201]:
-            # Récupérer l'ID du devis créé
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                id_devis = result[0].get('id_devis')
-            elif isinstance(result, dict):
-                id_devis = result.get('id_devis')
-            else:
-                # Récupérer le dernier ID
+            # 🔥 Récupérer l'ID du devis créé
+            try:
+                result = response.json()
+                print(f"🔍 Résultat JSON: {result}")
+            except Exception as e:
+                print(f"❌ Erreur parsing JSON: {e}")
+                # Si la réponse est vide, récupérer le dernier ID
                 get_response = requests.get(
                     f"{supabase_url}/rest/v1/devis?select=id_devis&order=id_devis.desc&limit=1",
                     headers=headers
                 )
                 if get_response.status_code == 200 and get_response.json():
                     id_devis = get_response.json()[0].get('id_devis')
+                    print(f"🔍 ID récupéré via SELECT: {id_devis}")
                 else:
                     id_devis = None
             
-            # Insérer les lignes du devis
+            if 'result' in locals() and result:
+                if isinstance(result, list) and len(result) > 0:
+                    id_devis = result[0].get('id_devis')
+                elif isinstance(result, dict):
+                    id_devis = result.get('id_devis')
+                elif 'id_devis' not in locals() or not id_devis:
+                    id_devis = None
+            
             if id_devis:
+                # Insérer les lignes
                 for ligne in lignes:
                     total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
                     ligne_data = {
