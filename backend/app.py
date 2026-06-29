@@ -731,6 +731,8 @@ def backup_database():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
 @app.route('/api/restore', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def restore_database():

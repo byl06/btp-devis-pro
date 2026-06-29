@@ -2555,14 +2555,35 @@ async restoreData() {
                     
                     clearTimeout(timeoutId);
                     
-                    const result = await response.json();
+                    // 🔥 Lire la réponse en texte d'abord pour debug
+                    const text = await response.text();
+                    console.log("📊 Réponse brute restauration:", text);
                     
-                    if (result.success) {
+                    let result;
+                    try {
+                        result = JSON.parse(text);
+                    } catch(e) {
+                        console.error("❌ Erreur parsing JSON:", e);
+                        loadingDiv.remove();
+                        alert('❌ Erreur: La réponse du serveur n\'est pas valide. Vérifiez les logs.');
+                        return;
+                    }
+                    
+                    console.log("📊 Résultat restauration:", result);
+                    
+                    // 🔥 Vérification plus tolérante
+                    if (result && (result.success === true || result.message === 'Restauration réussie')) {
                         loadingDiv.innerHTML = `
                             <div style="background: #1E293B; padding: 30px 50px; border-radius: 20px; text-align: center; border: 1px solid #10B981;">
                                 <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 20px; color: #10B981;"></i>
                                 <h3>✅ Restauration réussie !</h3>
-                                <p style="margin-top: 10px;">Redirection vers la page de connexion...</p>
+                                <p style="margin-top: 10px; color: #94A3B8;">
+                                    ${result.data ? 
+                                        `${result.data.clients || 0} clients, ${result.data.projets || 0} projets, ${result.data.devis || 0} devis restaurés` : 
+                                        'Toutes vos données ont été restaurées'
+                                    }
+                                </p>
+                                <p style="margin-top: 10px; color: #94A3B8;">Redirection vers la page de connexion...</p>
                             </div>
                         `;
                         
@@ -2570,18 +2591,20 @@ async restoreData() {
                             localStorage.removeItem('token');
                             localStorage.removeItem('user');
                             window.location.href = 'login.html';
-                        }, 2000);
+                        }, 3000);
                     } else {
                         loadingDiv.remove();
-                        alert('❌ Erreur: ' + result.error);
+                        alert('❌ Erreur: ' + (result?.error || result?.message || 'Erreur inconnue'));
                     }
                 } catch (error) {
                     document.getElementById('restore-loading')?.remove();
-                    console.error('Erreur:', error);
+                    console.error('❌ Erreur restauration:', error);
                     if (error.name === 'AbortError') {
                         alert('❌ La restauration a pris trop de temps. Vérifiez votre connexion.');
+                    } else if (error.message.includes('Unexpected')) {
+                        alert('❌ Le fichier sélectionné n\'est pas un fichier de sauvegarde valide.');
                     } else {
-                        alert('❌ Fichier invalide: ' + error.message);
+                        alert('❌ Erreur: ' + error.message);
                     }
                 }
             }
