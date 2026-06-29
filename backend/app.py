@@ -758,11 +758,11 @@ def restore_database():
         # 🔥 VIDER LES TABLES
         tables = ['ligne_devis', 'facture', 'devis', 'client', 'projet']
         for table in tables:
-            requests.delete(
+            response = requests.delete(
                 f"{supabase_url}/rest/v1/{table}",
                 headers=headers
             )
-            print(f"   🗑️ Table {table} vidée")
+            print(f"   🗑️ Table {table} vidée (status: {response.status_code})")
         
         # 🔥 INSÉRER LES CLIENTS
         for client in backup_data.get('clients', []):
@@ -860,11 +860,13 @@ def restore_database():
         settings = backup_data.get('settings')
         if settings:
             # Supprimer les anciens settings
-            requests.delete(
+            delete_response = requests.delete(
                 f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
                 headers=headers
             )
+            print(f"   🗑️ Settings supprimés (status: {delete_response.status_code})")
             
+            from datetime import datetime
             settings_data = {
                 "id_user": user_id,
                 "company_name": settings.get('company_name', ''),
@@ -887,17 +889,21 @@ def restore_database():
             
             if response.status_code in [200, 201]:
                 print("   ✅ Settings restaurés")
+            else:
+                print(f"   ❌ Erreur settings: {response.text}")
         
         print("🎉 RESTAURATION TERMINÉE !")
         print("=" * 60)
         
+        # 🔥 RETOURNER UNE RÉPONSE JSON VALIDE
         return jsonify({'success': True, 'message': 'Restauration réussie'})
         
     except Exception as e:
         print(f"❌ Erreur restauration: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        # 🔥 TOUJOURS retourner du JSON valide
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==================== FACTURES ====================
 
