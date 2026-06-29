@@ -597,10 +597,78 @@ def delete_projet(id_projet):
 def get_devis():
     try:
         user_id = get_jwt_identity()
-        devis = devis_model.get_by_user(user_id)
-        return jsonify(devis)
+        user_id = int(user_id)
+        print(f"🔍 Récupération devis pour user_id: {user_id}")
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 🔥 Récupérer les devis SANS jointure (requête simple)
+        response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&order=id_devis.desc",
+            headers=headers
+        )
+        
+        print(f"🔍 Status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"❌ Erreur: {response.text}")
+            return jsonify([]), 500
+        
+        devis_list = response.json()
+        print(f"🔍 Devis trouvés: {len(devis_list)}")
+        
+        result = []
+        for devis in devis_list:
+            # Récupérer le client séparément avec id_client
+            client_nom = "Client inconnu"
+            if devis.get('id_client'):
+                client_response = requests.get(
+                    f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+                    headers=headers
+                )
+                if client_response.status_code == 200 and client_response.json():
+                    client = client_response.json()[0]
+                    client_nom = client.get('nom', 'Client inconnu')
+            
+            # Récupérer le projet séparément
+            projet_nom = "Projet inconnu"
+            if devis.get('id_projet'):
+                projet_response = requests.get(
+                    f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
+                    headers=headers
+                )
+                if projet_response.status_code == 200 and projet_response.json():
+                    projet = projet_response.json()[0]
+                    projet_nom = projet.get('nom_projet', 'Projet inconnu')
+            
+            result.append({
+                'id_devis': devis.get('id_devis'),
+                'date_creation': devis.get('date_creation'),
+                'total': devis.get('total', 0),
+                'statut': devis.get('statut', 'brouillon'),
+                'id_client': devis.get('id_client'),
+                'id_user': devis.get('id_user'),
+                'id_projet': devis.get('id_projet'),
+                'client_nom': client_nom,
+                'nom_projet': projet_nom
+            })
+        
+        print(f"✅ {len(result)} devis retournés")
+        return jsonify(result)
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Erreur get_devis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([]), 500
 
 @app.route('/api/devis', methods=['POST'])
 @jwt_required()
