@@ -1880,13 +1880,12 @@ def pay_facture(id_facture):
 def update_settings():
     try:
         user_id = get_jwt_identity()
-        user_id = int(user_id)
         data = request.json
         from datetime import datetime
         
         import requests
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         
         headers = {
             "Authorization": f"Bearer {supabase_key}",
@@ -1902,7 +1901,12 @@ def update_settings():
             "primary_color": data.get('primary_color', '#1E3A8A'),
             "secondary_color": data.get('secondary_color', '#7C3AED'),
             "accent_color": data.get('accent_color', '#06B6D4'),
-            "updated_at": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat(),
+            # 🔥 AJOUT : champs fiscaux
+            "nif": data.get('nif', ''),
+            "regime_tva": data.get('regime_tva', 'non assujetti'),
+            "numero_contribuable": data.get('numero_contribuable', ''),
+            "adresse_fiscale": data.get('adresse_fiscale', '')
         }
         
         response = requests.patch(

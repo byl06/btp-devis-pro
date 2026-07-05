@@ -236,6 +236,12 @@ updateAdminMenu() {
             this.filterDevis();
         }
     });
+
+    // Formulaire informations fiscales
+if (e.target.id === 'fiscal-form') {
+    e.preventDefault();
+    await this.saveFiscalSettings();
+}
 }
     
     async loadPage(page) {
@@ -2108,6 +2114,47 @@ async renderParametres() {
 </div>
 
 
+// ========== INFORMATIONS FISCALES ==========
+<div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(245,158,11,0.3);">
+    <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
+    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+        Ces informations sont obligatoires pour émettre des factures normalisées (e-MCF).
+    </p>
+    <form id="fiscal-form">
+        <div class="form-group">
+            <label>NIF (Numéro d'Identification Fiscale) *</label>
+            <input type="text" id="nif" value="${settings.nif || ''}" placeholder="Ex: 4201234567890" required>
+        </div>
+        <div class="form-group">
+            <label>Régime TVA</label>
+            <select id="regime-tva">
+                <option value="non assujetti" ${settings.regime_tva === 'non assujetti' ? 'selected' : ''}>Non assujetti</option>
+                <option value="assujetti" ${settings.regime_tva === 'assujetti' ? 'selected' : ''}>Assujetti</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Numéro de contribuable</label>
+            <input type="text" id="numero-contribuable" value="${settings.numero_contribuable || ''}" placeholder="Numéro de contribuable">
+        </div>
+        <div class="form-group">
+            <label>Adresse fiscale</label>
+            <input type="text" id="adresse-fiscale" value="${settings.adresse_fiscale || ''}" placeholder="Adresse fiscale">
+        </div>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+            <button type="submit" class="btn-primary" style="background: #F59E0B;">
+                <i class="fas fa-save"></i> Enregistrer
+            </button>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('fiscal-form').reset();">
+                <i class="fas fa-undo"></i> Réinitialiser
+            </button>
+        </div>
+        <p style="font-size:0.75rem; color:#94A3B8; margin-top:0.5rem;">
+            <i class="fas fa-info-circle"></i> Le NIF est obligatoire pour la facturation normalisée.
+        </p>
+    </form>
+</div>
+
+
 <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(6,182,212,0.2);">
     <h3><i class="fas fa-key" style="color:#06B6D4;"></i> Changer le mot de passe</h3>
     <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
@@ -3580,6 +3627,54 @@ async downloadPDFFacture(id_facture) {
         window.open(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, '_blank');
     } catch (error) {
         Toast.error('❌ Erreur téléchargement');
+    }
+}
+
+
+async saveFiscalSettings() {
+    const nif = document.getElementById('nif').value.trim();
+    const regime_tva = document.getElementById('regime-tva').value;
+    const numero_contribuable = document.getElementById('numero-contribuable').value.trim();
+    const adresse_fiscale = document.getElementById('adresse-fiscale').value.trim();
+    
+    // Vérifier que le NIF est renseigné
+    if (!nif) {
+        Toast.warning('⚠️ Le NIF est obligatoire pour la facturation normalisée');
+        document.getElementById('nif').focus();
+        return;
+    }
+    
+    // Vérifier la longueur du NIF (minimum 10 caractères)
+    if (nif.length < 10) {
+        Toast.warning('⚠️ Le NIF doit contenir au moins 10 caractères');
+        document.getElementById('nif').focus();
+        return;
+    }
+    
+    const data = {
+        nif: nif,
+        regime_tva: regime_tva,
+        numero_contribuable: numero_contribuable,
+        adresse_fiscale: adresse_fiscale
+    };
+    
+    try {
+        const response = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Informations fiscales enregistrées avec succès');
+            // Mettre à jour l'affichage
+            this.loadPage('parametres');
+        } else {
+            Toast.error(result.message || '❌ Erreur lors de l\'enregistrement');
+        }
+    } catch (error) {
+        console.error('Erreur saveFiscalSettings:', error);
+        Toast.error('❌ Erreur de connexion');
     }
 }
 
