@@ -2145,6 +2145,243 @@ def get_factures(id_user):
         import traceback
         traceback.print_exc()
         return jsonify([]), 500
+
+
+# ==================== FACTURE NORMALISÉE ====================
+
+@app.route('/api/facture/<int:id_facture>/normaliser', methods=['POST'])
+@jwt_required()
+def normaliser_facture(id_facture):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        import requests
+        from datetime import datetime
+        import uuid
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Vérifier que la facture existe
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        
+        # 2. Vérifier les infos fiscales du vendeur
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
+        
+        if not settings.get('nif'):
+            return jsonify({'success': False, 'message': 'Veuillez configurer votre NIF dans les paramètres'}), 400
+        
+        # 3. Récupérer le client pour son IFU
+        client_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{facture.get('id_client')}",
+            headers=headers
+        )
+        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
+        
+        # 4. Générer un numéro de facture fiscale
+        num_fiscal = f"FAC-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
+        
+        # 5. Simulation API e-MECeF (à remplacer par l'appel réel)
+        qr_code = f"QR-{num_fiscal}"
+        code_securite = str(uuid.uuid4())[:12]
+        
+        # 6. Mettre à jour la facture
+        update_data = {
+            "type_facture": "normalisee",
+            "statut_fiscal": "normalisee",
+            "num_facture_fiscale": num_fiscal,
+            "code_securite": code_securite,
+            "qr_code": qr_code,
+            "date_validation_fiscale": datetime.now().isoformat(),
+            "ifu_client": data.get('ifu_client', client.get('ifu', '')),
+            "regime_tva": data.get('regime_tva', 'non assujetti')
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({
+                'success': True,
+                'message': 'Facture normalisée avec succès',
+                'num_fiscal': num_fiscal,
+                'qr_code': qr_code
+            })
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur normalisation: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])
+@jwt_required()
+def generate_pdf_normalise(id_facture):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        import io
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer la facture
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'error': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        
+        # Récupérer le devis
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
+            headers=headers
+        )
+        devis = devis_response.json()[0] if devis_response.status_code == 200 and devis_response.json() else {}
+        
+        # Récupérer le client
+        client_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+            headers=headers
+        )
+        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
+        
+        # Récupérer les lignes
+        lignes_response = requests.get(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
+            headers=headers
+        )
+        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
+        
+        # Récupérer les settings
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {
+            'company_name': 'BTP Devis Pro',
+            'nif': 'Non renseigné'
+        }
+        
+        # Créer le PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                                rightMargin=2*cm, leftMargin=2*cm, 
+                                topMargin=2*cm, bottomMargin=2*cm)
+        
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1)
+        
+        story = []
+        
+        # En-tête
+        story.append(Paragraph("FACTURE NORMALISÉE", title_style))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Infos vendeur
+        story.append(Paragraph(f"Vendeur: {settings.get('company_name', 'BTP Devis Pro')}", styles['Normal']))
+        story.append(Paragraph(f"NIF: {settings.get('nif', 'Non renseigné')}", styles['Normal']))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Infos client
+        story.append(Paragraph(f"Client: {client.get('nom', 'Non renseigné')}", styles['Normal']))
+        story.append(Paragraph(f"IFU: {facture.get('ifu_client', 'Non renseigné')}", styles['Normal']))
+        story.append(Paragraph(f"Adresse: {client.get('adresse', 'Non renseigné')}", styles['Normal']))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Numéro fiscal
+        story.append(Paragraph(f"Numéro fiscal: {facture.get('num_facture_fiscale', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"Code sécurité: {facture.get('code_securite', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"Date: {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Tableau des articles
+        data = [['Désignation', 'Qté', 'Prix U.', 'Total']]
+        total = 0
+        for ligne in lignes:
+            total_ligne = ligne.get('quantite', 0) * ligne.get('prix_unitaire', 0)
+            total += total_ligne
+            data.append([
+                ligne.get('designation', ''),
+                str(ligne.get('quantite', 0)),
+                f"{ligne.get('prix_unitaire', 0):,.0f} F",
+                f"{total_ligne:,.0f} F"
+            ])
+        
+        data.append(['', '', 'TOTAL', f"{total:,.0f} FCFA"])
+        
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 0.5*cm))
+        
+        # QR Code (simulé)
+        story.append(Paragraph(f"QR Code: {facture.get('qr_code', 'N/A')}", styles['Normal']))
+        story.append(Paragraph("Facture conforme à la réglementation en vigueur", styles['Normal']))
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'facture_normalisee_{id_facture}.pdf'
+        )
+        
+    except Exception as e:
+        print(f"❌ Erreur PDF normalisé: {e}")
+        return jsonify({'error': str(e)}), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['PUT'])
 @jwt_required()

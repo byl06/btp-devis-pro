@@ -678,65 +678,116 @@ async exportClientsToExcel() {
     async renderFactures() {
     try {
         const userId = this.currentUser.id;
+        console.log("Chargement factures pour user:", userId);
+        
         const response = await apiRequest(`/api/factures/${userId}`);
-        const data = await response.json();
-        const factures = this.normalizeResponse(data);
+        const factures = this.safeArray(await response.json());
         
         console.log("Factures reçues:", factures);
         
-        if (!factures || factures.length === 0) {
-            return `
-                <div class="glass-card" style="text-align:center; padding:60px;">
-                    <i class="fas fa-receipt" style="font-size:48px; opacity:0.5;"></i>
-                    <h3>Aucune facture</h3>
-                    <p>Validez un devis pour générer une facture</p>
-                </div>
-            `;
-        }
+        // Séparer les factures simples et normalisées
+        const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee');
+        const facturesNormalisees = factures.filter(f => f.type_facture === 'normalisee');
         
         return `
-            <div class="table-container">
-                <h3>Mes factures</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>N° Facture</th>
-                            <th>Devis lié</th>
-                            <th>Client</th>
-                            <th>Date</th>
-                            <th>Montant</th>
-                            <th>Statut</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${factures.map(f => `
-                            <tr>
-                                <td>#${f.id_facture}</td>
-                                <td>DEVIS-${f.id_devis}</td>
-                                <td>${f.client_nom || '-'}</td>
-                                <td>${new Date(f.date_facture).toLocaleDateString()}</td>
-                                <td>${(f.montant || 0).toLocaleString()} FCFA</div>
-                                <td>
-                                    <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
-                                        ${f.statut === 'payée' ? 'Payée' : 'Non payée'}
-                                    </span>
-                                </div>
-                                <td>
-                                    <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée">
-                                        <i class="fas fa-credit-card"></i>
-                                    </button>
-                                </div>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <div class="page-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                    <h3><i class="fas fa-receipt"></i> Mes factures</h3>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-primary" onclick="app.openCreateDevisModal()" style="background:var(--primary);">
+                            <i class="fas fa-plus"></i> Facture simple
+                        </button>
+                        <button class="btn-primary" onclick="app.creerFactureNormalisee()" style="background:#F59E0B;">
+                            <i class="fas fa-file-invoice"></i> Facture normalisée
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Onglets -->
+                <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem;">
+                    <div class="tab-facture active" onclick="app.switchFactureTab('simples')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid #06B6D4; color:white;">
+                        <i class="fas fa-file-alt"></i> Simples (${facturesSimples.length})
+                    </div>
+                    <div class="tab-facture" onclick="app.switchFactureTab('normalisees')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid transparent; color:#94A3B8;">
+                        <i class="fas fa-check-circle"></i> Normalisées (${facturesNormalisees.length})
+                    </div>
+                </div>
+                
+                <!-- Contenu des onglets -->
+                <div id="factures-content">
+                    ${this.renderFactureTable(facturesSimples, 'simples')}
+                </div>
             </div>
         `;
     } catch (error) {
         console.error('Erreur factures:', error);
         return '<div class="glass-card">Erreur chargement des factures</div>';
     }
+}
+
+renderFactureTable(factures, type) {
+    if (!factures || factures.length === 0) {
+        return `
+            <div class="glass-card" style="text-align:center; padding:60px;">
+                <i class="fas fa-receipt" style="font-size:48px; opacity:0.5;"></i>
+                <h3>Aucune facture ${type === 'simples' ? 'simple' : 'normalisée'}</h3>
+                <p>${type === 'simples' ? 'Validez un devis pour générer une facture' : 'Normalisez une facture simple existante'}</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>N° Facture</th>
+                        <th>Devis lié</th>
+                        <th>Client</th>
+                        <th>Date</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${factures.map(f => `
+                        <tr>
+                            <td>#${f.id_facture}</td>
+                            <td>DEVIS-${f.id_devis}</td>
+                            <td>${f.client_nom || '-'}</td>
+                            <td>${new Date(f.date_facture).toLocaleDateString()}</td>
+                            <td>${(f.montant || 0).toLocaleString()} FCFA</td>
+                            <td>
+                                <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
+                                    ${f.statut === 'payée' ? 'Payée' : 'Non payée'}
+                                </span>
+                                ${f.type_facture === 'normalisee' ? '<span class="status-badge" style="background:rgba(245,158,11,0.2);color:#F59E0B;margin-left:5px;">Normalisée</span>' : ''}
+                            </td>
+                            <td>
+                                ${type === 'simples' && f.statut !== 'payée' ? `
+                                <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée">
+                                    <i class="fas fa-credit-card"></i>
+                                </button>
+                                ` : ''}
+                                ${type === 'simples' ? `
+                                <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
+                                    <i class="fas fa-file-invoice"></i>
+                                </button>
+                                ` : `
+                                <button class="btn-icon" onclick="app.downloadPDFFacture(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                `}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
     
     renderParametres() {
@@ -3458,6 +3509,77 @@ async changePassword() {
         }
     } catch (error) {
         Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// Changer d'onglet factures
+switchFactureTab(tab) {
+    const tabs = document.querySelectorAll('.tab-facture');
+    tabs.forEach((t, i) => {
+        t.style.borderBottom = '3px solid transparent';
+        t.style.color = '#94A3B8';
+        if ((i === 0 && tab === 'simples') || (i === 1 && tab === 'normalisees')) {
+            t.style.borderBottom = '3px solid ' + (tab === 'simples' ? '#06B6D4' : '#F59E0B');
+            t.style.color = (tab === 'simples' ? 'white' : '#F59E0B');
+        }
+    });
+    // Recharger le contenu
+    this.loadPage('factures');
+}
+
+// Normaliser une facture
+async normaliserFacture(id_facture) {
+    if (!confirm('⚠️ Émettre cette facture comme facture normalisée ? Cette action est irréversible.')) return;
+    
+    try {
+        const ifuClient = prompt('📋 Entrez l\'IFU du client :');
+        if (!ifuClient) return;
+        
+        const response = await apiRequest(`/api/facture/${id_facture}/normaliser`, {
+            method: 'POST',
+            body: JSON.stringify({ ifu_client: ifuClient })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Facture normalisée émise !');
+            setTimeout(() => this.loadPage('factures'), 1000);
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// Créer une facture normalisée directement
+async creerFactureNormalisee() {
+    // Vérifier si le NIF est configuré
+    try {
+        const response = await apiRequest('/api/settings');
+        const data = await response.json();
+        const settings = data.settings || {};
+        
+        if (!settings.nif) {
+            Toast.warning('⚠️ Veuillez configurer votre NIF dans les paramètres avant de créer une facture normalisée.');
+            this.loadPage('parametres');
+            return;
+        }
+    } catch(e) {
+        Toast.error('❌ Erreur');
+        return;
+    }
+    
+    // Ouvrir l'interface e-MCF
+    window.open('/facture-normalisee.html', '_blank');
+}
+
+// Télécharger PDF facture normalisée
+async downloadPDFFacture(id_facture) {
+    try {
+        window.open(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, '_blank');
+    } catch (error) {
+        Toast.error('❌ Erreur téléchargement');
     }
 }
 
