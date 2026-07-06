@@ -2009,6 +2009,9 @@ async renderParametres() {
         const response = await apiRequest('/api/settings');
         const data = await response.json();
         const settings = data.settings || {};
+
+        // 🔥 Sauvegarder les settings pour les utiliser dans les onglets
+        this.currentSettings = settings;
         
         // Onglet actif (par défaut: 'entreprise')
         let activeTab = 'entreprise';
@@ -2054,6 +2057,10 @@ async renderParametres() {
     }
 }
 renderParametreContent(tab, settings) {
+    // Si settings n'est pas passé, utiliser this.currentSettings
+    if (!settings || Object.keys(settings).length === 0) {
+        settings = this.currentSettings || {};
+    }
     const tabs = {
         entreprise: `
             <!-- ===== ONGLET ENTREPRISE ===== -->
@@ -2239,24 +2246,26 @@ renderParametreContent(tab, settings) {
     return tabs[tab] || tabs.entreprise;
 }
 switchParametreTab(tab) {
+    // Mettre à jour les onglets visuellement
     const tabs = document.querySelectorAll('.tab-parametre');
+    const colors = ['#06B6D4', '#F59E0B', '#EF4444', '#10B981'];
+    const tabNames = ['entreprise', 'fiscal', 'securite', 'backup'];
+    
     tabs.forEach((t, i) => {
         t.style.borderBottom = '3px solid transparent';
         t.style.color = '#94A3B8';
+        if (tabNames[i] === tab) {
+            t.style.borderBottom = `3px solid ${colors[i]}`;
+            t.style.color = 'white';
+        }
     });
     
-    // Mettre à jour l'onglet actif
-    const tabMap = ['entreprise', 'fiscal', 'securite', 'backup'];
-    const index = tabMap.indexOf(tab);
-    if (index !== -1) {
-        const activeTab = tabs[index];
-        const colors = ['#06B6D4', '#F59E0B', '#EF4444', '#10B981'];
-        activeTab.style.borderBottom = `3px solid ${colors[index]}`;
-        activeTab.style.color = 'white';
+    // Mettre à jour le contenu sans recharger toute la page
+    const settings = this.currentSettings || {};
+    const contentArea = document.getElementById('parametres-content');
+    if (contentArea) {
+        contentArea.innerHTML = this.renderParametreContent(tab, settings);
     }
-    
-    // Recharger le contenu
-    this.loadPage('parametres');
 }
 
 updatePreview() {
