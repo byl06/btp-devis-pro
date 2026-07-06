@@ -188,7 +188,7 @@ updateAdminMenu() {
     }
 }
     
-    setupEventListeners() {
+setupEventListeners() {
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -214,15 +214,18 @@ updateAdminMenu() {
             e.preventDefault();
             await this.uploadLogo();
         }
-        // 🔥 AJOUT : Formulaire changer mot de passe
         if (e.target.id === 'change-password-form') {
             e.preventDefault();
             await this.changePassword();
         }
+        // 🔥 AJOUT : Formulaire informations fiscales
+        if (e.target.id === 'fiscal-form') {
+            e.preventDefault();
+            await this.saveFiscalSettings();
+        }
     });
     
     // ========== FILTRES POUR LA PAGE DEVIS ==========
-    // Délégation d'événements pour la recherche et les filtres
     document.addEventListener('input', (e) => {
         if (e.target.id === 'search-devis') {
             console.log("🔍 Recherche en cours...");
@@ -236,12 +239,6 @@ updateAdminMenu() {
             this.filterDevis();
         }
     });
-
-    // Formulaire informations fiscales
-if (e.target.id === 'fiscal-form') {
-    e.preventDefault();
-    await this.saveFiscalSettings();
-}
 }
     
     async loadPage(page) {
