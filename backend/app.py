@@ -1880,6 +1880,7 @@ def pay_facture(id_facture):
 def update_settings():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
         data = request.json
         from datetime import datetime
         
@@ -1902,11 +1903,10 @@ def update_settings():
             "secondary_color": data.get('secondary_color', '#7C3AED'),
             "accent_color": data.get('accent_color', '#06B6D4'),
             "updated_at": datetime.now().isoformat(),
-            # 🔥 AJOUT : champs fiscaux
-            "nif": data.get('nif', ''),
-            "regime_tva": data.get('regime_tva', 'non assujetti'),
-            "numero_contribuable": data.get('numero_contribuable', ''),
-            "adresse_fiscale": data.get('adresse_fiscale', '')
+            # 🔥 NOUVEAUX CHAMPS
+            "slogan": data.get('slogan', ''),
+            "website": data.get('website', ''),
+            "footer_text": data.get('footer_text', '')
         }
         
         response = requests.patch(
@@ -1923,6 +1923,8 @@ def update_settings():
     except Exception as e:
         print(f"❌ Erreur update_settings: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
 
 @app.route('/api/settings/logo', methods=['POST'])
 @jwt_required()
@@ -2005,6 +2007,96 @@ def upload_logo():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/preview-header', methods=['GET'])
+@jwt_required()
+def preview_header():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer les settings
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
+        
+        # Créer le PDF d'aperçu
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        import io
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        
+        # Style pour le titre
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            alignment=1  # Centré
+        )
+        
+        story = []
+        
+        # ===== EN-TÊTE =====
+        company_name = settings.get('company_name', 'Mon Entreprise')
+        slogan = settings.get('slogan', '')
+        phone = settings.get('company_phone', '')
+        email = settings.get('company_email', '')
+        address = settings.get('company_address', '')
+        website = settings.get('website', '')
+        
+        story.append(Paragraph(company_name, title_style))
+        if slogan:
+            story.append(Paragraph(slogan, styles['Normal']))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(f"📞 {phone}" if phone else "", styles['Normal']))
+        story.append(Paragraph(f"✉ {email}" if email else "", styles['Normal']))
+        story.append(Paragraph(f"📍 {address}" if address else "", styles['Normal']))
+        if website:
+            story.append(Paragraph(f"🌐 {website}", styles['Normal']))
+        
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph("APERÇU DE L'EN-TÊTE", styles['Heading1']))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph("Ceci est un aperçu de l'en-tête qui apparaîtra sur vos devis et factures.", styles['Normal']))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # ===== PIED DE PAGE =====
+        footer_text = settings.get('footer_text', '')
+        if footer_text:
+            story.append(Spacer(1, 1*cm))
+            story.append(Paragraph(footer_text, styles['Normal']))
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='apercu_en-tete.pdf'
+        )
+        
+    except Exception as e:
+        print(f"❌ Erreur preview: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Route pour servir les logos
 @app.route('/uploads/<filename>')

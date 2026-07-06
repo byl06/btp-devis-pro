@@ -200,7 +200,7 @@ setupEventListeners() {
         });
     });
 
-    // Formulaires des paramètres
+    // ===== FORMULAIRES =====
     document.addEventListener('submit', async (e) => {
         if (e.target.id === 'company-form') {
             e.preventDefault();
@@ -218,14 +218,17 @@ setupEventListeners() {
             e.preventDefault();
             await this.changePassword();
         }
-        // 🔥 AJOUT : Formulaire informations fiscales
         if (e.target.id === 'fiscal-form') {
             e.preventDefault();
             await this.saveFiscalSettings();
         }
+        if (e.target.id === 'header-form') {
+            e.preventDefault();
+            await this.saveHeaderSettings();
+        }
     });
     
-    // ========== FILTRES POUR LA PAGE DEVIS ==========
+    // ===== FILTRES POUR LA PAGE DEVIS =====
     document.addEventListener('input', (e) => {
         if (e.target.id === 'search-devis') {
             console.log("🔍 Recherche en cours...");
@@ -239,8 +242,31 @@ setupEventListeners() {
             this.filterDevis();
         }
     });
-}
+} 
+
+async saveHeaderSettings() {
+    const data = {
+        slogan: document.getElementById('header-slogan')?.value || '',
+        website: document.getElementById('header-website')?.value || '',
+        footer_text: document.getElementById('header-footer')?.value || ''
+    };
     
+    try {
+        const response = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            Toast.success('✅ En-tête personnalisé enregistré');
+            this.loadPage('parametres');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
     async loadPage(page) {
         const contentArea = document.getElementById('content-area');
         const pageTitle = document.getElementById('page-title');
@@ -1984,221 +2010,253 @@ async renderParametres() {
         const data = await response.json();
         const settings = data.settings || {};
         
+        // Onglet actif (par défaut: 'entreprise')
+        let activeTab = 'entreprise';
+        
         return `
             <div class="page-content">
-                <h2><i class="fas fa-sliders-h"></i> Personnalisation</h2>
-                <p style="color:#94A3B8; margin-bottom:1.5rem;">Personnalisez votre application et gérez votre compte</p>
+                <h2><i class="fas fa-sliders-h"></i> Paramètres</h2>
+                <p style="color:#94A3B8; margin-bottom:1.5rem;">Gérez les informations de votre entreprise et vos préférences.</p>
                 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(350px,1fr)); gap:1.5rem;">
-                    
-                    <!-- Informations entreprise -->
-                    <div class="glass-card">
-                        <h3><i class="fas fa-building"></i> Informations entreprise</h3>
-                        <form id="company-form">
-                            <div class="form-group">
-                                <label>Nom de l'entreprise</label>
-                                <input type="text" id="company-name" value="${settings.company_name || ''}" class="form-control" placeholder="Votre entreprise" oninput="app.updatePreview()">
-                            </div>
-                            <div class="form-group">
-                                <label>Email</label>
-                                <input type="email" id="company-email" value="${settings.company_email || ''}" class="form-control" placeholder="contact@entreprise.com" oninput="app.updatePreview()">
-                            </div>
-                            <div class="form-group">
-                                <label>Téléphone</label>
-                                <input type="tel" id="company-phone" value="${settings.company_phone || ''}" class="form-control" placeholder="01 23 45 67 89" oninput="app.updatePreview()">
-                            </div>
-                            <div class="form-group">
-                                <label>Adresse</label>
-                                <textarea id="company-address" rows="2" class="form-control" placeholder="Adresse complète" oninput="app.updatePreview()">${settings.company_address || ''}</textarea>
-                            </div>
-                            <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
-                        </form>
+                <!-- ===== ONGLETS ===== -->
+                <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem; flex-wrap:wrap;">
+                    <div class="tab-parametre ${activeTab === 'entreprise' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('entreprise')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'entreprise' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'entreprise' ? 'white' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-building"></i> Entreprise
                     </div>
-                    
-                    <!-- Logo -->
-                    <div class="glass-card">
-                        <h3><i class="fas fa-image"></i> Logo</h3>
-                        <div style="text-align:center; margin-bottom:1rem;">
-                            ${settings.company_logo ? 
-                                `<img src="${API_URL}/uploads/${settings.company_logo}" id="logo-preview" style="max-width:150px; max-height:150px; border-radius:10px; object-fit:contain;">` : 
-                                `<div id="logo-preview" style="width:150px; height:150px; background:#334155; border-radius:10px; margin:0 auto; display:flex; align-items:center; justify-content:center;">
-                                    <i class="fas fa-image" style="font-size:48px; color:#64748B;"></i>
-                                </div>`
-                            }
-                        </div>
-                        <form id="logo-form" enctype="multipart/form-data">
-                            <input type="file" id="company-logo" accept="image/*" class="form-control">
-                            <button type="submit" class="btn-primary" style="margin-top:1rem;"><i class="fas fa-upload"></i> Télécharger logo</button>
-                        </form>
+                    <div class="tab-parametre ${activeTab === 'fiscal' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('fiscal')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'fiscal' ? '#F59E0B' : 'transparent'}; color:${activeTab === 'fiscal' ? '#F59E0B' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-file-invoice"></i> Fiscal
                     </div>
-                    
-                    <!-- Couleurs -->
-                    <div class="glass-card">
-                        <h3><i class="fas fa-palette"></i> Couleurs personnalisées</h3>
-                        <form id="colors-form">
-                            <div class="form-group">
-                                <label>Couleur principale</label>
-                                <input type="color" id="primary-color" value="${settings.primary_color || '#1E3A8A'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
-                            </div>
-                            <div class="form-group">
-                                <label>Couleur secondaire</label>
-                                <input type="color" id="secondary-color" value="${settings.secondary_color || '#7C3AED'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
-                            </div>
-                            <div class="form-group">
-                                <label>Couleur d'accent</label>
-                                <input type="color" id="accent-color" value="${settings.accent_color || '#06B6D4'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
-                            </div>
-                            <button type="submit" class="btn-primary"><i class="fas fa-palette"></i> Appliquer</button>
-                        </form>
+                    <div class="tab-parametre ${activeTab === 'securite' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('securite')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'securite' ? '#EF4444' : 'transparent'}; color:${activeTab === 'securite' ? '#EF4444' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-key"></i> Sécurité
+                    </div>
+                    <div class="tab-parametre ${activeTab === 'backup' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('backup')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'backup' ? '#10B981' : 'transparent'}; color:${activeTab === 'backup' ? '#10B981' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-database"></i> Sauvegarde
                     </div>
                 </div>
                 
-                <!-- ========== APERÇU EN DIRECT ========== -->
-                <div class="glass-card" style="margin-top:1.5rem;">
-                    <h3><i class="fas fa-eye"></i> Aperçu en direct</h3>
-                    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">Voici à quoi ressemblera votre entreprise sur les devis et factures</p>
-                    
-                    <div style="background:linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border-radius:15px; padding:1.5rem;">
-                        <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem;">
-                            ${settings.company_logo ? 
-                                `<img src="${API_URL}/uploads/${settings.company_logo}" id="preview-logo" style="height:60px; border-radius:10px; object-fit:contain;">` : 
-                                `<div id="preview-logo" style="width:60px; height:60px; background:#334155; border-radius:10px; display:flex; align-items:center; justify-content:center;">
-                                    <i class="fas fa-building" style="font-size:24px; color:#64748B;"></i>
-                                </div>`
-                            }
-                            <div>
-                                <strong id="preview-company-name" style="color:${settings.primary_color || '#1E3A8A'}; font-size:1.2rem;">${settings.company_name || 'Votre entreprise'}</strong>
-                                <p id="preview-contact" style="font-size:0.8rem; color:#94A3B8; margin-top:5px;">
-                                    ${settings.company_email || 'email@entreprise.com'} | ${settings.company_phone || 'téléphone'}
-                                </p>
-                                <p id="preview-address" style="font-size:0.75rem; color:#64748B;">${settings.company_address || 'Adresse de votre entreprise'}</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Aperçu du devis -->
-                        <div style="border-top:1px solid #334155; padding-top:1rem; margin-top:0.5rem;">
-                            <p style="font-size:0.8rem; color:#94A3B8;">📄 Exemple d'en-tête de devis :</p>
-                            <div style="background:#1E293B; border-radius:10px; padding:0.75rem;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-                                    <div style="display:flex; align-items:center; gap:0.5rem;">
-                                        ${settings.company_logo ? 
-                                            `<img src="${API_URL}/uploads/${settings.company_logo}" style="height:30px;">` : 
-                                            `<i class="fas fa-hard-hat" style="font-size:24px; color:${settings.primary_color || '#1E3A8A'}"></i>`
-                                        }
-                                        <span style="font-weight:bold; color:${settings.primary_color || '#1E3A8A'}">${settings.company_name || 'BTP Pro'}</span>
-                                    </div>
-                                    <span style="font-size:0.7rem; color:#64748B;">DEVIS PROFESSIONNEL</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section Backup/Restore -->
-<div class="glass-card" style="margin-top:1.5rem;">
-    <h3><i class="fas fa-database"></i> Sauvegarde des données</h3>
-    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem;">
-        <button class="btn-primary" onclick="app.backupData()" style="background:#10B981; border-color:#10B981;">
-            <i class="fas fa-download"></i> Télécharger sauvegarde
-        </button>
-        <button class="btn-secondary" onclick="app.restoreData()" style="background:#F59E0B; border-color:#F59E0B;">
-            <i class="fas fa-upload"></i> Restaurer sauvegarde
-        </button>
-    </div>
-    <p style="font-size:0.8rem; color:#94A3B8; margin-top:1rem;">
-        <i class="fas fa-info-circle"></i> La sauvegarde contient tous vos clients, projets, devis, factures et paramètres.
-    </p>
-</div>
-
-
-
-<div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(245,158,11,0.3);">
-    <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
-    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
-        Ces informations sont obligatoires pour émettre des factures normalisées (e-MCF).
-    </p>
-    <form id="fiscal-form">
-        <div class="form-group">
-            <label>NIF (Numéro d'Identification Fiscale) *</label>
-            <input type="text" id="nif" value="${settings.nif || ''}" placeholder="Ex: 4201234567890" required>
-        </div>
-        <div class="form-group">
-            <label>Régime TVA</label>
-            <select id="regime-tva">
-                <option value="non assujetti" ${settings.regime_tva === 'non assujetti' ? 'selected' : ''}>Non assujetti</option>
-                <option value="assujetti" ${settings.regime_tva === 'assujetti' ? 'selected' : ''}>Assujetti</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Numéro de contribuable</label>
-            <input type="text" id="numero-contribuable" value="${settings.numero_contribuable || ''}" placeholder="Numéro de contribuable">
-        </div>
-        <div class="form-group">
-            <label>Adresse fiscale</label>
-            <input type="text" id="adresse-fiscale" value="${settings.adresse_fiscale || ''}" placeholder="Adresse fiscale">
-        </div>
-        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-            <button type="submit" class="btn-primary" style="background: #F59E0B;">
-                <i class="fas fa-save"></i> Enregistrer
-            </button>
-            <button type="button" class="btn-secondary" onclick="document.getElementById('fiscal-form').reset();">
-                <i class="fas fa-undo"></i> Réinitialiser
-            </button>
-        </div>
-        <p style="font-size:0.75rem; color:#94A3B8; margin-top:0.5rem;">
-            <i class="fas fa-info-circle"></i> Le NIF est obligatoire pour la facturation normalisée.
-        </p>
-    </form>
-</div>
-
-
-<div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(6,182,212,0.2);">
-    <h3><i class="fas fa-key" style="color:#06B6D4;"></i> Changer le mot de passe</h3>
-    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
-        Modifiez votre mot de passe pour sécuriser votre compte.
-    </p>
-    
-    <form id="change-password-form">
-        <div class="form-group">
-            <label>Ancien mot de passe</label>
-            <input type="password" id="old-password" class="form-control" placeholder="Votre mot de passe actuel" required>
-        </div>
-        <div class="form-group">
-            <label>Nouveau mot de passe</label>
-            <input type="password" id="new-password" class="form-control" placeholder="Nouveau mot de passe (min. 4 caractères)" required>
-        </div>
-        <div class="form-group">
-            <label>Confirmer le nouveau mot de passe</label>
-            <input type="password" id="confirm-password" class="form-control" placeholder="Confirmez le nouveau mot de passe" required>
-        </div>
-        <button type="submit" class="btn-primary" style="background: #06B6D4;">
-            <i class="fas fa-save"></i> Changer le mot de passe
-        </button>
-    </form>
-</div>
-                
-                <!-- ========== SECTION DÉCONNEXION STYLÉE ========== -->
-                <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(239,68,68,0.3);">
-                    <h3><i class="fas fa-shield-alt" style="color:#F87171;"></i> Sécurité du compte</h3>
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:1rem;">
-                        <div>
-                            <p style="margin-bottom:5px;">Connecté en tant que : <strong>${this.currentUser.nom || this.currentUser.email}</strong></p>
-                            <p style="font-size:0.85rem; color:#94A3B8;">${this.currentUser.email}</p>
-                            <p style="font-size:0.8rem; color:#64748B; margin-top:5px;">
-                                <i class="fas fa-building"></i> ${this.currentUser.entreprise || 'BTP Pro'}
-                            </p>
-                        </div>
-                        <button class="btn-logout" onclick="app.logout()">
-                            <i class="fas fa-sign-out-alt"></i> Se déconnecter
-                        </button>
-                    </div>
+                <!-- ===== CONTENU DES ONGLETS ===== -->
+                <div id="parametres-content">
+                    ${this.renderParametreContent(activeTab, settings)}
                 </div>
             </div>
         `;
     } catch (error) {
         console.error('Erreur:', error);
-        return '<div class="glass-card">Erreur chargement paramètres</div>';
+        return '<div class="glass-card">❌ Erreur chargement des paramètres</div>';
     }
+}
+renderParametreContent(tab, settings) {
+    const tabs = {
+        entreprise: `
+            <!-- ===== ONGLET ENTREPRISE ===== -->
+            <div class="glass-card">
+                <h3><i class="fas fa-building"></i> Informations de l'entreprise</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+                    Ces informations apparaîtront sur vos devis et factures.
+                </p>
+                <form id="company-form">
+                    <div class="form-group">
+                        <label>Nom de l'entreprise</label>
+                        <input type="text" id="company-name" value="${settings.company_name || ''}" class="form-control" placeholder="Votre entreprise" oninput="app.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="company-email" value="${settings.company_email || ''}" class="form-control" placeholder="contact@entreprise.com" oninput="app.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Téléphone</label>
+                        <input type="tel" id="company-phone" value="${settings.company_phone || ''}" class="form-control" placeholder="01 23 45 67 89" oninput="app.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea id="company-address" rows="2" class="form-control" placeholder="Adresse complète" oninput="app.updatePreview()">${settings.company_address || ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Slogan</label>
+                        <input type="text" id="header-slogan" value="${settings.slogan || ''}" class="form-control" placeholder="Votre slogan (ex: Bâtisseurs de confiance)">
+                    </div>
+                    <div class="form-group">
+                        <label>Site web</label>
+                        <input type="text" id="header-website" value="${settings.website || ''}" class="form-control" placeholder="www.votre-site.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Pied de page personnalisé</label>
+                        <input type="text" id="header-footer" value="${settings.footer_text || ''}" class="form-control" placeholder="Mentions légales ou message personnalisé">
+                    </div>
+                    <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
+                    <button type="button" class="btn-secondary" onclick="app.previewHeader()" style="margin-left:0.5rem;">
+                        <i class="fas fa-eye"></i> Aperçu PDF
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Logo -->
+            <div class="glass-card" style="margin-top:1.5rem;">
+                <h3><i class="fas fa-image"></i> Logo</h3>
+                <div style="text-align:center; margin-bottom:1rem;">
+                    ${settings.company_logo ? 
+                        `<img src="${API_URL}/uploads/${settings.company_logo}" id="logo-preview" style="max-width:150px; max-height:150px; border-radius:10px; object-fit:contain;">` : 
+                        `<div id="logo-preview" style="width:150px; height:150px; background:#334155; border-radius:10px; margin:0 auto; display:flex; align-items:center; justify-content:center;">
+                            <i class="fas fa-image" style="font-size:48px; color:#64748B;"></i>
+                        </div>`
+                    }
+                </div>
+                <form id="logo-form" enctype="multipart/form-data">
+                    <input type="file" id="company-logo" accept="image/*" class="form-control">
+                    <button type="submit" class="btn-primary" style="margin-top:1rem;"><i class="fas fa-upload"></i> Télécharger logo</button>
+                </form>
+            </div>
+            
+            <!-- Couleurs -->
+            <div class="glass-card" style="margin-top:1.5rem;">
+                <h3><i class="fas fa-palette"></i> Couleurs personnalisées</h3>
+                <form id="colors-form">
+                    <div class="form-group">
+                        <label>Couleur principale</label>
+                        <input type="color" id="primary-color" value="${settings.primary_color || '#1E3A8A'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Couleur secondaire</label>
+                        <input type="color" id="secondary-color" value="${settings.secondary_color || '#7C3AED'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Couleur d'accent</label>
+                        <input type="color" id="accent-color" value="${settings.accent_color || '#06B6D4'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                    </div>
+                    <button type="submit" class="btn-primary"><i class="fas fa-palette"></i> Appliquer</button>
+                </form>
+            </div>
+        `,
+        
+        fiscal: `
+            <!-- ===== ONGLET FISCAL ===== -->
+            <div class="glass-card" style="border:1px solid rgba(245,158,11,0.3);">
+                <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+                    Ces informations sont obligatoires pour émettre des factures normalisées (e-MCF).
+                </p>
+                <form id="fiscal-form">
+                    <div class="form-group">
+                        <label>NIF (Numéro d'Identification Fiscale) *</label>
+                        <input type="text" id="nif" value="${settings.nif || ''}" placeholder="Ex: 4201234567890" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Régime TVA</label>
+                        <select id="regime-tva">
+                            <option value="non assujetti" ${settings.regime_tva === 'non assujetti' ? 'selected' : ''}>Non assujetti</option>
+                            <option value="assujetti" ${settings.regime_tva === 'assujetti' ? 'selected' : ''}>Assujetti</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Numéro de contribuable</label>
+                        <input type="text" id="numero-contribuable" value="${settings.numero_contribuable || ''}" placeholder="Numéro de contribuable">
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse fiscale</label>
+                        <input type="text" id="adresse-fiscale" value="${settings.adresse_fiscale || ''}" placeholder="Adresse fiscale">
+                    </div>
+                    <button type="submit" class="btn-primary" style="background: #F59E0B;">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
+                </form>
+                <p style="font-size:0.75rem; color:#94A3B8; margin-top:1rem;">
+                    <i class="fas fa-info-circle"></i> Le NIF est obligatoire pour la facturation normalisée.
+                </p>
+            </div>
+        `,
+        
+        securite: `
+            <!-- ===== ONGLET SÉCURITÉ ===== -->
+            <div class="glass-card" style="border:1px solid rgba(6,182,212,0.2);">
+                <h3><i class="fas fa-key" style="color:#06B6D4;"></i> Changer le mot de passe</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+                    Modifiez votre mot de passe pour sécuriser votre compte.
+                </p>
+                <form id="change-password-form">
+                    <div class="form-group">
+                        <label>Ancien mot de passe</label>
+                        <input type="password" id="old-password" class="form-control" placeholder="Votre mot de passe actuel" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" id="new-password" class="form-control" placeholder="Nouveau mot de passe (min. 4 caractères)" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirmer le nouveau mot de passe</label>
+                        <input type="password" id="confirm-password" class="form-control" placeholder="Confirmez le nouveau mot de passe" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="background: #06B6D4;">
+                        <i class="fas fa-save"></i> Changer le mot de passe
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Déconnexion -->
+            <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(239,68,68,0.3);">
+                <h3><i class="fas fa-shield-alt" style="color:#F87171;"></i> Sécurité du compte</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:1rem;">
+                    <div>
+                        <p style="margin-bottom:5px;">Connecté en tant que : <strong>${this.currentUser.nom || this.currentUser.email}</strong></p>
+                        <p style="font-size:0.85rem; color:#94A3B8;">${this.currentUser.email}</p>
+                    </div>
+                    <button class="btn-logout" onclick="app.logout()">
+                        <i class="fas fa-sign-out-alt"></i> Se déconnecter
+                    </button>
+                </div>
+            </div>
+        `,
+        
+        backup: `
+            <!-- ===== ONGLET SAUVEGARDE ===== -->
+            <div class="glass-card">
+                <h3><i class="fas fa-database"></i> Sauvegarde des données</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+                    Sauvegardez ou restaurez l'intégralité de vos données (clients, projets, devis, factures).
+                </p>
+                <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                    <button class="btn-primary" onclick="app.backupData()" style="background:#10B981; border-color:#10B981;">
+                        <i class="fas fa-download"></i> Télécharger sauvegarde
+                    </button>
+                    <button class="btn-secondary" onclick="app.restoreData()" style="background:#F59E0B; border-color:#F59E0B;">
+                        <i class="fas fa-upload"></i> Restaurer sauvegarde
+                    </button>
+                </div>
+                <p style="font-size:0.8rem; color:#94A3B8; margin-top:1rem;">
+                    <i class="fas fa-info-circle"></i> La sauvegarde contient tous vos clients, projets, devis, factures et paramètres.
+                </p>
+            </div>
+        `
+    };
+    
+    return tabs[tab] || tabs.entreprise;
+}
+switchParametreTab(tab) {
+    const tabs = document.querySelectorAll('.tab-parametre');
+    tabs.forEach((t, i) => {
+        t.style.borderBottom = '3px solid transparent';
+        t.style.color = '#94A3B8';
+    });
+    
+    // Mettre à jour l'onglet actif
+    const tabMap = ['entreprise', 'fiscal', 'securite', 'backup'];
+    const index = tabMap.indexOf(tab);
+    if (index !== -1) {
+        const activeTab = tabs[index];
+        const colors = ['#06B6D4', '#F59E0B', '#EF4444', '#10B981'];
+        activeTab.style.borderBottom = `3px solid ${colors[index]}`;
+        activeTab.style.color = 'white';
+    }
+    
+    // Recharger le contenu
+    this.loadPage('parametres');
 }
 
 updatePreview() {
@@ -3567,7 +3625,6 @@ switchFactureTab(tab) {
             t.style.color = (tab === 'simples' ? 'white' : '#F59E0B');
         }
     });
-    // Recharger le contenu
     this.loadPage('factures');
 }
 
