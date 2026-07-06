@@ -2111,7 +2111,7 @@ async renderParametres() {
 </div>
 
 
-// ========== INFORMATIONS FISCALES ==========
+
 <div class="glass-card" style="margin-top:1.5rem; border:1px solid rgba(245,158,11,0.3);">
     <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
     <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
