@@ -202,27 +202,29 @@ setupEventListeners() {
 
     // ===== FORMULAIRES =====
     document.addEventListener('submit', async (e) => {
-        if (e.target.id === 'company-form') {
+        const target = e.target;
+        
+        if (target.id === 'company-form') {
             e.preventDefault();
             await this.saveCompanySettings();
         }
-        if (e.target.id === 'colors-form') {
+        else if (target.id === 'colors-form') {
             e.preventDefault();
             await this.saveColorSettings();
         }
-        if (e.target.id === 'logo-form') {
+        else if (target.id === 'logo-form') {
             e.preventDefault();
             await this.uploadLogo();
         }
-        if (e.target.id === 'change-password-form') {
+        else if (target.id === 'change-password-form') {
             e.preventDefault();
             await this.changePassword();
         }
-        if (e.target.id === 'fiscal-form') {
+        else if (target.id === 'fiscal-form') {
             e.preventDefault();
             await this.saveFiscalSettings();
         }
-        if (e.target.id === 'header-form') {
+        else if (target.id === 'header-form') {
             e.preventDefault();
             await this.saveHeaderSettings();
         }
@@ -242,7 +244,7 @@ setupEventListeners() {
             this.filterDevis();
         }
     });
-} 
+}
 
 async saveHeaderSettings() {
     const data = {
@@ -2061,6 +2063,7 @@ renderParametreContent(tab, settings) {
     if (!settings || Object.keys(settings).length === 0) {
         settings = this.currentSettings || {};
     }
+    
     const tabs = {
         entreprise: `
             <!-- ===== ONGLET ENTREPRISE ===== -->
@@ -2072,19 +2075,19 @@ renderParametreContent(tab, settings) {
                 <form id="company-form">
                     <div class="form-group">
                         <label>Nom de l'entreprise</label>
-                        <input type="text" id="company-name" value="${settings.company_name || ''}" class="form-control" placeholder="Votre entreprise" oninput="app.updatePreview()">
+                        <input type="text" id="company-name" value="${settings.company_name || ''}" class="form-control" placeholder="Votre entreprise">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="company-email" value="${settings.company_email || ''}" class="form-control" placeholder="contact@entreprise.com" oninput="app.updatePreview()">
+                        <input type="email" id="company-email" value="${settings.company_email || ''}" class="form-control" placeholder="contact@entreprise.com">
                     </div>
                     <div class="form-group">
                         <label>Téléphone</label>
-                        <input type="tel" id="company-phone" value="${settings.company_phone || ''}" class="form-control" placeholder="01 23 45 67 89" oninput="app.updatePreview()">
+                        <input type="tel" id="company-phone" value="${settings.company_phone || ''}" class="form-control" placeholder="01 23 45 67 89">
                     </div>
                     <div class="form-group">
                         <label>Adresse</label>
-                        <textarea id="company-address" rows="2" class="form-control" placeholder="Adresse complète" oninput="app.updatePreview()">${settings.company_address || ''}</textarea>
+                        <textarea id="company-address" rows="2" class="form-control" placeholder="Adresse complète">${settings.company_address || ''}</textarea>
                     </div>
                     <div class="form-group">
                         <label>Slogan</label>
@@ -2098,10 +2101,14 @@ renderParametreContent(tab, settings) {
                         <label>Pied de page personnalisé</label>
                         <input type="text" id="header-footer" value="${settings.footer_text || ''}" class="form-control" placeholder="Mentions légales ou message personnalisé">
                     </div>
-                    <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
-                    <button type="button" class="btn-secondary" onclick="app.previewHeader()" style="margin-left:0.5rem;">
-                        <i class="fas fa-eye"></i> Aperçu PDF
-                    </button>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button type="submit" class="btn-primary" id="btn-save-company">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="app.previewHeader()" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                            <i class="fas fa-eye"></i> Aperçu PDF
+                        </button>
+                    </div>
                 </form>
             </div>
             
@@ -2128,15 +2135,15 @@ renderParametreContent(tab, settings) {
                 <form id="colors-form">
                     <div class="form-group">
                         <label>Couleur principale</label>
-                        <input type="color" id="primary-color" value="${settings.primary_color || '#1E3A8A'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                        <input type="color" id="primary-color" value="${settings.primary_color || '#1E3A8A'}" style="width:100%; height:40px;">
                     </div>
                     <div class="form-group">
                         <label>Couleur secondaire</label>
-                        <input type="color" id="secondary-color" value="${settings.secondary_color || '#7C3AED'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                        <input type="color" id="secondary-color" value="${settings.secondary_color || '#7C3AED'}" style="width:100%; height:40px;">
                     </div>
                     <div class="form-group">
                         <label>Couleur d'accent</label>
-                        <input type="color" id="accent-color" value="${settings.accent_color || '#06B6D4'}" style="width:100%; height:40px;" oninput="app.updatePreview()">
+                        <input type="color" id="accent-color" value="${settings.accent_color || '#06B6D4'}" style="width:100%; height:40px;">
                     </div>
                     <button type="submit" class="btn-primary"><i class="fas fa-palette"></i> Appliquer</button>
                 </form>
@@ -2328,41 +2335,55 @@ async uploadLogo() {
 }
 
 async saveCompanySettings() {
-    const settings = {
-        company_name: document.getElementById('company-name').value,
-        company_email: document.getElementById('company-email').value,
-        company_phone: document.getElementById('company-phone').value,
-        company_address: document.getElementById('company-address').value
+    const data = {
+        company_name: document.getElementById('company-name')?.value || '',
+        company_email: document.getElementById('company-email')?.value || '',
+        company_phone: document.getElementById('company-phone')?.value || '',
+        company_address: document.getElementById('company-address')?.value || '',
+        slogan: document.getElementById('header-slogan')?.value || '',
+        website: document.getElementById('header-website')?.value || '',
+        footer_text: document.getElementById('header-footer')?.value || ''
     };
     
     try {
-        const response = await apiRequest('/api/settings', { method: 'PUT', body: JSON.stringify(settings) });
+        const response = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
         const result = await response.json();
         if (result.success) {
-            alert('✅ Informations enregistrées');
+            Toast.success('✅ Informations enregistrées');
             this.loadPage('parametres');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
         }
     } catch (error) {
-        alert('❌ Erreur');
+        Toast.error('❌ Erreur de connexion');
     }
 }
 
 async saveColorSettings() {
-    const settings = {
-        primary_color: document.getElementById('primary-color').value,
-        secondary_color: document.getElementById('secondary-color').value,
-        accent_color: document.getElementById('accent-color').value
+    const data = {
+        primary_color: document.getElementById('primary-color')?.value || '#1E3A8A',
+        secondary_color: document.getElementById('secondary-color')?.value || '#7C3AED',
+        accent_color: document.getElementById('accent-color')?.value || '#06B6D4'
     };
     
     try {
-        const response = await apiRequest('/api/settings', { method: 'PUT', body: JSON.stringify(settings) });
+        const response = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
         const result = await response.json();
         if (result.success) {
-            alert('✅ Couleurs appliquées');
-            this.applyThemeColors(settings);
+            Toast.success('✅ Couleurs appliquées');
+            this.applyThemeColors(data);
+            this.loadPage('parametres');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
         }
     } catch (error) {
-        alert('❌ Erreur');
+        Toast.error('❌ Erreur de connexion');
     }
 }
 
@@ -3693,6 +3714,37 @@ async downloadPDFFacture(id_facture) {
     }
 }
 
+async previewHeader() {
+    // D'abord, enregistrer les modifications avant l'aperçu
+    const data = {
+        company_name: document.getElementById('company-name')?.value || '',
+        slogan: document.getElementById('header-slogan')?.value || '',
+        company_phone: document.getElementById('company-phone')?.value || '',
+        company_email: document.getElementById('company-email')?.value || '',
+        company_address: document.getElementById('company-address')?.value || '',
+        website: document.getElementById('header-website')?.value || '',
+        footer_text: document.getElementById('header-footer')?.value || ''
+    };
+    
+    try {
+        // Enregistrer d'abord
+        const saveResponse = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        const saveResult = await saveResponse.json();
+        if (!saveResult.success) {
+            Toast.error('❌ Enregistrez d\'abord les informations');
+            return;
+        }
+        
+        // Puis ouvrir l'aperçu
+        window.open(`${API_URL}/api/preview-header`, '_blank');
+        Toast.success('✅ Aperçu généré');
+    } catch (error) {
+        Toast.error('❌ Erreur');
+    }
+}
 
 async saveFiscalSettings() {
     const nif = document.getElementById('nif').value.trim();
