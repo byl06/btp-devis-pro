@@ -1886,13 +1886,20 @@ def update_settings():
         
         import requests
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
         headers = {
             "Authorization": f"Bearer {supabase_key}",
             "apikey": supabase_key,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
         }
+        
+        # Vérifier si settings existe
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
         
         update_data = {
             "company_name": data.get('company_name', ''),
@@ -1903,25 +1910,37 @@ def update_settings():
             "secondary_color": data.get('secondary_color', '#7C3AED'),
             "accent_color": data.get('accent_color', '#06B6D4'),
             "updated_at": datetime.now().isoformat(),
-            # 🔥 NOUVEAUX CHAMPS
             "slogan": data.get('slogan', ''),
             "website": data.get('website', ''),
             "footer_text": data.get('footer_text', '')
         }
         
-        response = requests.patch(
-            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
-            headers=headers,
-            json=update_data
-        )
+        # Si settings existe, mettre à jour
+        if check_response.status_code == 200 and check_response.json():
+            response = requests.patch(
+                f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+                headers=headers,
+                json=update_data
+            )
+        else:
+            # Créer si n'existe pas
+            update_data["id_user"] = user_id
+            update_data["created_at"] = datetime.now().isoformat()
+            response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=update_data
+            )
         
-        if response.status_code in [200, 204]:
+        if response.status_code in [200, 201, 204]:
             return jsonify({'success': True, 'message': 'Paramètres mis à jour'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
     except Exception as e:
         print(f"❌ Erreur update_settings: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
