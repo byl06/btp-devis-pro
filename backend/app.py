@@ -2035,8 +2035,16 @@ def preview_header():
         user_id = int(user_id)
         
         import requests
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        import io
+        from flask import send_file
+        
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
         headers = {
             "Authorization": f"Bearer {supabase_key}",
@@ -2052,28 +2060,20 @@ def preview_header():
         settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
         
         # Créer le PDF d'aperçu
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        import io
-        
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4)
         styles = getSampleStyleSheet()
         
-        # Style pour le titre
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=16,
-            alignment=1  # Centré
+            alignment=1
         )
         
         story = []
         
-        # ===== EN-TÊTE =====
+        # En-tête
         company_name = settings.get('company_name', 'Mon Entreprise')
         slogan = settings.get('slogan', '')
         phone = settings.get('company_phone', '')
@@ -2085,9 +2085,12 @@ def preview_header():
         if slogan:
             story.append(Paragraph(slogan, styles['Normal']))
         story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(f"📞 {phone}" if phone else "", styles['Normal']))
-        story.append(Paragraph(f"✉ {email}" if email else "", styles['Normal']))
-        story.append(Paragraph(f"📍 {address}" if address else "", styles['Normal']))
+        if phone:
+            story.append(Paragraph(f"📞 {phone}", styles['Normal']))
+        if email:
+            story.append(Paragraph(f"✉ {email}", styles['Normal']))
+        if address:
+            story.append(Paragraph(f"📍 {address}", styles['Normal']))
         if website:
             story.append(Paragraph(f"🌐 {website}", styles['Normal']))
         
@@ -2097,7 +2100,6 @@ def preview_header():
         story.append(Paragraph("Ceci est un aperçu de l'en-tête qui apparaîtra sur vos devis et factures.", styles['Normal']))
         story.append(Spacer(1, 0.5*cm))
         
-        # ===== PIED DE PAGE =====
         footer_text = settings.get('footer_text', '')
         if footer_text:
             story.append(Spacer(1, 1*cm))
@@ -2115,6 +2117,8 @@ def preview_header():
         
     except Exception as e:
         print(f"❌ Erreur preview: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # Route pour servir les logos

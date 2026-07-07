@@ -3715,34 +3715,15 @@ async downloadPDFFacture(id_facture) {
 }
 
 async previewHeader() {
-    // D'abord, enregistrer les modifications avant l'aperçu
-    const data = {
-        company_name: document.getElementById('company-name')?.value || '',
-        slogan: document.getElementById('header-slogan')?.value || '',
-        company_phone: document.getElementById('company-phone')?.value || '',
-        company_email: document.getElementById('company-email')?.value || '',
-        company_address: document.getElementById('company-address')?.value || '',
-        website: document.getElementById('header-website')?.value || '',
-        footer_text: document.getElementById('header-footer')?.value || ''
-    };
-    
     try {
-        // Enregistrer d'abord
-        const saveResponse = await apiRequest('/api/settings', {
-            method: 'PUT',
-            body: JSON.stringify(data)
-        });
-        const saveResult = await saveResponse.json();
-        if (!saveResult.success) {
-            Toast.error('❌ Enregistrez d\'abord les informations');
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Toast.error('❌ Vous devez être connecté');
             return;
         }
-        
-        // Puis ouvrir l'aperçu
-        window.open(`${API_URL}/api/preview-header`, '_blank');
-        Toast.success('✅ Aperçu généré');
+        window.open(`${API_URL}/api/preview-header?t=${Date.now()}`, '_blank');
     } catch (error) {
-        Toast.error('❌ Erreur');
+        Toast.error('❌ Erreur génération aperçu');
     }
 }
 
