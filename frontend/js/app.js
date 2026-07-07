@@ -3721,8 +3721,39 @@ async previewHeader() {
             Toast.error('❌ Vous devez être connecté');
             return;
         }
-        window.open(`${API_URL}/api/preview-header?t=${Date.now()}`, '_blank');
+        
+        // 🔥 Utiliser fetch pour télécharger le PDF
+        Toast.info('📄 Génération de l\'aperçu...');
+        
+        const response = await fetch(`${API_URL}/api/preview-header`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            Toast.error(error.error || '❌ Erreur');
+            return;
+        }
+        
+        // Récupérer le blob du PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'apercu_en-tete.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Toast.success('✅ Aperçu PDF téléchargé');
+        
     } catch (error) {
+        console.error('Erreur preview:', error);
         Toast.error('❌ Erreur génération aperçu');
     }
 }
