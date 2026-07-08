@@ -1686,6 +1686,64 @@ def get_settings():
     except Exception as e:
         print(f"❌ Erreur get_settings: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/settings/import-header', methods=['POST'])
+@jwt_required()
+def import_header():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        if 'header_file' not in request.files:
+            return jsonify({'success': False, 'message': 'Aucun fichier'}), 400
+        
+        file = request.files['header_file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'Fichier vide'}), 400
+        
+        # Sauvegarder le fichier
+        import os
+        from datetime import datetime
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        filename = f"header_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+        
+        upload_folder = os.path.join(os.path.dirname(__file__), 'uploads', 'headers')
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        filepath = os.path.join(upload_folder, filename)
+        file.save(filepath)
+        
+        # Mettre à jour la base de données
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {
+            "custom_header": filename,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'En-tête importé avec succès'})
+        else:
+            return jsonify({'success': False, 'message': response.text}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur import_header: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['DELETE'])
 @jwt_required()
@@ -2037,10 +2095,12 @@ def preview_header():
         import requests
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
+        from reportlab.lib.utils import ImageReader
         import io
+        import os
         from flask import send_file
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
@@ -2059,51 +2119,160 @@ def preview_header():
         )
         settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
         
-        # Créer le PDF d'aperçu
+        # Couleurs
+        primary_color = settings.get('primary_color', '#1E3A8A')
+        secondary_color = settings.get('secondary_color', '#7C3AED')
+        accent_color = settings.get('accent_color', '#06B6D4')
+        
+        # Créer le PDF
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                                rightMargin=2*cm, leftMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
+        
         styles = getSampleStyleSheet()
         
+        # Styles personnalisés
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=16,
-            alignment=1
+            fontSize=24,
+            textColor=colors.HexColor(primary_color),
+            alignment=1,
+            spaceAfter=10
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'Subtitle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.HexColor('#6B7280'),
+            alignment=1,
+            spaceAfter=20
+        )
+        
+        section_title = ParagraphStyle(
+            'SectionTitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor(primary_color),
+            spaceAfter=10
+        )
+        
+        body_style = ParagraphStyle(
+            'Body',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#374151'),
+            leading=14
         )
         
         story = []
         
-        # En-tête
+        # ===== EN-TÊTE AVEC LOGO ET BANDEAU =====
+        # Bandeau coloré en haut
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Logo
+        logo_path = None
+        if settings.get('company_logo'):
+            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+        
+        # Conteneur logo + titre
+        if logo_path and os.path.exists(logo_path):
+            try:
+                logo_img = Image(logo_path, width=80, height=80)
+                story.append(logo_img)
+                story.append(Spacer(1, 0.3*cm))
+            except:
+                pass
+        
+        # Nom de l'entreprise
         company_name = settings.get('company_name', 'Mon Entreprise')
-        slogan = settings.get('slogan', '')
-        phone = settings.get('company_phone', '')
-        email = settings.get('company_email', '')
-        address = settings.get('company_address', '')
-        website = settings.get('website', '')
-        
         story.append(Paragraph(company_name, title_style))
+        
+        # Slogan
+        slogan = settings.get('slogan', '')
         if slogan:
-            story.append(Paragraph(slogan, styles['Normal']))
+            story.append(Paragraph(slogan, subtitle_style))
+        
         story.append(Spacer(1, 0.3*cm))
-        if phone:
-            story.append(Paragraph(f"📞 {phone}", styles['Normal']))
-        if email:
-            story.append(Paragraph(f"✉ {email}", styles['Normal']))
-        if address:
-            story.append(Paragraph(f"📍 {address}", styles['Normal']))
-        if website:
-            story.append(Paragraph(f"🌐 {website}", styles['Normal']))
+        
+        # Ligne de séparation colorée
+        story.append(Paragraph(f"<hr color='{primary_color}' size='2'/>", styles['Normal']))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Coordonnées
+        coords = []
+        if settings.get('company_phone'):
+            coords.append(f"📞 {settings.get('company_phone')}")
+        if settings.get('company_email'):
+            coords.append(f"✉ {settings.get('company_email')}")
+        if settings.get('company_address'):
+            coords.append(f"📍 {settings.get('company_address')}")
+        if settings.get('website'):
+            coords.append(f"🌐 {settings.get('website')}")
+        
+        if coords:
+            coord_text = " | ".join(coords)
+            story.append(Paragraph(coord_text, body_style))
         
         story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph("APERÇU DE L'EN-TÊTE", styles['Heading1']))
+        
+        # ===== APERÇU DU DEVIS =====
+        story.append(Paragraph("📄 APERÇU DE L'EN-TÊTE SUR VOS DEVIS", section_title))
         story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph("Ceci est un aperçu de l'en-tête qui apparaîtra sur vos devis et factures.", styles['Normal']))
+        
+        # Cadre d'aperçu
+        story.append(Paragraph(
+            "Voici comment votre en-tête apparaîtra sur vos devis et factures.",
+            body_style
+        ))
         story.append(Spacer(1, 0.5*cm))
         
+        # Exemple de devis
+        devis_data = [
+            ['Référence', 'DEVIS-2025-0001'],
+            ['Date', '07/07/2025'],
+            ['Client', 'Exemple Client'],
+            ['Montant', '1 000 000 FCFA'],
+            ['Statut', 'Brouillon']
+        ]
+        
+        table_data = [['Information', 'Valeur']]
+        table_data.extend(devis_data)
+        
+        table = Table(table_data, colWidths=[4*cm, 10*cm])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(primary_color)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F9FAFB')),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#374151')),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 0.5*cm))
+        
+        # ===== PIED DE PAGE =====
         footer_text = settings.get('footer_text', '')
         if footer_text:
             story.append(Spacer(1, 1*cm))
-            story.append(Paragraph(footer_text, styles['Normal']))
+            story.append(Paragraph(
+                f"<font color='#6B7280' size='8'><i>{footer_text}</i></font>",
+                styles['Normal']
+            ))
+        
+        # Pied de page standard
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(
+            f"<font color='{primary_color}' size='8'>© {datetime.now().year} {settings.get('company_name', 'Mon Entreprise')} - Tous droits réservés</font>",
+            styles['Normal']
+        ))
         
         doc.build(story)
         buffer.seek(0)

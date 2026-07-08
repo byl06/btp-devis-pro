@@ -2128,6 +2128,38 @@ renderParametreContent(tab, settings) {
                     <button type="submit" class="btn-primary" style="margin-top:1rem;"><i class="fas fa-upload"></i> Télécharger logo</button>
                 </form>
             </div>
+
+            <!-- ===== IMPORTER EN-TÊTE ===== -->
+<div class="glass-card" style="margin-top:1.5rem; border:2px dashed #8B5CF6; background:rgba(139,92,246,0.05);">
+    <h3><i class="fas fa-file-import" style="color:#8B5CF6;"></i> Importer votre en-tête</h3>
+    <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+        Importez un fichier HTML ou PDF contenant votre en-tête personnalisé (logo, informations, design).
+    </p>
+    
+    <form id="import-header-form" enctype="multipart/form-data">
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+            <div style="flex:1; min-width:200px;">
+                <input type="file" id="import-header-file" accept=".html,.pdf,.docx" class="form-control" style="padding:8px;">
+                <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
+                    Formats acceptés : HTML, PDF, DOCX
+                </p>
+            </div>
+            <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9);">
+                <i class="fas fa-upload"></i> Importer
+            </button>
+            <button type="button" class="btn-secondary" onclick="app.previewImportedHeader()">
+                <i class="fas fa-eye"></i> Aperçu
+            </button>
+        </div>
+    </form>
+    
+    <div style="margin-top:1rem; padding:1rem; background:rgba(139,92,246,0.08); border-radius:8px;">
+        <p style="font-size:0.8rem; color:#94A3B8;">
+            <i class="fas fa-info-circle" style="color:#8B5CF6;"></i>
+            Votre en-tête importé sera utilisé sur tous vos devis et factures à la place des informations saisies ci-dessus.
+        </p>
+    </div>
+</div>
             
             <!-- Couleurs -->
             <div class="glass-card" style="margin-top:1.5rem;">
@@ -2300,6 +2332,49 @@ updatePreview() {
     }
 }
 
+
+// Importer un en-tête personnalisé
+async importHeader() {
+    const fileInput = document.getElementById('import-header-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        Toast.warning('⚠️ Veuillez sélectionner un fichier');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('header_file', file);
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/settings/import-header`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        const result = await response.json();
+        if (result.success) {
+            Toast.success('✅ En-tête importé avec succès !');
+            this.loadPage('parametres');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// Aperçu de l'en-tête importé
+async previewImportedHeader() {
+    try {
+        window.open(`${API_URL}/api/preview-imported-header`, '_blank');
+    } catch (error) {
+        Toast.error('❌ Erreur');
+    }
+}
 async uploadLogo() {
     const fileInput = document.getElementById('company-logo');
     const file = fileInput.files[0];
