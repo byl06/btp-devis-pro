@@ -1299,7 +1299,10 @@ def generate_pdf(id_devis):
                 'company_logo': None,
                 'primary_color': '#1E3A8A',
                 'secondary_color': '#7C3AED',
-                'accent_color': '#06B6D4'
+                'accent_color': '#06B6D4',
+                'slogan': '',
+                'website': '',
+                'footer_text': ''
             }
         
         # Ajouter les infos au devis
@@ -1363,15 +1366,28 @@ def generate_pdf(id_devis):
                 except:
                     pass
         
-        # En-tête
+        # En-tête avec slogan
         company_name = settings.get('company_name', 'BTP Devis Pro')
         story.append(Paragraph(company_name, styles['Normal']))
+        
+        # 🔥 SLOGAN
+        slogan = settings.get('slogan', '')
+        if slogan:
+            story.append(Paragraph(slogan, subtitle_style))
+        
         story.append(Spacer(1, 0.2*cm))
         story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
         story.append(Spacer(1, 0.3*cm))
         
+        # Coordonnées
         company_info = f"{settings.get('company_email', '')} | {settings.get('company_phone', '')}"
         story.append(Paragraph(company_info, subtitle_style))
+        
+        # 🔥 SITE WEB
+        website = settings.get('website', '')
+        if website:
+            story.append(Paragraph(f"🌐 {website}", subtitle_style))
+        
         if settings.get('company_address'):
             story.append(Paragraph(settings.get('company_address'), subtitle_style))
         
@@ -1525,8 +1541,14 @@ def generate_pdf(id_devis):
         
         # Pied de page
         story.append(Paragraph("<hr/>", styles['Normal']))
-        footer_text = f"Devis généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
-        story.append(Paragraph(footer_text, subtitle_style))
+        
+        # 🔥 PIED DE PAGE PERSONNALISÉ
+        footer_text = settings.get('footer_text', '')
+        if footer_text:
+            story.append(Paragraph(footer_text, subtitle_style))
+        
+        footer_info = f"Devis généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
+        story.append(Paragraph(footer_info, subtitle_style))
         
         doc.build(story)
         buffer.seek(0)
@@ -2641,9 +2663,10 @@ def generate_pdf_normalise(id_facture):
         import io
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
+        import os
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
@@ -2693,42 +2716,137 @@ def generate_pdf_normalise(id_facture):
         )
         settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {
             'company_name': 'BTP Devis Pro',
-            'nif': 'Non renseigné'
+            'company_email': 'contact@btpdevispro.com',
+            'company_phone': '+229 90000000',
+            'company_address': '',
+            'company_logo': None,
+            'primary_color': '#1E3A8A',
+            'secondary_color': '#7C3AED',
+            'accent_color': '#06B6D4',
+            'slogan': '',
+            'website': '',
+            'footer_text': ''
         }
         
         # Créer le PDF
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                                rightMargin=2*cm, leftMargin=2*cm, 
+                                rightMargin=2*cm, leftMargin=2*cm,
                                 topMargin=2*cm, bottomMargin=2*cm)
         
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1)
+        primary_color = settings.get('primary_color', '#1E3A8A')
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor(primary_color),
+            alignment=1
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'Subtitle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#6B7280'),
+            alignment=1
+        )
+        
+        body_style = ParagraphStyle(
+            'Body',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#374151')
+        )
         
         story = []
         
-        # En-tête
+        # Logo
+        if settings.get('company_logo'):
+            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+            if os.path.exists(logo_path):
+                try:
+                    logo_img = Image(logo_path, width=60, height=60)
+                    story.append(logo_img)
+                except:
+                    pass
+        
+        # En-tête avec slogan
+        company_name = settings.get('company_name', 'BTP Devis Pro')
+        story.append(Paragraph(company_name, title_style))
+        
+        # Slogan
+        slogan = settings.get('slogan', '')
+        if slogan:
+            story.append(Paragraph(slogan, subtitle_style))
+        
+        story.append(Spacer(1, 0.2*cm))
         story.append(Paragraph("FACTURE NORMALISÉE", title_style))
         story.append(Spacer(1, 0.3*cm))
         
-        # Infos vendeur
-        story.append(Paragraph(f"Vendeur: {settings.get('company_name', 'BTP Devis Pro')}", styles['Normal']))
-        story.append(Paragraph(f"NIF: {settings.get('nif', 'Non renseigné')}", styles['Normal']))
+        # Coordonnées
+        coords = []
+        if settings.get('company_email'):
+            coords.append(f"✉ {settings.get('company_email')}")
+        if settings.get('company_phone'):
+            coords.append(f"📞 {settings.get('company_phone')}")
+        if settings.get('company_address'):
+            coords.append(f"📍 {settings.get('company_address')}")
+        if settings.get('website'):
+            coords.append(f"🌐 {settings.get('website')}")
+        
+        if coords:
+            story.append(Paragraph(" | ".join(coords), subtitle_style))
+        
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph("<hr/>", styles['Normal']))
         story.append(Spacer(1, 0.3*cm))
+        
+        # Infos facture
+        info_data = [
+            ['Numéro fiscal', facture.get('num_facture_fiscale', 'N/A')],
+            ['Code sécurité', facture.get('code_securite', 'N/A')],
+            ['Date', datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y')],
+            ['Statut', facture.get('statut', 'non payée').upper()]
+        ]
+        
+        info_table = Table(info_data, colWidths=[4*cm, 8*cm])
+        info_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor(primary_color)),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 0.5*cm))
         
         # Infos client
-        story.append(Paragraph(f"Client: {client.get('nom', 'Non renseigné')}", styles['Normal']))
-        story.append(Paragraph(f"IFU: {facture.get('ifu_client', 'Non renseigné')}", styles['Normal']))
-        story.append(Paragraph(f"Adresse: {client.get('adresse', 'Non renseigné')}", styles['Normal']))
-        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph("Informations Client", styles['Heading2']))
+        client_data = [
+            ['Nom', client.get('nom', 'Non renseigné')],
+            ['IFU', facture.get('ifu_client', 'Non renseigné')],
+            ['Email', client.get('email', '-')],
+            ['Téléphone', client.get('telephone', '-')],
+            ['Adresse', client.get('adresse', '-')]
+        ]
         
-        # Numéro fiscal
-        story.append(Paragraph(f"Numéro fiscal: {facture.get('num_facture_fiscale', 'N/A')}", styles['Normal']))
-        story.append(Paragraph(f"Code sécurité: {facture.get('code_securite', 'N/A')}", styles['Normal']))
-        story.append(Paragraph(f"Date: {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
+        client_table = Table(client_data, colWidths=[3*cm, 9*cm])
+        client_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F3F4F6')),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(client_table)
         story.append(Spacer(1, 0.5*cm))
         
         # Tableau des articles
+        story.append(Paragraph("Détail des Articles", styles['Heading2']))
+        
         data = [['Désignation', 'Qté', 'Prix U.', 'Total']]
         total = 0
         for ligne in lignes:
@@ -2745,17 +2863,29 @@ def generate_pdf_normalise(id_facture):
         
         table = Table(data)
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ]))
         story.append(table)
         story.append(Spacer(1, 0.5*cm))
         
-        # QR Code (simulé)
-        story.append(Paragraph(f"QR Code: {facture.get('qr_code', 'N/A')}", styles['Normal']))
-        story.append(Paragraph("Facture conforme à la réglementation en vigueur", styles['Normal']))
+        # QR Code
+        story.append(Paragraph(f"QR Code: {facture.get('qr_code', 'N/A')}", body_style))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Pied de page
+        story.append(Paragraph("<hr/>", styles['Normal']))
+        
+        # Pied de page personnalisé
+        footer_text = settings.get('footer_text', '')
+        if footer_text:
+            story.append(Paragraph(footer_text, subtitle_style))
+        
+        story.append(Paragraph("Facture conforme à la réglementation en vigueur", subtitle_style))
+        story.append(Paragraph(f"© {datetime.now().year} {settings.get('company_name', 'BTP Devis Pro')} - Tous droits réservés", subtitle_style))
         
         doc.build(story)
         buffer.seek(0)
@@ -2769,6 +2899,8 @@ def generate_pdf_normalise(id_facture):
         
     except Exception as e:
         print(f"❌ Erreur PDF normalisé: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['PUT'])
