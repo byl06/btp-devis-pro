@@ -237,6 +237,36 @@ setupEventListeners() {
             this.filterDevis();
         }
     });
+
+    // ===== FORMULAIRES =====
+document.addEventListener('submit', async (e) => {
+    const target = e.target;
+    
+    if (target.id === 'company-form') {
+        e.preventDefault();
+        await this.saveCompanySettings();
+    }
+    else if (target.id === 'colors-form') {
+        e.preventDefault();
+        await this.saveColorSettings();
+    }
+    else if (target.id === 'logo-form') {
+        e.preventDefault();
+        await this.uploadLogo();
+    }
+    else if (target.id === 'change-password-form') {
+        e.preventDefault();
+        await this.changePassword();
+    }
+    else if (target.id === 'fiscal-form') {
+        e.preventDefault();
+        await this.saveFiscalSettings();
+    }
+    else if (target.id === 'import-header-form') {  // 🔥 AJOUT ICI
+        e.preventDefault();
+        await this.importHeader();
+    }
+});
     
     document.addEventListener('change', (e) => {
         if (e.target.id === 'filter-status' || e.target.id === 'filter-date') {
@@ -2139,15 +2169,15 @@ renderParametreContent(tab, settings) {
     <form id="import-header-form" enctype="multipart/form-data">
         <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
             <div style="flex:1; min-width:200px;">
-                <input type="file" id="import-header-file" accept=".html,.pdf,.docx" class="form-control" style="padding:8px;">
+                <input type="file" id="import-header-file" accept=".html,.pdf,.docx" class="form-control" style="padding:8px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white; width:100%;">
                 <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
                     Formats acceptés : HTML, PDF, DOCX
                 </p>
             </div>
-            <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9);">
+            <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; border:none; color:white; display:inline-flex; align-items:center; gap:8px;">
                 <i class="fas fa-upload"></i> Importer
             </button>
-            <button type="button" class="btn-secondary" onclick="app.previewImportedHeader()">
+            <button type="button" class="btn-secondary" onclick="app.previewImportedHeader()" style="background: linear-gradient(135deg, #059669, #10B981); color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <i class="fas fa-eye"></i> Aperçu
             </button>
         </div>
@@ -2358,21 +2388,57 @@ async importHeader() {
         const result = await response.json();
         if (result.success) {
             Toast.success('✅ En-tête importé avec succès !');
+            // Réinitialiser le champ file
+            document.getElementById('import-header-file').value = '';
             this.loadPage('parametres');
         } else {
-            Toast.error(result.message || '❌ Erreur');
+            Toast.error(result.message || '❌ Erreur lors de l\'import');
         }
     } catch (error) {
+        console.error('Erreur importHeader:', error);
         Toast.error('❌ Erreur de connexion');
     }
 }
 
-// Aperçu de l'en-tête importé
 async previewImportedHeader() {
     try {
-        window.open(`${API_URL}/api/preview-imported-header`, '_blank');
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Toast.error('❌ Vous devez être connecté');
+            return;
+        }
+        
+        Toast.info('📄 Génération de l\'aperçu...');
+        
+        const response = await fetch(`${API_URL}/api/preview-imported-header`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            Toast.error(error.error || '❌ Erreur');
+            return;
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'apercu_en-tete_importe.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Toast.success('✅ Aperçu PDF téléchargé');
+        
     } catch (error) {
-        Toast.error('❌ Erreur');
+        console.error('Erreur previewImportedHeader:', error);
+        Toast.error('❌ Erreur génération aperçu');
     }
 }
 async uploadLogo() {
