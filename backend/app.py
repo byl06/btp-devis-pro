@@ -1689,6 +1689,85 @@ def get_settings():
 
 
 @app.route('/api/settings/import-header', methods=['POST'])
+@jwt_required()
+def import_header():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        if 'header_file' not in request.files:
+            return jsonify({'success': False, 'message': 'Aucun fichier'}), 400
+        
+        file = request.files['header_file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'Fichier vide'}), 400
+        
+        # Sauvegarder le fichier
+        import os
+        from datetime import datetime
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        filename = f"header_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+        
+        upload_folder = os.path.join(os.path.dirname(__file__), 'uploads', 'headers')
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        filepath = os.path.join(upload_folder, filename)
+        file.save(filepath)
+        print(f"✅ Fichier en-tête sauvegardé: {filepath}")
+        
+        # 🔥 Mettre à jour dans Supabase
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier si settings existe pour cet utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            # Mettre à jour
+            update_data = {
+                "custom_header": filename,
+                "updated_at": datetime.now().isoformat()
+            }
+            response = requests.patch(
+                f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+                headers=headers,
+                json=update_data
+            )
+        else:
+            # Créer les settings avec le header
+            settings_data = {
+                "id_user": user_id,
+                "custom_header": filename,
+                "company_name": "Mon Entreprise",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=settings_data
+            )
+        
+        if response.status_code in [200, 201, 204]:
+            return jsonify({'success': True, 'message': 'En-tête importé avec succès'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur import_header: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
     
 @app.route('/api/devis/<int:id_devis>', methods=['DELETE'])
 @jwt_required()
