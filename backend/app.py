@@ -1769,6 +1769,82 @@ def import_header():
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
     
+
+@app.route('/api/preview-imported-header', methods=['GET'])
+@jwt_required()
+def preview_imported_header():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        import os
+        from flask import send_file
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        import io
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer les settings
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
+        
+        # Vérifier si un en-tête personnalisé a été importé
+        custom_header = settings.get('custom_header')
+        if custom_header:
+            header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
+            if os.path.exists(header_path):
+                # Si c'est un PDF, l'envoyer directement
+                if custom_header.endswith('.pdf'):
+                    return send_file(header_path, mimetype='application/pdf', as_attachment=True, download_name='en-tete_importe.pdf')
+                # Si c'est un HTML, le convertir en PDF
+                elif custom_header.endswith('.html'):
+                    # Lire le HTML
+                    with open(header_path, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                    
+                    # Générer un PDF à partir du HTML
+                    from weasyprint import HTML
+                    pdf_buffer = io.BytesIO()
+                    HTML(string=html_content).write_pdf(pdf_buffer)
+                    pdf_buffer.seek(0)
+                    return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name='en-tete_importe.pdf')
+        
+        # Si pas d'en-tête importé, afficher un message
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        story.append(Paragraph("AUCUN EN-TÊTE IMPORTÉ", styles['Title']))
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph("Vous n'avez pas encore importé d'en-tête personnalisé.", styles['Normal']))
+        story.append(Paragraph("Allez dans Paramètres → Entreprise → Importer votre en-tête.", styles['Normal']))
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='aucun_en-tete.pdf')
+        
+    except Exception as e:
+        print(f"❌ Erreur preview_imported_header: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 @app.route('/api/devis/<int:id_devis>', methods=['DELETE'])
 @jwt_required()
 def delete_devis(id_devis):
