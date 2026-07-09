@@ -834,6 +834,9 @@ renderFactureTable(factures, type) {
                                 </button>
                                 ` : ''}
                                 ${type === 'simples' ? `
+                                <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF facture" style="background:#EF4444;color:white;">
+                                    <i class="fas fa-file-pdf"></i>
+                                </button>
                                 <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
                                     <i class="fas fa-file-invoice"></i>
                                 </button>
@@ -1613,20 +1616,17 @@ async createFacture(id_devis) {
 async payFacture(id_facture) {
     if (confirm('Marquer cette facture comme payée ?')) {
         try {
-            console.log("Paiement facture ID:", id_facture);
             const response = await apiRequest(`/api/facture/${id_facture}/pay`, { method: 'PUT' });
             const result = await response.json();
             
             if (result.success) {
                 Toast.success('Facture marquée comme payée');
-                // Recharger la page des factures
                 this.loadPage('factures');
             } else {
                 Toast.error(result.message || 'Erreur lors du paiement');
             }
         } catch (error) {
-            console.error('Erreur:', error);
-            Toast.error('Erreur de connexion');
+            Toast.error('❌ Erreur de connexion');
         }
     }
 }
@@ -2439,6 +2439,48 @@ async previewImportedHeader() {
     } catch (error) {
         console.error('Erreur previewImportedHeader:', error);
         Toast.error('❌ Erreur génération aperçu');
+    }
+}
+
+async downloadFacturePDF(id_facture) {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Toast.error('❌ Vous devez être connecté');
+            return;
+        }
+        
+        Toast.info('📄 Téléchargement de la facture...');
+        
+        const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            Toast.error(error.error || '❌ Erreur');
+            return;
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `facture_${id_facture}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Toast.success('✅ Facture PDF téléchargée');
+        
+    } catch (error) {
+        console.error('Erreur downloadFacturePDF:', error);
+        Toast.error('❌ Erreur téléchargement');
     }
 }
 async uploadLogo() {
