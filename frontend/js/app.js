@@ -788,6 +788,7 @@ async exportClientsToExcel() {
     }
 }
 
+
 renderFactureTable(factures, type) {
     if (!factures || factures.length === 0) {
         return `
@@ -828,22 +829,24 @@ renderFactureTable(factures, type) {
                                 ${f.type_facture === 'normalisee' ? '<span class="status-badge" style="background:rgba(245,158,11,0.2);color:#F59E0B;margin-left:5px;">Normalisée</span>' : ''}
                             </td>
                             <td>
-                                ${type === 'simples' && f.statut !== 'payée' ? `
-                                <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée">
-                                    <i class="fas fa-credit-card"></i>
-                                </button>
-                                ` : ''}
                                 ${type === 'simples' ? `
-                                <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF facture" style="background:#EF4444;color:white;">
-                                    <i class="fas fa-file-pdf"></i>
-                                </button>
-                                <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
-                                    <i class="fas fa-file-invoice"></i>
-                                </button>
+                                    <!-- 🔥 BOUTON PDF FACTURE SIMPLE -->
+                                    <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF facture" style="background:#EF4444;color:white;">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </button>
+                                    ${f.statut !== 'payée' ? `
+                                    <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée">
+                                        <i class="fas fa-credit-card"></i>
+                                    </button>
+                                    ` : ''}
+                                    <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
+                                        <i class="fas fa-file-invoice"></i>
+                                    </button>
                                 ` : `
-                                <button class="btn-icon" onclick="app.downloadPDFFacture(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
-                                    <i class="fas fa-download"></i>
-                                </button>
+                                    <!-- 🔥 BOUTON PDF FACTURE NORMALISÉE -->
+                                    <button class="btn-icon" onclick="app.downloadPDFFacture(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
+                                        <i class="fas fa-download"></i>
+                                    </button>
                                 `}
                             </td>
                         </tr>
@@ -3838,6 +3841,7 @@ switchFactureTab(tab) {
             t.style.color = (tab === 'simples' ? 'white' : '#F59E0B');
         }
     });
+    // Recharger le contenu
     this.loadPage('factures');
 }
 
