@@ -750,6 +750,9 @@ async exportClientsToExcel() {
         const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee');
         const facturesNormalisees = factures.filter(f => f.type_facture === 'normalisee');
         
+        // Récupérer l'onglet actif
+        const activeTab = this.currentFactureTab || 'simples';
+        
         return `
             <div class="page-content">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
@@ -766,19 +769,23 @@ async exportClientsToExcel() {
                 
                 <!-- Onglets -->
                 <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem;">
-                    <div class="tab-facture active" onclick="app.switchFactureTab('simples')" 
-                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid #06B6D4; color:white;">
+                    <div class="tab-facture ${activeTab === 'simples' ? 'active' : ''}" 
+                         onclick="app.switchFactureTab('simples')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'simples' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'simples' ? 'white' : '#94A3B8'};">
                         <i class="fas fa-file-alt"></i> Simples (${facturesSimples.length})
                     </div>
-                    <div class="tab-facture" onclick="app.switchFactureTab('normalisees')" 
-                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid transparent; color:#94A3B8;">
+                    <div class="tab-facture ${activeTab === 'normalisees' ? 'active' : ''}" 
+                         onclick="app.switchFactureTab('normalisees')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'normalisees' ? '#F59E0B' : 'transparent'}; color:${activeTab === 'normalisees' ? '#F59E0B' : '#94A3B8'};">
                         <i class="fas fa-check-circle"></i> Normalisées (${facturesNormalisees.length})
                     </div>
                 </div>
                 
                 <!-- Contenu des onglets -->
                 <div id="factures-content">
-                    ${this.renderFactureTable(facturesSimples, 'simples')}
+                    ${activeTab === 'simples' 
+                        ? this.renderFactureTable(facturesSimples, 'simples') 
+                        : this.renderFactureTable(facturesNormalisees, 'normalisees')}
                 </div>
             </div>
         `;
@@ -3833,15 +3840,22 @@ async changePassword() {
 // Changer d'onglet factures
 switchFactureTab(tab) {
     const tabs = document.querySelectorAll('.tab-facture');
+    const tabMap = {
+        'simples': 0,
+        'normalisees': 1
+    };
+    
     tabs.forEach((t, i) => {
         t.style.borderBottom = '3px solid transparent';
         t.style.color = '#94A3B8';
-        if ((i === 0 && tab === 'simples') || (i === 1 && tab === 'normalisees')) {
+        if (i === tabMap[tab]) {
             t.style.borderBottom = '3px solid ' + (tab === 'simples' ? '#06B6D4' : '#F59E0B');
             t.style.color = (tab === 'simples' ? 'white' : '#F59E0B');
         }
     });
-    // Recharger le contenu
+    
+    // Recharger le contenu avec le bon onglet
+    this.currentFactureTab = tab;
     this.loadPage('factures');
 }
 

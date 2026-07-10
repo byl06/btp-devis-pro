@@ -2916,7 +2916,7 @@ def generate_facture_pdf(id_facture):
         import io
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm, mm
         import os
@@ -2930,7 +2930,7 @@ def generate_facture_pdf(id_facture):
             "Content-Type": "application/json"
         }
         
-        # Récupérer la facture
+        # 1. Récupérer la facture
         facture_response = requests.get(
             f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
             headers=headers
@@ -2941,28 +2941,28 @@ def generate_facture_pdf(id_facture):
         
         facture = facture_response.json()[0]
         
-        # Récupérer le devis
+        # 2. Récupérer le devis
         devis_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
             headers=headers
         )
         devis = devis_response.json()[0] if devis_response.status_code == 200 and devis_response.json() else {}
         
-        # Récupérer le client
+        # 3. Récupérer le client
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
             headers=headers
         )
         client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
         
-        # Récupérer les lignes
+        # 4. Récupérer les lignes
         lignes_response = requests.get(
             f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
             headers=headers
         )
         lignes = lignes_response.json() if lignes_response.status_code == 200 else []
         
-        # Récupérer les settings
+        # 5. Récupérer les settings
         settings_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
@@ -2987,8 +2987,8 @@ def generate_facture_pdf(id_facture):
         # ========== CRÉATION DU PDF ==========
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4,
-                                rightMargin=35, leftMargin=35,
-                                topMargin=30, bottomMargin=30)
+                                rightMargin=2*cm, leftMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
         
         styles = getSampleStyleSheet()
         
@@ -2999,7 +2999,7 @@ def generate_facture_pdf(id_facture):
             fontSize=22,
             fontName='Times-Roman',
             textColor=colors.HexColor('#333333'),
-            alignment=1,  # Centré
+            alignment=1,
             spaceAfter=5
         )
         
@@ -3008,7 +3008,8 @@ def generate_facture_pdf(id_facture):
             parent=styles['Normal'],
             fontSize=10,
             fontName='Times-Roman',
-            textColor=colors.HexColor('#333333')
+            textColor=colors.HexColor('#333333'),
+            leading=14
         )
         
         bold_style = ParagraphStyle(
@@ -3017,21 +3018,14 @@ def generate_facture_pdf(id_facture):
             fontName='Times-Bold'
         )
         
-        small_style = ParagraphStyle(
-            'SmallStyle',
-            parent=normal_style,
-            fontSize=9
-        )
-        
         beige = colors.HexColor('#F3C8AA')
         light_grey = colors.HexColor('#EEEEEE')
         black = colors.HexColor('#000000')
-        dark_grey = colors.HexColor('#333333')
         
         story = []
         
         # ============================================================
-        # 1. EN-TÊTE : FACTURE | LOGO
+        # EN-TÊTE : FACTURE | LOGO
         # ============================================================
         
         # Vérifier si un en-tête personnalisé a été importé
@@ -3045,7 +3039,7 @@ def generate_facture_pdf(id_facture):
         # En-tête : deux colonnes (FACTURE | Logo)
         header_data = []
         
-        # Colonne gauche : FACTURE
+        # Colonne gauche : FACTURE avec fond beige
         left_cell = Paragraph("FACTURE", title_style)
         
         # Colonne droite : Logo
@@ -3054,30 +3048,32 @@ def generate_facture_pdf(id_facture):
             logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
             if os.path.exists(logo_path):
                 try:
-                    logo_img = Image(logo_path, width=50*mm, height=25*mm)
+                    logo_img = Image(logo_path, width=60, height=50)
                     logo_cell = logo_img
                 except:
                     logo_cell = ""
         
         # Tableau en-tête (2 colonnes)
-        header_table = Table([[left_cell, logo_cell]], colWidths=[90*mm, 50*mm])
+        header_table = Table([[left_cell, logo_cell]], colWidths=[10*cm, 6*cm])
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (0, 0), 'CENTER'),
             ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('BACKGROUND', (0, 0), (0, 0), beige),
+            ('BOX', (0, 0), (0, 0), 1, black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(header_table)
-        story.append(Spacer(1, 0.2*cm))
+        story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # 2. INFORMATIONS SOCIÉTÉ / CLIENT
+        # INFORMATIONS SOCIÉTÉ / CLIENT
         # ============================================================
         
-        # Deux colonnes
+        # Colonne gauche : Société
         company_info = f"""
         <b>{settings.get('company_name', 'Mon Entreprise')}</b><br/>
         {settings.get('company_address', '')}<br/>
@@ -3085,45 +3081,47 @@ def generate_facture_pdf(id_facture):
         {settings.get('company_email', '')}
         """
         
-        # N° de facture et date
+        # Colonne droite : Client + N° facture
         facture_info = f"""
         <b>Client</b><br/>
         {client.get('nom', 'Non renseigné')}<br/>
         {client.get('adresse', '')}<br/>
+        <br/>
         N° Facture: {facture.get('id_facture')}<br/>
         Date: {datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y')}
         """
         
         info_table = Table([
             [Paragraph(company_info, normal_style), Paragraph(facture_info, normal_style)]
-        ], colWidths=[85*mm, 85*mm])
+        ], colWidths=[8*cm, 8*cm])
         info_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
         ]))
         story.append(info_table)
-        story.append(Spacer(1, 0.3*cm))
+        story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # 3. OBJET DE LA FACTURE
+        # OBJET DE LA FACTURE
         # ============================================================
         
         objet_data = [[Paragraph("<b>Objet de la facture</b>", normal_style)]]
-        objet_table = Table(objet_data, colWidths=[180*mm])
+        objet_table = Table(objet_data, colWidths=[18*cm])
         objet_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), light_grey),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('BOX', (0, 0), (-1, -1), 1, black),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
         story.append(objet_table)
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # 4. TABLEAU PRINCIPAL
+        # TABLEAU PRINCIPAL
         # ============================================================
         
         # En-tête du tableau
@@ -3132,17 +3130,17 @@ def generate_facture_pdf(id_facture):
         ]
         
         total_ht = 0
-        # Lignes (au moins 10 lignes vides comme dans le modèle)
+        # Lignes
         for i, ligne in enumerate(lignes):
             ref = f"ART-{i+1:03d}"
             designation = ligne.get('designation', '')
             qte = str(ligne.get('quantite', 0))
-            prix = f"{ligne.get('prix_unitaire', 0):,.0f} F"
+            prix = f"{ligne.get('prix_unitaire', 0):,.0f}"
             total_ligne = ligne.get('quantite', 0) * ligne.get('prix_unitaire', 0)
             total_ht += total_ligne
-            table_data.append([ref, designation, qte, prix, f"{total_ligne:,.0f} F"])
+            table_data.append([ref, designation, qte, prix, f"{total_ligne:,.0f}"])
         
-        # Ajouter des lignes vides si moins de 10
+        # Ajouter des lignes vides pour atteindre 10 lignes
         while len(table_data) < 11:
             table_data.append(['', '', '', '', ''])
         
@@ -3154,36 +3152,34 @@ def generate_facture_pdf(id_facture):
         
         # Lignes de totaux
         table_data.append(['', '', '', '', ''])
-        table_data.append(['', '', '', 'TOTAL HT', f"{total_ht:,.0f} F"])
-        table_data.append(['', '', '', 'Remise', f"{remise:,.0f} F"])
-        table_data.append(['', '', '', 'Net Financier', f"{net_financier:,.0f} F"])
-        table_data.append(['', '', '', 'TVA (18%)', f"{tva:,.0f} F"])
-        table_data.append(['', '', '', 'TOTAL TTC', f"{total_ttc:,.0f} F"])
+        table_data.append(['', '', '', 'TOTAL HT', f"{total_ht:,.0f}"])
+        table_data.append(['', '', '', 'Remise', f"{remise:,.0f}"])
+        table_data.append(['', '', '', 'Net Financier', f"{net_financier:,.0f}"])
+        table_data.append(['', '', '', 'TVA (18%)', f"{tva:,.0f}"])
+        table_data.append(['', '', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
         
         # Création du tableau
-        main_table = Table(table_data, colWidths=[25*mm, 60*mm, 25*mm, 25*mm, 45*mm])
+        main_table = Table(table_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 2.5*cm, 4.5*cm])
         main_table.setStyle(TableStyle([
             # En-tête
             ('BACKGROUND', (0, 0), (-1, 0), beige),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOX', (0, 0), (-1, -1), 1, black),
             ('GRID', (0, 0), (-1, -1), 1, black),
             # Corps
             ('FONTNAME', (0, 1), (-1, -6), 'Times-Roman'),
-            ('FONTSIZE', (0, 1), (-1, -6), 10),
+            ('FONTSIZE', (0, 1), (-1, -6), 9),
             ('ALIGN', (2, 1), (4, -7), 'CENTER'),
-            # Totaux (dernières lignes)
+            # Totaux
             ('FONTNAME', (0, -5), (-1, -1), 'Times-Bold'),
-            ('FONTSIZE', (0, -5), (-1, -1), 11),
+            ('FONTSIZE', (0, -5), (-1, -1), 10),
             ('ALIGN', (3, -5), (-1, -1), 'RIGHT'),
             ('BACKGROUND', (3, -5), (3, -1), beige),
             ('BACKGROUND', (0, -1), (2, -1), beige),
             ('BACKGROUND', (3, -1), (4, -1), beige),
-            ('TEXTCOLOR', (3, -1), (4, -1), colors.HexColor('#333333')),
-            # Ajuster la hauteur des lignes
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))
@@ -3191,16 +3187,16 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # 5. MODE DE PAIEMENT
+        # MODE DE PAIEMENT
         # ============================================================
         
         paiement_data = [
             [Paragraph("<b>Mode de paiement</b>", normal_style)],
             [Paragraph("Virement bancaire / Espèces", normal_style)],
-            [Paragraph("Date d'échéance: 30 jours", normal_style)]
+            [Paragraph(f"Date d'échéance: {datetime.now().strftime('%d/%m/%Y')}", normal_style)]
         ]
         
-        paiement_table = Table(paiement_data, colWidths=[60*mm])
+        paiement_table = Table(paiement_data, colWidths=[6*cm])
         paiement_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), beige),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
@@ -3209,14 +3205,14 @@ def generate_facture_pdf(id_facture):
             ('GRID', (0, 0), (-1, -1), 1, black),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(paiement_table)
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # 6. CONDITIONS
+        # CONDITIONS
         # ============================================================
         
         conditions_text = """
@@ -3228,7 +3224,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # 7. MESSAGE DE REMERCIEMENT
+        # MESSAGE DE REMERCIEMENT
         # ============================================================
         
         thanks_text = """
@@ -3239,22 +3235,9 @@ def generate_facture_pdf(id_facture):
             'ThanksStyle',
             parent=normal_style,
             alignment=1,
-            textColor=colors.HexColor('#333333'),
-            fontSize=11
+            fontSize=10
         )
         story.append(Paragraph(thanks_text, thanks_style))
-        story.append(Spacer(1, 0.3*cm))
-        
-        # Pied de page personnalisé
-        if settings.get('footer_text'):
-            footer_style = ParagraphStyle(
-                'FooterStyle',
-                parent=normal_style,
-                alignment=1,
-                fontSize=8,
-                textColor=colors.HexColor('#666666')
-            )
-            story.append(Paragraph(settings.get('footer_text'), footer_style))
         
         doc.build(story)
         buffer.seek(0)
