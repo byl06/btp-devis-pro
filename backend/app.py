@@ -1724,10 +1724,16 @@ def import_header():
         if file.filename == '':
             return jsonify({'success': False, 'message': 'Fichier vide'}), 400
         
+        # 🔥 Vérifier l'extension (images uniquement)
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        
+        if ext not in allowed_extensions:
+            return jsonify({'success': False, 'message': f'Format non supporté. Utilisez: {", ".join(allowed_extensions)}'}), 400
+        
         # Sauvegarder le fichier
         import os
         from datetime import datetime
-        ext = file.filename.rsplit('.', 1)[-1].lower()
         filename = f"header_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
         
         upload_folder = os.path.join(os.path.dirname(__file__), 'uploads', 'headers')
@@ -1735,7 +1741,7 @@ def import_header():
         
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
-        print(f"✅ Fichier en-tête sauvegardé: {filepath}")
+        print(f"✅ En-tête image sauvegardé: {filepath}")
         
         # 🔥 Mettre à jour dans Supabase
         import requests
@@ -1748,7 +1754,7 @@ def import_header():
             "Content-Type": "application/json"
         }
         
-        # Vérifier si settings existe pour cet utilisateur
+        # Vérifier si settings existe
         check_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
@@ -1766,7 +1772,7 @@ def import_header():
                 json=update_data
             )
         else:
-            # Créer les settings avec le header
+            # Créer les settings
             settings_data = {
                 "id_user": user_id,
                 "custom_header": filename,
@@ -1781,7 +1787,7 @@ def import_header():
             )
         
         if response.status_code in [200, 201, 204]:
-            return jsonify({'success': True, 'message': 'En-tête importé avec succès'})
+            return jsonify({'success': True, 'message': 'En-tête image importé avec succès'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
         
@@ -3027,40 +3033,32 @@ def generate_facture_pdf(id_facture):
         story = []
         
         # ============================================================
-        # 🔥 PARTIE 1 : EN-TÊTE IMPORTÉ (si présent)
+        # 🔥 PARTIE 1 : EN-TÊTE IMPORTÉ (IMAGE)
         # ============================================================
         custom_header = settings.get('custom_header')
-        header_imported = False
         
         if custom_header:
             header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
-            
-            # Si c'est un PDF, on l'utilise comme en-tête
-            if os.path.exists(header_path) and custom_header.endswith('.pdf'):
-                # On va extraire le contenu du PDF pour l'intégrer
-                # Pour l'instant, on utilise l'image du logo + nom de l'entreprise
-                header_imported = True
-                
-                # Afficher le nom de l'entreprise en grand
-                story.append(Paragraph(settings.get('company_name', 'Mon Entreprise'), title_style))
-                
-                # Slogan
-                if settings.get('slogan'):
-                    story.append(Paragraph(settings.get('slogan'), normal_style))
-                
-                story.append(Spacer(1, 0.3*cm))
-                story.append(Paragraph("<hr/>", styles['Normal']))
-                story.append(Spacer(1, 0.3*cm))
+            if os.path.exists(header_path):
+                try:
+                    # 🔥 Ajouter l'image en haut de la page
+                    header_img = Image(header_path, width=17*cm, height=4*cm)
+                    story.append(header_img)
+                    story.append(Spacer(1, 0.5*cm))
+                    header_imported = True
+                except Exception as e:
+                    print(f"⚠️ Erreur chargement image en-tête: {e}")
+                    header_imported = False
+            else:
+                header_imported = False
+        else:
+            header_imported = False
         
         # Si pas d'en-tête importé, utiliser le logo + infos
         if not header_imported:
             # En-tête : deux colonnes (FACTURE | Logo)
-            header_data = []
-            
-            # Colonne gauche : FACTURE avec fond beige
             left_cell = Paragraph("FACTURE", title_style)
             
-            # Colonne droite : Logo
             logo_cell = ""
             if settings.get('company_logo'):
                 logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
@@ -3090,7 +3088,6 @@ def generate_facture_pdf(id_facture):
         # PARTIE 2 : INFORMATIONS SOCIÉTÉ / CLIENT
         # ============================================================
         
-        # Colonne gauche : Société
         company_info = f"""
         <b>{settings.get('company_name', 'Mon Entreprise')}</b><br/>
         {settings.get('company_address', '')}<br/>
@@ -3098,7 +3095,6 @@ def generate_facture_pdf(id_facture):
         {settings.get('company_email', '')}
         """
         
-        # Colonne droite : Client + N° facture
         facture_info = f"""
         <b>Client</b><br/>
         {client.get('nom', 'Non renseigné')}<br/>
@@ -3141,13 +3137,11 @@ def generate_facture_pdf(id_facture):
         # PARTIE 4 : TABLEAU PRINCIPAL
         # ============================================================
         
-        # En-tête du tableau
         table_data = [
             ['Référence article', 'Désignation', 'Quantité', 'Prix Unitaire', 'Montant HT']
         ]
         
         total_ht = 0
-        # Lignes
         for i, ligne in enumerate(lignes):
             ref = f"ART-{i+1:03d}"
             designation = ligne.get('designation', '')
@@ -3157,17 +3151,14 @@ def generate_facture_pdf(id_facture):
             total_ht += total_ligne
             table_data.append([ref, designation, qte, prix, f"{total_ligne:,.0f}"])
         
-        # Ajouter des lignes vides pour atteindre 10 lignes
         while len(table_data) < 11:
             table_data.append(['', '', '', '', ''])
         
-        # Totaux
         remise = 0
         net_financier = total_ht
         tva = total_ht * 0.18
         total_ttc = total_ht + tva
         
-        # Lignes de totaux
         table_data.append(['', '', '', '', ''])
         table_data.append(['', '', '', 'TOTAL HT', f"{total_ht:,.0f}"])
         table_data.append(['', '', '', 'Remise', f"{remise:,.0f}"])
@@ -3175,10 +3166,8 @@ def generate_facture_pdf(id_facture):
         table_data.append(['', '', '', 'TVA (18%)', f"{tva:,.0f}"])
         table_data.append(['', '', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
         
-        # Création du tableau
         main_table = Table(table_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 2.5*cm, 4.5*cm])
         main_table.setStyle(TableStyle([
-            # En-tête
             ('BACKGROUND', (0, 0), (-1, 0), beige),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
@@ -3186,11 +3175,9 @@ def generate_facture_pdf(id_facture):
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOX', (0, 0), (-1, -1), 1, black),
             ('GRID', (0, 0), (-1, -1), 1, black),
-            # Corps
             ('FONTNAME', (0, 1), (-1, -6), 'Times-Roman'),
             ('FONTSIZE', (0, 1), (-1, -6), 9),
             ('ALIGN', (2, 1), (4, -7), 'CENTER'),
-            # Totaux
             ('FONTNAME', (0, -5), (-1, -1), 'Times-Bold'),
             ('FONTSIZE', (0, -5), (-1, -1), 10),
             ('ALIGN', (3, -5), (-1, -1), 'RIGHT'),
@@ -3256,7 +3243,6 @@ def generate_facture_pdf(id_facture):
         )
         story.append(Paragraph(thanks_text, thanks_style))
         
-        # Pied de page personnalisé
         if settings.get('footer_text'):
             footer_style = ParagraphStyle(
                 'FooterStyle',

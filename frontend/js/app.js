@@ -2179,10 +2179,10 @@ renderParametreContent(tab, settings) {
     <form id="import-header-form" enctype="multipart/form-data">
         <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
             <div style="flex:1; min-width:200px;">
-                <input type="file" id="import-header-file" accept=".html,.pdf,.docx" class="form-control" style="padding:8px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white; width:100%;">
+                <input type="file" id="import-header-file" accept="image/*" class="form-control" style="padding:8px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white; width:100%;">
                 <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
-                    Formats acceptés : HTML, PDF, DOCX
-                </p>
+    Formats acceptés : PNG, JPG, JPEG, GIF, WEBP
+</p>
             </div>
             <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; border:none; color:white; display:inline-flex; align-items:center; gap:8px;">
                 <i class="fas fa-upload"></i> Importer
