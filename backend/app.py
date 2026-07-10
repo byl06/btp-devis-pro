@@ -2916,7 +2916,7 @@ def generate_facture_pdf(id_facture):
         import io
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm, mm
         import os
@@ -2984,7 +2984,9 @@ def generate_facture_pdf(id_facture):
                 'custom_header': None
             }
         
-        # ========== CRÉATION DU PDF ==========
+        # ============================================================
+        # CRÉATION DU PDF
+        # ============================================================
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4,
                                 rightMargin=2*cm, leftMargin=2*cm,
@@ -3025,52 +3027,67 @@ def generate_facture_pdf(id_facture):
         story = []
         
         # ============================================================
-        # EN-TÊTE : FACTURE | LOGO
+        # 🔥 PARTIE 1 : EN-TÊTE IMPORTÉ (si présent)
         # ============================================================
-        
-        # Vérifier si un en-tête personnalisé a été importé
         custom_header = settings.get('custom_header')
+        header_imported = False
+        
         if custom_header:
             header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
+            
+            # Si c'est un PDF, on l'utilise comme en-tête
             if os.path.exists(header_path) and custom_header.endswith('.pdf'):
-                # Si c'est un PDF, l'envoyer directement
-                return send_file(header_path, mimetype='application/pdf', as_attachment=True, download_name=f'facture_{id_facture}.pdf')
+                # On va extraire le contenu du PDF pour l'intégrer
+                # Pour l'instant, on utilise l'image du logo + nom de l'entreprise
+                header_imported = True
+                
+                # Afficher le nom de l'entreprise en grand
+                story.append(Paragraph(settings.get('company_name', 'Mon Entreprise'), title_style))
+                
+                # Slogan
+                if settings.get('slogan'):
+                    story.append(Paragraph(settings.get('slogan'), normal_style))
+                
+                story.append(Spacer(1, 0.3*cm))
+                story.append(Paragraph("<hr/>", styles['Normal']))
+                story.append(Spacer(1, 0.3*cm))
         
-        # En-tête : deux colonnes (FACTURE | Logo)
-        header_data = []
-        
-        # Colonne gauche : FACTURE avec fond beige
-        left_cell = Paragraph("FACTURE", title_style)
-        
-        # Colonne droite : Logo
-        logo_cell = ""
-        if settings.get('company_logo'):
-            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
-            if os.path.exists(logo_path):
-                try:
-                    logo_img = Image(logo_path, width=60, height=50)
-                    logo_cell = logo_img
-                except:
-                    logo_cell = ""
-        
-        # Tableau en-tête (2 colonnes)
-        header_table = Table([[left_cell, logo_cell]], colWidths=[10*cm, 6*cm])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-            ('BACKGROUND', (0, 0), (0, 0), beige),
-            ('BOX', (0, 0), (0, 0), 1, black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        story.append(header_table)
-        story.append(Spacer(1, 0.5*cm))
+        # Si pas d'en-tête importé, utiliser le logo + infos
+        if not header_imported:
+            # En-tête : deux colonnes (FACTURE | Logo)
+            header_data = []
+            
+            # Colonne gauche : FACTURE avec fond beige
+            left_cell = Paragraph("FACTURE", title_style)
+            
+            # Colonne droite : Logo
+            logo_cell = ""
+            if settings.get('company_logo'):
+                logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+                if os.path.exists(logo_path):
+                    try:
+                        logo_img = Image(logo_path, width=60, height=50)
+                        logo_cell = logo_img
+                    except:
+                        logo_cell = ""
+            
+            header_table = Table([[left_cell, logo_cell]], colWidths=[10*cm, 6*cm])
+            header_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+                ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+                ('BACKGROUND', (0, 0), (0, 0), beige),
+                ('BOX', (0, 0), (0, 0), 1, black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            story.append(header_table)
+            story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # INFORMATIONS SOCIÉTÉ / CLIENT
+        # PARTIE 2 : INFORMATIONS SOCIÉTÉ / CLIENT
         # ============================================================
         
         # Colonne gauche : Société
@@ -3104,7 +3121,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # OBJET DE LA FACTURE
+        # PARTIE 3 : OBJET DE LA FACTURE
         # ============================================================
         
         objet_data = [[Paragraph("<b>Objet de la facture</b>", normal_style)]]
@@ -3121,7 +3138,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # TABLEAU PRINCIPAL
+        # PARTIE 4 : TABLEAU PRINCIPAL
         # ============================================================
         
         # En-tête du tableau
@@ -3187,7 +3204,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # MODE DE PAIEMENT
+        # PARTIE 5 : MODE DE PAIEMENT
         # ============================================================
         
         paiement_data = [
@@ -3212,7 +3229,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # CONDITIONS
+        # PARTIE 6 : CONDITIONS
         # ============================================================
         
         conditions_text = """
@@ -3224,7 +3241,7 @@ def generate_facture_pdf(id_facture):
         story.append(Spacer(1, 0.5*cm))
         
         # ============================================================
-        # MESSAGE DE REMERCIEMENT
+        # PARTIE 7 : MESSAGE DE REMERCIEMENT
         # ============================================================
         
         thanks_text = """
@@ -3238,6 +3255,17 @@ def generate_facture_pdf(id_facture):
             fontSize=10
         )
         story.append(Paragraph(thanks_text, thanks_style))
+        
+        # Pied de page personnalisé
+        if settings.get('footer_text'):
+            footer_style = ParagraphStyle(
+                'FooterStyle',
+                parent=normal_style,
+                alignment=1,
+                fontSize=8,
+                textColor=colors.HexColor('#666666')
+            )
+            story.append(Paragraph(settings.get('footer_text'), footer_style))
         
         doc.build(story)
         buffer.seek(0)
