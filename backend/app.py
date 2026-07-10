@@ -2936,7 +2936,7 @@ def generate_facture_pdf(id_facture):
             "Content-Type": "application/json"
         }
         
-        # 1. Récupérer la facture
+        # Récupérer les données
         facture_response = requests.get(
             f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
             headers=headers
@@ -2947,83 +2947,71 @@ def generate_facture_pdf(id_facture):
         
         facture = facture_response.json()[0]
         
-        # 2. Récupérer le devis
         devis_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
             headers=headers
         )
         devis = devis_response.json()[0] if devis_response.status_code == 200 and devis_response.json() else {}
         
-        # 3. Récupérer le client
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
             headers=headers
         )
         client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
         
-        # 4. Récupérer les lignes
         lignes_response = requests.get(
             f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
             headers=headers
         )
         lignes = lignes_response.json() if lignes_response.status_code == 200 else []
         
-        # 5. Récupérer les settings
         settings_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
         )
-        
-        if settings_response.status_code == 200 and settings_response.json():
-            settings = settings_response.json()[0]
-        else:
-            settings = {
-                'company_name': 'Mon Entreprise',
-                'company_email': '',
-                'company_phone': '',
-                'company_address': '',
-                'company_logo': None,
-                'primary_color': '#1E3A8A',
-                'slogan': '',
-                'website': '',
-                'footer_text': '',
-                'custom_header': None
-            }
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
         
         # ============================================================
-        # CRÉATION DU PDF
+        # CRÉATION DU PDF - 1 PAGE
         # ============================================================
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4,
-                                rightMargin=2*cm, leftMargin=2*cm,
-                                topMargin=2*cm, bottomMargin=2*cm)
+                                rightMargin=1.5*cm, leftMargin=1.5*cm,
+                                topMargin=1.5*cm, bottomMargin=1.5*cm)
         
         styles = getSampleStyleSheet()
         
-        # Styles
+        # Styles réduits pour tenir sur 1 page
         title_style = ParagraphStyle(
             'TitleStyle',
             parent=styles['Normal'],
-            fontSize=22,
-            fontName='Times-Roman',
+            fontSize=16,
+            fontName='Times-Bold',
             textColor=colors.HexColor('#333333'),
             alignment=1,
-            spaceAfter=5
+            spaceAfter=3
         )
         
         normal_style = ParagraphStyle(
             'NormalStyle',
             parent=styles['Normal'],
-            fontSize=10,
+            fontSize=8,
             fontName='Times-Roman',
             textColor=colors.HexColor('#333333'),
-            leading=14
+            leading=10
         )
         
         bold_style = ParagraphStyle(
             'BoldStyle',
             parent=normal_style,
             fontName='Times-Bold'
+        )
+        
+        small_style = ParagraphStyle(
+            'SmallStyle',
+            parent=normal_style,
+            fontSize=7,
+            leading=9
         )
         
         beige = colors.HexColor('#F3C8AA')
@@ -3033,59 +3021,50 @@ def generate_facture_pdf(id_facture):
         story = []
         
         # ============================================================
-        # 🔥 PARTIE 1 : EN-TÊTE IMPORTÉ (IMAGE)
+        # 1. EN-TÊTE IMPORTÉ (IMAGE)
         # ============================================================
         custom_header = settings.get('custom_header')
+        header_imported = False
         
         if custom_header:
             header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
             if os.path.exists(header_path):
                 try:
-                    # 🔥 Ajouter l'image en haut de la page
-                    header_img = Image(header_path, width=17*cm, height=4*cm)
+                    header_img = Image(header_path, width=17*cm, height=2.5*cm)
                     story.append(header_img)
-                    story.append(Spacer(1, 0.5*cm))
+                    story.append(Spacer(1, 0.2*cm))
                     header_imported = True
-                except Exception as e:
-                    print(f"⚠️ Erreur chargement image en-tête: {e}")
-                    header_imported = False
-            else:
-                header_imported = False
-        else:
-            header_imported = False
+                except:
+                    pass
         
-        # Si pas d'en-tête importé, utiliser le logo + infos
         if not header_imported:
-            # En-tête : deux colonnes (FACTURE | Logo)
+            # FACTURE | Logo
             left_cell = Paragraph("FACTURE", title_style)
-            
             logo_cell = ""
             if settings.get('company_logo'):
                 logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
                 if os.path.exists(logo_path):
                     try:
-                        logo_img = Image(logo_path, width=60, height=50)
+                        logo_img = Image(logo_path, width=40, height=40)
                         logo_cell = logo_img
                     except:
                         logo_cell = ""
             
-            header_table = Table([[left_cell, logo_cell]], colWidths=[10*cm, 6*cm])
+            header_table = Table([[left_cell, logo_cell]], colWidths=[12*cm, 5*cm])
             header_table.setStyle(TableStyle([
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('ALIGN', (0, 0), (0, 0), 'CENTER'),
                 ('ALIGN', (1, 0), (1, 0), 'CENTER'),
                 ('BACKGROUND', (0, 0), (0, 0), beige),
                 ('BOX', (0, 0), (0, 0), 1, black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 10),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ]))
             story.append(header_table)
-            story.append(Spacer(1, 0.5*cm))
+            story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # PARTIE 2 : INFORMATIONS SOCIÉTÉ / CLIENT
+        # 2. INFOS SOCIÉTÉ / CLIENT (réduit)
         # ============================================================
         
         company_info = f"""
@@ -3099,7 +3078,6 @@ def generate_facture_pdf(id_facture):
         <b>Client</b><br/>
         {client.get('nom', 'Non renseigné')}<br/>
         {client.get('adresse', '')}<br/>
-        <br/>
         N° Facture: {facture.get('id_facture')}<br/>
         Date: {datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y')}
         """
@@ -3109,149 +3087,129 @@ def generate_facture_pdf(id_facture):
         ], colWidths=[8*cm, 8*cm])
         info_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
         story.append(info_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # PARTIE 3 : OBJET DE LA FACTURE
+        # 3. OBJET DE LA FACTURE (réduit)
         # ============================================================
         
         objet_data = [[Paragraph("<b>Objet de la facture</b>", normal_style)]]
-        objet_table = Table(objet_data, colWidths=[18*cm])
+        objet_table = Table(objet_data, colWidths=[17*cm])
         objet_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), light_grey),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('BOX', (0, 0), (-1, -1), 1, black),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))
         story.append(objet_table)
-        story.append(Spacer(1, 0.3*cm))
+        story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # PARTIE 4 : TABLEAU PRINCIPAL
+        # 4. TABLEAU PRINCIPAL (réduit)
         # ============================================================
         
         table_data = [
-            ['Référence article', 'Désignation', 'Quantité', 'Prix Unitaire', 'Montant HT']
+            ['Réf', 'Désignation', 'Qté', 'Prix U.', 'Montant HT']
         ]
         
         total_ht = 0
-        for i, ligne in enumerate(lignes):
+        for i, ligne in enumerate(lignes[:8]):  # Max 8 lignes pour tenir
             ref = f"ART-{i+1:03d}"
-            designation = ligne.get('designation', '')
+            designation = ligne.get('designation', '')[:30]  # Tronquer
             qte = str(ligne.get('quantite', 0))
             prix = f"{ligne.get('prix_unitaire', 0):,.0f}"
             total_ligne = ligne.get('quantite', 0) * ligne.get('prix_unitaire', 0)
             total_ht += total_ligne
             table_data.append([ref, designation, qte, prix, f"{total_ligne:,.0f}"])
         
-        while len(table_data) < 11:
+        # Ajouter des lignes vides si moins de 8
+        while len(table_data) < 9:
             table_data.append(['', '', '', '', ''])
         
+        # Totaux
         remise = 0
-        net_financier = total_ht
         tva = total_ht * 0.18
         total_ttc = total_ht + tva
         
         table_data.append(['', '', '', '', ''])
         table_data.append(['', '', '', 'TOTAL HT', f"{total_ht:,.0f}"])
-        table_data.append(['', '', '', 'Remise', f"{remise:,.0f}"])
-        table_data.append(['', '', '', 'Net Financier', f"{net_financier:,.0f}"])
         table_data.append(['', '', '', 'TVA (18%)', f"{tva:,.0f}"])
         table_data.append(['', '', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
         
-        main_table = Table(table_data, colWidths=[2.5*cm, 5.5*cm, 2.5*cm, 2.5*cm, 4.5*cm])
+        main_table = Table(table_data, colWidths=[2*cm, 5.5*cm, 2*cm, 2.5*cm, 4*cm])
         main_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), beige),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
             ('BOX', (0, 0), (-1, -1), 1, black),
             ('GRID', (0, 0), (-1, -1), 1, black),
-            ('FONTNAME', (0, 1), (-1, -6), 'Times-Roman'),
-            ('FONTSIZE', (0, 1), (-1, -6), 9),
-            ('ALIGN', (2, 1), (4, -7), 'CENTER'),
-            ('FONTNAME', (0, -5), (-1, -1), 'Times-Bold'),
-            ('FONTSIZE', (0, -5), (-1, -1), 10),
-            ('ALIGN', (3, -5), (-1, -1), 'RIGHT'),
-            ('BACKGROUND', (3, -5), (3, -1), beige),
+            ('FONTNAME', (0, 1), (-1, -4), 'Times-Roman'),
+            ('FONTSIZE', (0, 1), (-1, -4), 7),
+            ('ALIGN', (2, 1), (4, -5), 'CENTER'),
+            ('FONTNAME', (0, -3), (-1, -1), 'Times-Bold'),
+            ('FONTSIZE', (0, -3), (-1, -1), 8),
+            ('ALIGN', (3, -3), (-1, -1), 'RIGHT'),
+            ('BACKGROUND', (3, -3), (3, -1), beige),
             ('BACKGROUND', (0, -1), (2, -1), beige),
             ('BACKGROUND', (3, -1), (4, -1), beige),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
         story.append(main_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # PARTIE 5 : MODE DE PAIEMENT
+        # 5. MODE DE PAIEMENT (réduit)
         # ============================================================
         
         paiement_data = [
             [Paragraph("<b>Mode de paiement</b>", normal_style)],
-            [Paragraph("Virement bancaire / Espèces", normal_style)],
-            [Paragraph(f"Date d'échéance: {datetime.now().strftime('%d/%m/%Y')}", normal_style)]
+            [Paragraph("Virement / Espèces", normal_style)],
+            [Paragraph(f"Échéance: {datetime.now().strftime('%d/%m/%Y')}", small_style)]
         ]
         
-        paiement_table = Table(paiement_data, colWidths=[6*cm])
+        paiement_table = Table(paiement_data, colWidths=[5*cm])
         paiement_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), beige),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
             ('BOX', (0, 0), (-1, -1), 1, black),
             ('GRID', (0, 0), (-1, -1), 1, black),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
         ]))
         story.append(paiement_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # PARTIE 6 : CONDITIONS
+        # 6. CONDITIONS + REMERCIEMENT (réduit)
         # ============================================================
         
         conditions_text = """
-        <b>Conditions :</b><br/>
-        Le règlement de la facture doit être effectué avant la date d'échéance indiquée.
-        Toute facture non payée à l'échéance pourra entraîner des frais de retard conformément aux conditions générales de vente.
+        <b>Conditions :</b> Règlement avant échéance. Frais de retard applicables.
         """
-        story.append(Paragraph(conditions_text, normal_style))
-        story.append(Spacer(1, 0.5*cm))
-        
-        # ============================================================
-        # PARTIE 7 : MESSAGE DE REMERCIEMENT
-        # ============================================================
+        story.append(Paragraph(conditions_text, small_style))
+        story.append(Spacer(1, 0.1*cm))
         
         thanks_text = """
         Nous vous remercions d'avoir choisi nos services.
-        Votre satisfaction est notre priorité.
         """
         thanks_style = ParagraphStyle(
             'ThanksStyle',
             parent=normal_style,
             alignment=1,
-            fontSize=10
+            fontSize=8
         )
         story.append(Paragraph(thanks_text, thanks_style))
-        
-        if settings.get('footer_text'):
-            footer_style = ParagraphStyle(
-                'FooterStyle',
-                parent=normal_style,
-                alignment=1,
-                fontSize=8,
-                textColor=colors.HexColor('#666666')
-            )
-            story.append(Paragraph(settings.get('footer_text'), footer_style))
         
         doc.build(story)
         buffer.seek(0)

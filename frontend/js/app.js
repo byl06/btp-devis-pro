@@ -2145,9 +2145,7 @@ renderParametreContent(tab, settings) {
                         <button type="submit" class="btn-primary" id="btn-save-company">
                             <i class="fas fa-save"></i> Enregistrer
                         </button>
-                        <button type="button" class="btn-secondary" onclick="app.previewHeader()" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                            <i class="fas fa-eye"></i> Aperçu PDF
-                        </button>
+                       
                     </div>
                 </form>
             </div>
