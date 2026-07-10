@@ -1239,6 +1239,9 @@ def generate_pdf(id_devis):
         from reportlab.lib.units import cm
         from reportlab.lib.utils import ImageReader
         from reportlab.platypus import Image
+        from reportlab.graphics.shapes import Drawing, String, Rect
+        from reportlab.graphics import renderPDF
+        from reportlab.lib.colors import Color, red
         import os
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
@@ -1321,6 +1324,39 @@ def generate_pdf(id_devis):
             ligne['quantite'] = int(ligne['quantite']) if ligne['quantite'] else 0
             ligne['total_ligne'] = float(ligne['total_ligne']) if ligne['total_ligne'] else 0
         
+        # ============================================================
+        # CRÉATION DU TAMPON "PAYÉ" (pour les devis payés)
+        # ============================================================
+        def create_stamp_paye():
+            d = Drawing(280, 180)
+            
+            # Rectangle rouge
+            rect = Rect(0, 20, 280, 140, 
+                        fillColor=Color(1, 0, 0, 0.12),
+                        strokeColor=Color(1, 0, 0, 0.7),
+                        strokeWidth=3)
+            d.add(rect)
+            
+            # Texte PAYÉ
+            text = String(140, 90, "PAYÉ", 
+                          fontSize=46, 
+                          fillColor=Color(1, 0, 0, 0.75),
+                          fontName='Helvetica-Bold')
+            text.rotateAngle = -25
+            text.textAnchor = 'middle'
+            d.add(text)
+            
+            # Date
+            date_text = String(140, 110, datetime.now().strftime('%d/%m/%Y'),
+                               fontSize=11,
+                               fillColor=Color(1, 0, 0, 0.5),
+                               fontName='Helvetica')
+            date_text.rotateAngle = -25
+            date_text.textAnchor = 'middle'
+            d.add(date_text)
+            
+            return d
+        
         # ========== CRÉATION DU PDF ==========
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, 
@@ -1366,11 +1402,10 @@ def generate_pdf(id_devis):
                 except:
                     pass
         
-        # En-tête avec slogan
+        # En-tête
         company_name = settings.get('company_name', 'BTP Devis Pro')
         story.append(Paragraph(company_name, styles['Normal']))
         
-        # 🔥 SLOGAN
         slogan = settings.get('slogan', '')
         if slogan:
             story.append(Paragraph(slogan, subtitle_style))
@@ -1379,11 +1414,9 @@ def generate_pdf(id_devis):
         story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
         story.append(Spacer(1, 0.3*cm))
         
-        # Coordonnées
         company_info = f"{settings.get('company_email', '')} | {settings.get('company_phone', '')}"
         story.append(Paragraph(company_info, subtitle_style))
         
-        # 🔥 SITE WEB
         website = settings.get('website', '')
         if website:
             story.append(Paragraph(f"🌐 {website}", subtitle_style))
@@ -1522,7 +1555,7 @@ def generate_pdf(id_devis):
         # Signatures
         entreprise_name = settings.get("company_name", "l'entreprise")
         signature_data = [
-            [f'Pour {entreprise_name}', 'Pour le client'],
+            [f'Pour {entreprise_name}', 'Pour el client'],
             ['_________________________', '_________________________'],
             ['Date et signature', 'Date et signature']
         ]
@@ -1542,13 +1575,22 @@ def generate_pdf(id_devis):
         # Pied de page
         story.append(Paragraph("<hr/>", styles['Normal']))
         
-        # 🔥 PIED DE PAGE PERSONNALISÉ
         footer_text = settings.get('footer_text', '')
         if footer_text:
             story.append(Paragraph(footer_text, subtitle_style))
         
         footer_info = f"Devis généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
         story.append(Paragraph(footer_info, subtitle_style))
+        
+        # ============================================================
+        # AJOUT DU TAMPON "PAYÉ" SI LE DEVIS EST PAYÉ
+        # ============================================================
+        # Pour un devis, le statut "payé" n'existe pas normalement,
+        # mais on peut l'ajouter si jamais
+        if devis.get('statut') == 'payé' or devis.get('statut') == 'paye':
+            stamp = create_stamp_paye()
+            story.append(Spacer(1, 0.5*cm))
+            story.append(stamp)
         
         doc.build(story)
         buffer.seek(0)
