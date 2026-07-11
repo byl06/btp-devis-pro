@@ -1164,6 +1164,11 @@ openCreateClientModal() {
                         <label>Adresse</label>
                         <textarea id="client-adresse" rows="3"></textarea>
                     </div>
+                    // Dans la modale de création client, ajoute ce champ après l'adresse
+<div class="form-group">
+    <label>IFU (Numéro d'Identification Fiscale)</label>
+    <input type="text" id="client-ifu" placeholder="13 caractères">
+</div>
                     <div class="form-actions">
                         <button type="submit" class="btn-primary">Enregistrer</button>
                         <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -1198,7 +1203,8 @@ form.addEventListener('submit', async (e) => {
         nom: document.getElementById('client-nom').value,
         telephone: document.getElementById('client-telephone').value,
         email: document.getElementById('client-email').value,
-        adresse: document.getElementById('client-adresse').value
+        adresse: document.getElementById('client-adresse').value,
+        ifu: document.getElementById('client-ifu').value || ''  // Ajout  // Ajout de l'IFU avec valeur par défaut vide
     };
     
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -2145,7 +2151,9 @@ renderParametreContent(tab, settings) {
                         <button type="submit" class="btn-primary" id="btn-save-company">
                             <i class="fas fa-save"></i> Enregistrer
                         </button>
-                       
+                        <button type="button" class="btn-secondary" onclick="app.previewHeader()" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                            <i class="fas fa-eye"></i> Aperçu PDF
+                        </button>
                     </div>
                 </form>
             </div>
@@ -2185,9 +2193,7 @@ renderParametreContent(tab, settings) {
             <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; border:none; color:white; display:inline-flex; align-items:center; gap:8px;">
                 <i class="fas fa-upload"></i> Importer
             </button>
-            <button type="button" class="btn-secondary" onclick="app.previewImportedHeader()" style="background: linear-gradient(135deg, #059669, #10B981); color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.3s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-eye"></i> Aperçu
-            </button>
+            
         </div>
     </form>
     
@@ -2221,41 +2227,44 @@ renderParametreContent(tab, settings) {
         `,
         
         fiscal: `
-            <!-- ===== ONGLET FISCAL ===== -->
-            <div class="glass-card" style="border:1px solid rgba(245,158,11,0.3);">
-                <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
-                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
-                    Ces informations sont obligatoires pour émettre des factures normalisées (e-MCF).
-                </p>
-                <form id="fiscal-form">
-                    <div class="form-group">
-                        <label>NIF (Numéro d'Identification Fiscale) *</label>
-                        <input type="text" id="nif" value="${settings.nif || ''}" placeholder="Ex: 4201234567890" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Régime TVA</label>
-                        <select id="regime-tva">
-                            <option value="non assujetti" ${settings.regime_tva === 'non assujetti' ? 'selected' : ''}>Non assujetti</option>
-                            <option value="assujetti" ${settings.regime_tva === 'assujetti' ? 'selected' : ''}>Assujetti</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Numéro de contribuable</label>
-                        <input type="text" id="numero-contribuable" value="${settings.numero_contribuable || ''}" placeholder="Numéro de contribuable">
-                    </div>
-                    <div class="form-group">
-                        <label>Adresse fiscale</label>
-                        <input type="text" id="adresse-fiscale" value="${settings.adresse_fiscale || ''}" placeholder="Adresse fiscale">
-                    </div>
-                    <button type="submit" class="btn-primary" style="background: #F59E0B;">
-                        <i class="fas fa-save"></i> Enregistrer
-                    </button>
-                </form>
-                <p style="font-size:0.75rem; color:#94A3B8; margin-top:1rem;">
-                    <i class="fas fa-info-circle"></i> Le NIF est obligatoire pour la facturation normalisée.
+    <!-- ===== ONGLET FISCAL ===== -->
+    <div class="glass-card" style="border:1px solid rgba(245,158,11,0.3);">
+        <h3><i class="fas fa-file-invoice" style="color:#F59E0B;"></i> Informations fiscales</h3>
+        <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+            Ces informations sont obligatoires pour émettre des factures normalisées (e-MCF).
+        </p>
+        <form id="fiscal-form">
+            <div class="form-group">
+                <label>NIF (Numéro d'Identification Fiscale) *</label>
+                <input type="text" id="nif" value="${settings.nif || ''}" placeholder="Ex: 0202347221089" required>
+                <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
+                    <i class="fas fa-info-circle"></i> 13 caractères (ex: 0202347221089)
                 </p>
             </div>
-        `,
+            <div class="form-group">
+                <label>Régime TVA</label>
+                <select id="regime-tva">
+                    <option value="non assujetti" ${settings.regime_tva === 'non assujetti' ? 'selected' : ''}>Non assujetti</option>
+                    <option value="assujetti" ${settings.regime_tva === 'assujetti' ? 'selected' : ''}>Assujetti</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Numéro de contribuable</label>
+                <input type="text" id="numero-contribuable" value="${settings.numero_contribuable || ''}" placeholder="Numéro de contribuable">
+            </div>
+            <div class="form-group">
+                <label>Adresse fiscale</label>
+                <input type="text" id="adresse-fiscale" value="${settings.adresse_fiscale || ''}" placeholder="Adresse fiscale">
+            </div>
+            <button type="submit" class="btn-primary" style="background: #F59E0B;">
+                <i class="fas fa-save"></i> Enregistrer
+            </button>
+        </form>
+        <p style="font-size:0.75rem; color:#94A3B8; margin-top:1rem;">
+            <i class="fas fa-info-circle"></i> Le NIF est obligatoire pour la facturation normalisée.
+        </p>
+    </div>
+    `,
         
         securite: `
             <!-- ===== ONGLET SÉCURITÉ ===== -->
@@ -3862,22 +3871,35 @@ async normaliserFacture(id_facture) {
     if (!confirm('⚠️ Émettre cette facture comme facture normalisée ? Cette action est irréversible.')) return;
     
     try {
-        const ifuClient = prompt('📋 Entrez l\'IFU du client :');
+        const ifuClient = prompt('📋 Entrez l\'IFU du client (13 caractères) :');
         if (!ifuClient) return;
+        
+        if (ifuClient.length !== 13) {
+            Toast.error('❌ L\'IFU doit contenir exactement 13 caractères');
+            return;
+        }
+        
+        const paymentMethod = prompt('💳 Méthode de paiement :', 'ESPECES');
+        if (!paymentMethod) return;
         
         const response = await apiRequest(`/api/facture/${id_facture}/normaliser`, {
             method: 'POST',
-            body: JSON.stringify({ ifu_client: ifuClient })
+            body: JSON.stringify({ 
+                ifu_client: ifuClient,
+                payment_method: paymentMethod
+            })
         });
         const result = await response.json();
         
         if (result.success) {
             Toast.success('✅ Facture normalisée émise !');
-            setTimeout(() => this.loadPage('factures'), 1000);
+            Toast.info(`📋 Numéro fiscal: ${result.num_fiscal}`);
+            setTimeout(() => this.loadPage('factures'), 1500);
         } else {
             Toast.error(result.message || '❌ Erreur');
         }
     } catch (error) {
+        console.error('Erreur normalisation:', error);
         Toast.error('❌ Erreur de connexion');
     }
 }

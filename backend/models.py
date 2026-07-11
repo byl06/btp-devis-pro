@@ -317,6 +317,29 @@ class Facture:
     
     def update_status(self, id_facture, statut):
         return self.db.update("facture", id_facture, {"statut": statut})
+        # Dans la classe Facture, ajoute cette méthode
+        # Dans la classe Facture, ajoute cette méthode
+def update(self, id_facture, data):
+    """Met à jour une facture"""
+    import requests
+    supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+    
+    headers = {
+        "Authorization": f"Bearer {supabase_key}",
+        "apikey": supabase_key,
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.patch(
+        f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+        headers=headers,
+        json=data
+    )
+    
+    return response.status_code in [200, 204]
+    
+    
 
 class Abonnement:
     def __init__(self):
@@ -371,3 +394,29 @@ class Settings:
             "updated_at": datetime.now().isoformat()
         }
         return self.db.insert("settings", data)
+# ==================== AJOUTS POUR L'API e-MCF ====================
+
+class LigneDevis:
+    def __init__(self):
+        self.db = Database()
+    
+    def get_by_devis(self, id_devis):
+        """Récupère toutes les lignes d'un devis"""
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        return []
