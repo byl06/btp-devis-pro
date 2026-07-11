@@ -2590,13 +2590,22 @@ def get_factures(id_user):
                     client = client_response.json()[0]
                     client_nom = client.get('nom', 'Inconnu')
             
+            # 🔥 INCLURE TOUS LES CHAMPS FISCAUX
             result.append({
                 'id_facture': facture.get('id_facture'),
                 'id_devis': id_devis,
                 'date_facture': facture.get('date_facture'),
                 'montant': facture.get('montant', 0),
                 'statut': facture.get('statut', 'non payée'),
-                'client_nom': client_nom
+                'client_nom': client_nom,
+                # 🔥 CHAMPS FISCAUX - CRUCIALS
+                'type_facture': facture.get('type_facture', 'simple'),
+                'statut_fiscal': facture.get('statut_fiscal', 'non_normalisee'),
+                'num_facture_fiscale': facture.get('num_facture_fiscale', ''),
+                'code_securite': facture.get('code_securite', ''),
+                'qr_code': facture.get('qr_code', ''),
+                'ifu_client': facture.get('ifu_client', ''),
+                'uid_facture': facture.get('uid_facture', '')
             })
         
         print(f"📋 {len(result)} factures trouvées pour l'utilisateur {current_user}")
