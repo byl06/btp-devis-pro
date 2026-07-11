@@ -2970,22 +2970,6 @@ def generate_pdf_normalise(id_facture):
             spaceBefore=5
         )
         
-        info_label = ParagraphStyle(
-            'InfoLabel',
-            parent=styles['Normal'],
-            fontSize=7,
-            textColor=colors.HexColor('#6B7280'),
-            fontName='Helvetica-Bold'
-        )
-        
-        info_value = ParagraphStyle(
-            'InfoValue',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=colors.HexColor('#1F2937'),
-            fontName='Helvetica'
-        )
-        
         # ===== STORY =====
         story = []
         
@@ -3119,27 +3103,22 @@ def generate_pdf_normalise(id_facture):
         
         main_table = Table(table_data, colWidths=[6.5*cm, 2*cm, 3*cm, 3.5*cm])
         main_table.setStyle(TableStyle([
-            # En-tête
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            # Lignes
             ('FONTNAME', (0, 1), (-1, -4), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -4), 8),
             ('ALIGN', (1, 1), (-1, -4), 'CENTER'),
             ('ALIGN', (0, 1), (0, -4), 'LEFT'),
-            # Totaux
             ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -3), (-1, -1), 8),
             ('BACKGROUND', (0, -3), (-1, -1), colors.HexColor('#F1F5F9')),
             ('TEXTCOLOR', (0, -3), (-1, -1), colors.HexColor(primary_color)),
             ('ALIGN', (2, -3), (-1, -1), 'RIGHT'),
-            # Total TTC
             ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
-            # Bordures
             ('GRID', (0, 0), (-1, -4), 0.5, colors.HexColor('#E2E8F0')),
             ('BOX', (0, -3), (-1, -1), 0.5, colors.HexColor(primary_color)),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -3191,16 +3170,16 @@ def generate_pdf_normalise(id_facture):
                 qr_img.save(qr_buffer, format='PNG')
                 qr_buffer.seek(0)
                 
-                # Créer l'image ReportLab
-                qr_image = ImageReader(qr_buffer)
-                qr_element = Image(qr_image, width=2.5*cm, height=2.5*cm)
+                # 🔥 CORRECTION : Utiliser directement le buffer avec Image
+                # Ne pas utiliser ImageReader, passer le buffer directement
+                qr_element = Image(qr_buffer, width=2.5*cm, height=2.5*cm)
                 print("✅ QR Code généré avec succès !")
                 
             except Exception as e:
                 print(f"❌ Erreur génération QR Code: {e}")
                 import traceback
                 traceback.print_exc()
-                qr_element = Paragraph(f"⚠️ Erreur QR Code", body_style)
+                qr_element = Paragraph("⚠️ Erreur QR Code", body_style)
         elif qr_code_data and len(qr_code_data) > 10 and not QRCODE_AVAILABLE:
             print("❌ QRCode library non disponible")
             qr_element = Paragraph("⚠️ QR Code (librairie manquante)", body_style)
