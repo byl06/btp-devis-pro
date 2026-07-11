@@ -1164,7 +1164,7 @@ openCreateClientModal() {
                         <label>Adresse</label>
                         <textarea id="client-adresse" rows="3"></textarea>
                     </div>
-                    // Dans la modale de création client, ajoute ce champ après l'adresse
+                    
 <div class="form-group">
     <label>IFU (Numéro d'Identification Fiscale)</label>
     <input type="text" id="client-ifu" placeholder="13 caractères">
