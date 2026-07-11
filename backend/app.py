@@ -4201,3 +4201,144 @@ def test_emcf():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# ==================== ROUTES DE TEST e-MCF ====================
+
+@app.route('/api/test-emcf-status', methods=['GET'])
+@jwt_required()
+def test_emcf_status():
+    """Test simple du statut e-MCF"""
+    try:
+        from emcf import EMCFClient
+        client = EMCFClient()
+        status = client.get_status()
+        return jsonify({
+            'success': True,
+            'jwt_present': bool(client.jwt_token),
+            'jwt_length': len(client.jwt_token) if client.jwt_token else 0,
+            'status': status
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-emcf-create', methods=['GET'])
+@jwt_required()
+def test_emcf_create():
+    """Test de création d'une facture e-MCF"""
+    try:
+        from emcf import EMCFClient
+        import json
+        
+        client = EMCFClient()
+        
+        # Facture de test très simple
+        test_data = {
+            "ifu": "0202347221089",
+            "type": "FV",
+            "items": [
+                {"name": "Article Test", "price": 1000, "quantity": 1, "taxGroup": "B"}
+            ],
+            "client": {
+                "ifu": "0202347221090",
+                "name": "Client Test",
+                "contact": "90000000",
+                "address": "Test"
+            },
+            "payment": [
+                {"name": "ESPECES", "amount": 1180}
+            ]
+        }
+        
+        create_result = client.create_invoice(test_data)
+        
+        return jsonify({
+            'success': True,
+            'create_result': create_result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-emcf-confirm/<uid>', methods=['GET'])
+@jwt_required()
+def test_emcf_confirm(uid):
+    """Test de confirmation d'une facture e-MCF"""
+    try:
+        from emcf import EMCFClient
+        client = EMCFClient()
+        
+        confirm_result = client.confirm_invoice(uid)
+        
+        return jsonify({
+            'success': True,
+            'uid': uid,
+            'confirm_result': confirm_result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-emcf-pending', methods=['GET'])
+@jwt_required()
+def test_emcf_pending():
+    """Voir les factures en attente"""
+    try:
+        from emcf import EMCFClient
+        client = EMCFClient()
+        
+        pending = client.get_pending_invoices()
+        
+        return jsonify({
+            'success': True,
+            'pending_count': len(pending) if pending else 0,
+            'pending': pending
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-emcf-cancel/<uid>', methods=['POST'])
+@jwt_required()
+def test_emcf_cancel(uid):
+    """Annuler une facture en attente"""
+    try:
+        from emcf import EMCFClient
+        client = EMCFClient()
+        
+        result = client.cancel_invoice(uid)
+        
+        return jsonify({
+            'success': True,
+            'uid': uid,
+            'cancelled': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-emcf-clear-all', methods=['POST'])
+@jwt_required()
+def test_emcf_clear_all():
+    """Annuler toutes les factures en attente"""
+    try:
+        from emcf import EMCFClient
+        client = EMCFClient()
+        
+        pending = client.get_pending_invoices()
+        if not pending:
+            return jsonify({'message': 'Aucune facture en attente'})
+        
+        results = []
+        for invoice in pending:
+            uid = invoice.get('uid')
+            if uid:
+                result = client.cancel_invoice(uid)
+                results.append({'uid': uid, 'cancelled': result})
+        
+        return jsonify({
+            'message': f'{len(results)} factures annulées',
+            'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
