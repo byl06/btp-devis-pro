@@ -2619,22 +2619,10 @@ def normaliser_facture(id_facture):
         user_id = int(user_id)
         data = request.json
         
-        ifu_client = data.get('ifu_client', '').strip()
-        payment_method = data.get('payment_method', 'ESPECES')
-        regime_tva = data.get('regime_tva', 'non assujetti')
+        print(f"🔍 Test - user_id: {user_id}")
+        print(f"🔍 Test - data: {data}")
         
-        print(f"🔍 Normalisation facture {id_facture} pour user {user_id}")
-        print(f"🔍 IFU client: {ifu_client}")
-        print(f"🔍 Méthode paiement: {payment_method}")
-        
-        # 1. Vérifier l'IFU client
-        if not ifu_client:
-            return jsonify({'success': False, 'message': 'IFU client requis'}), 400
-        
-        if len(ifu_client) != 13:
-            return jsonify({'success': False, 'message': 'IFU client doit contenir 13 caractères'}), 400
-        
-        # 2. Récupérer la facture
+        # Test direct avec Supabase
         import requests
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
@@ -2645,202 +2633,33 @@ def normaliser_facture(id_facture):
             "Content-Type": "application/json"
         }
         
-        facture_response = requests.get(
-            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
-            headers=headers
-        )
-        
-        if facture_response.status_code != 200 or not facture_response.json():
-            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
-        
-        facture = facture_response.json()[0]
-        
-        # 3. Récupérer le devis
-        devis_response = requests.get(
-            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
-            headers=headers
-        )
-        
-        if devis_response.status_code != 200 or not devis_response.json():
-            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
-        
-        devis = devis_response.json()[0]
-        
-        # Vérifier que le devis appartient à l'utilisateur
-        if devis.get('id_user') != user_id:
-            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
-        
-        # 4. Récupérer le client
-        client_response = requests.get(
-            f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
-            headers=headers
-        )
-        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
-        
-        # 5. Récupérer les lignes du devis
-        lignes_response = requests.get(
-            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
-            headers=headers
-        )
-        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
-        
-        # 6. Récupérer les settings (pour le NIF du vendeur)
-        settings_response = requests.get(
+        # Récupérer les settings
+        response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
         )
         
-        # 🔥 SI LES SETTINGS N'EXISTENT PAS, LES CRÉER
-        if settings_response.status_code != 200 or not settings_response.json():
-            print(f"⚠️ Settings non trouvés pour user {user_id}, création...")
-            
-            from datetime import datetime
-            default_settings = {
-                "id_user": user_id,
-                "company_name": "Mon Entreprise",
-                "company_email": "",
-                "company_phone": "",
-                "company_address": "",
-                "nif": "",
-                "regime_tva": "non assujetti",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            
-            create_response = requests.post(
-                f"{supabase_url}/rest/v1/settings",
-                headers=headers,
-                json=default_settings
-            )
-            
-            if create_response.status_code in [200, 201]:
-                print(f"✅ Settings créés pour user {user_id}")
-                settings = default_settings
-            else:
-                print(f"❌ Erreur création settings: {create_response.text}")
-                return jsonify({'success': False, 'message': 'Erreur création des paramètres'}), 500
-        else:
-            settings = settings_response.json()[0]
+        print(f"🔍 Test - status: {response.status_code}")
+        print(f"🔍 Test - response: {response.text}")
         
-        print(f"🔍 Settings: {settings}")
-        
-        # 🔥 VÉRIFIER QUE LE NIF EST CONFIGURÉ
-        nif_vendeur = settings.get('nif', '').strip()
-        if not nif_vendeur:
+        if response.status_code == 200 and response.json():
+            settings = response.json()[0]
+            nif = settings.get('nif', 'NON_TROUVE')
             return jsonify({
-                'success': False, 
-                'message': 'NIF vendeur non configuré. Veuillez configurer votre NIF dans les paramètres (Menu → Paramètres → Fiscal).'
-            }), 400
-        
-        if len(nif_vendeur) != 13:
-            return jsonify({
-                'success': False, 
-                'message': f'NIF vendeur invalide ({len(nif_vendeur)} caractères). Il doit contenir 13 caractères.'
-            }), 400
-        
-        # 7. Construire les données pour l'API
-        items = []
-        total_ht = 0
-        for ligne in lignes:
-            prix = float(ligne.get('prix_unitaire', 0))
-            qte = float(ligne.get('quantite', 1))
-            total_ligne = prix * qte
-            total_ht += total_ligne
-            items.append({
-                "name": ligne.get('designation', 'Article'),
-                "price": prix,
-                "quantity": qte,
-                "taxGroup": "B"  # 18% par défaut
+                'success': True, 
+                'message': 'Settings trouvés',
+                'settings': settings,
+                'nif': nif
             })
-        
-        # Montant total
-        montant_total = float(facture.get('montant', total_ht * 1.18))
-        
-        # 8. Préparer le payload pour l'API
-        invoice_payload = {
-            "ifu": nif_vendeur,
-            "type": "FV",
-            "items": items,
-            "client": {
-                "ifu": ifu_client,
-                "name": client.get('nom', 'Client'),
-                "contact": client.get('telephone', ''),
-                "address": client.get('adresse', '')
-            },
-            "payment": [
-                {
-                    "name": payment_method,
-                    "amount": montant_total
-                }
-            ]
-        }
-        
-        print(f"📤 Payload envoyé: {json.dumps(invoice_payload, indent=2)}")
-        
-        # 9. Envoyer à l'API e-MCF
-        from emcf import EMCFClient
-        emcf = EMCFClient()
-        create_result = emcf.create_invoice(invoice_payload)
-        
-        if 'error' in create_result:
-            error_msg = create_result['error']
-            if isinstance(error_msg, dict):
-                error_msg = json.dumps(error_msg)
-            return jsonify({'success': False, 'message': f'Erreur API: {error_msg}'}), 500
-        
-        uid = create_result.get('uid')
-        if not uid:
-            return jsonify({'success': False, 'message': 'UID non reçu de l\'API'}), 500
-        
-        print(f"✅ UID reçu: {uid}")
-        
-        # 10. Confirmer la facture
-        confirm_result = emcf.confirm_invoice(uid)
-        
-        if 'error' in confirm_result:
-            error_msg = confirm_result['error']
-            if isinstance(error_msg, dict):
-                error_msg = json.dumps(error_msg)
-            return jsonify({'success': False, 'message': f'Erreur confirmation: {error_msg}'}), 500
-        
-        print(f"✅ Confirmation reçue: {json.dumps(confirm_result, indent=2)}")
-        
-        # 11. Enregistrer les informations dans Supabase
-        from datetime import datetime
-        update_data = {
-            "type_facture": "normalisee",
-            "statut_fiscal": "normalisee",
-            "num_facture_fiscale": confirm_result.get('nim', ''),
-            "code_securite": confirm_result.get('codeMECeFDGI', ''),
-            "qr_code": confirm_result.get('qrCode', ''),
-            "date_validation_fiscale": datetime.now().isoformat(),
-            "ifu_client": ifu_client,
-            "regime_tva": regime_tva,
-            "uid_facture": uid
-        }
-        
-        patch_response = requests.patch(
-            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
-            headers=headers,
-            json=update_data
-        )
-        
-        if patch_response.status_code not in [200, 204]:
-            return jsonify({'success': False, 'message': f'Erreur mise à jour: {patch_response.text}'}), 500
-        
-        return jsonify({
-            'success': True,
-            'message': 'Facture normalisée avec succès',
-            'num_fiscal': confirm_result.get('nim', ''),
-            'qr_code': confirm_result.get('qrCode', ''),
-            'code_mecf': confirm_result.get('codeMECeFDGI', ''),
-            'uid': uid
-        })
-        
+        else:
+            return jsonify({
+                'success': False, 
+                'message': 'Settings non trouvés',
+                'status': response.status_code,
+                'response': response.text
+            }), 404
+            
     except Exception as e:
-        print(f"❌ Erreur normalisation: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
