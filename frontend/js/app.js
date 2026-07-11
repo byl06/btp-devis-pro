@@ -746,9 +746,9 @@ async exportClientsToExcel() {
         
         console.log("Factures reçues:", factures);
         
-        // Séparer les factures simples et normalisées
-        const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee');
-        const facturesNormalisees = factures.filter(f => f.type_facture === 'normalisee');
+        // 🔥 CORRECTION : Vérifier les deux champs
+        const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee' && f.statut_fiscal !== 'normalisee');
+        const facturesNormalisees = factures.filter(f => f.type_facture === 'normalisee' || f.statut_fiscal === 'normalisee');
         
         // Récupérer l'onglet actif
         const activeTab = this.currentFactureTab || 'simples';
@@ -833,12 +833,11 @@ renderFactureTable(factures, type) {
                                 <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
                                     ${f.statut === 'payée' ? 'Payée' : 'Non payée'}
                                 </span>
-                                ${f.type_facture === 'normalisee' ? '<span class="status-badge" style="background:rgba(245,158,11,0.2);color:#F59E0B;margin-left:5px;">Normalisée</span>' : ''}
+                                ${type === 'normalisees' ? '<span class="status-badge" style="background:rgba(16,185,129,0.2);color:#10B981;margin-left:5px;">✅ Normalisée</span>' : ''}
                             </td>
                             <td>
                                 ${type === 'simples' ? `
-                                    <!-- 🔥 BOUTON PDF FACTURE SIMPLE -->
-                                    <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF facture" style="background:#EF4444;color:white;">
+                                    <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF" style="background:#EF4444;color:white;">
                                         <i class="fas fa-file-pdf"></i>
                                     </button>
                                     ${f.statut !== 'payée' ? `
@@ -850,9 +849,11 @@ renderFactureTable(factures, type) {
                                         <i class="fas fa-file-invoice"></i>
                                     </button>
                                 ` : `
-                                    <!-- 🔥 BOUTON PDF FACTURE NORMALISÉE -->
                                     <button class="btn-icon" onclick="app.downloadPDFFacture(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
                                         <i class="fas fa-download"></i>
+                                    </button>
+                                    <button class="btn-icon" onclick="app.viewFactureNormalisee(${f.id_facture})" title="Voir détails" style="background:#3B82F6;color:white;">
+                                        <i class="fas fa-eye"></i>
                                     </button>
                                 `}
                             </td>
@@ -862,6 +863,10 @@ renderFactureTable(factures, type) {
             </table>
         </div>
     `;
+}
+viewFactureNormalisee(id_facture) {
+    // Ouvrir le PDF normalisé directement
+    this.downloadPDFFacture(id_facture);
 }
     
     renderParametres() {
