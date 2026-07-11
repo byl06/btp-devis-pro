@@ -2690,17 +2690,55 @@ def normaliser_facture(id_facture):
             headers=headers
         )
         
+        # 🔥 SI LES SETTINGS N'EXISTENT PAS, LES CRÉER
         if settings_response.status_code != 200 or not settings_response.json():
-            return jsonify({'success': False, 'message': 'Paramètres non trouvés'}), 404
+            print(f"⚠️ Settings non trouvés pour user {user_id}, création...")
+            
+            from datetime import datetime
+            default_settings = {
+                "id_user": user_id,
+                "company_name": "Mon Entreprise",
+                "company_email": "",
+                "company_phone": "",
+                "company_address": "",
+                "nif": "",
+                "regime_tva": "non assujetti",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            create_response = requests.post(
+                f"{supabase_url}/rest/v1/settings",
+                headers=headers,
+                json=default_settings
+            )
+            
+            if create_response.status_code in [200, 201]:
+                print(f"✅ Settings créés pour user {user_id}")
+                settings = default_settings
+            else:
+                print(f"❌ Erreur création settings: {create_response.text}")
+                return jsonify({'success': False, 'message': 'Erreur création des paramètres'}), 500
+        else:
+            settings = settings_response.json()[0]
         
-        settings = settings_response.json()[0]
+        print(f"🔍 Settings: {settings}")
+        
+        # 🔥 VÉRIFIER QUE LE NIF EST CONFIGURÉ
         nif_vendeur = settings.get('nif', '').strip()
+        if not nif_vendeur:
+            return jsonify({
+                'success': False, 
+                'message': 'NIF vendeur non configuré. Veuillez configurer votre NIF dans les paramètres (Menu → Paramètres → Fiscal).'
+            }), 400
         
-        if not nif_vendeur or len(nif_vendeur) != 13:
-            return jsonify({'success': False, 'message': 'NIF vendeur invalide. Configurez votre NIF dans les paramètres.'}), 400
+        if len(nif_vendeur) != 13:
+            return jsonify({
+                'success': False, 
+                'message': f'NIF vendeur invalide ({len(nif_vendeur)} caractères). Il doit contenir 13 caractères.'
+            }), 400
         
         # 7. Construire les données pour l'API
-        # Construire les items
         items = []
         total_ht = 0
         for ligne in lignes:
@@ -2740,6 +2778,7 @@ def normaliser_facture(id_facture):
         print(f"📤 Payload envoyé: {json.dumps(invoice_payload, indent=2)}")
         
         # 9. Envoyer à l'API e-MCF
+        from emcf import EMCFClient
         emcf = EMCFClient()
         create_result = emcf.create_invoice(invoice_payload)
         
@@ -2767,6 +2806,7 @@ def normaliser_facture(id_facture):
         print(f"✅ Confirmation reçue: {json.dumps(confirm_result, indent=2)}")
         
         # 11. Enregistrer les informations dans Supabase
+        from datetime import datetime
         update_data = {
             "type_facture": "normalisee",
             "statut_fiscal": "normalisee",
