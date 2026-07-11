@@ -2619,11 +2619,23 @@ def normaliser_facture(id_facture):
         user_id = int(user_id)
         data = request.json
         
-        print(f"🔍 Test - user_id: {user_id}")
-        print(f"🔍 Test - data: {data}")
+        ifu_client = data.get('ifu_client', '').strip()
+        payment_method = data.get('payment_method', 'ESPECES')
+        regime_tva = data.get('regime_tva', 'non assujetti')
         
-        # Test direct avec Supabase
+        print("=" * 60)
+        print(f"🔍 Normalisation facture {id_facture} pour user {user_id}")
+        print(f"🔍 IFU client: {ifu_client}")
+        print(f"🔍 Méthode paiement: {payment_method}")
+        print("=" * 60)
+        
+        if not ifu_client or len(ifu_client) != 13:
+            return jsonify({'success': False, 'message': 'IFU client invalide (13 caractères requis)'}), 400
+        
         import requests
+        from datetime import datetime
+        import json
+        
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
         
@@ -2633,33 +2645,167 @@ def normaliser_facture(id_facture):
             "Content-Type": "application/json"
         }
         
-        # Récupérer les settings
-        response = requests.get(
+        # 1. Récupérer la facture
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        print(f"✅ Facture récupérée: ID {facture.get('id_facture')}")
+        
+        # 2. Récupérer le devis
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        print(f"✅ Devis récupéré: ID {devis.get('id_devis')}")
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # 3. Récupérer le client
+        client_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
+            headers=headers
+        )
+        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
+        print(f"✅ Client récupéré: {client.get('nom')}")
+        
+        # 4. Récupérer les lignes du devis
+        lignes_response = requests.get(
+            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
+            headers=headers
+        )
+        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
+        print(f"✅ {len(lignes)} lignes récupérées")
+        
+        # 5. Récupérer les settings (pour le NIF du vendeur)
+        settings_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
         )
         
-        print(f"🔍 Test - status: {response.status_code}")
-        print(f"🔍 Test - response: {response.text}")
+        if settings_response.status_code != 200 or not settings_response.json():
+            return jsonify({'success': False, 'message': 'Paramètres non trouvés. Configurez votre NIF dans les paramètres.'}), 404
         
-        if response.status_code == 200 and response.json():
-            settings = response.json()[0]
-            nif = settings.get('nif', 'NON_TROUVE')
-            return jsonify({
-                'success': True, 
-                'message': 'Settings trouvés',
-                'settings': settings,
-                'nif': nif
+        settings = settings_response.json()[0]
+        nif_vendeur = settings.get('nif', '').strip()
+        
+        print(f"✅ NIF vendeur: {nif_vendeur}")
+        
+        if not nif_vendeur or len(nif_vendeur) != 13:
+            return jsonify({'success': False, 'message': f'NIF vendeur invalide ({len(nif_vendeur)} caractères). Configurez un NIF de 13 caractères.'}), 400
+        
+        # 6. Construire les items
+        items = []
+        for ligne in lignes:
+            prix = float(ligne.get('prix_unitaire', 0))
+            qte = float(ligne.get('quantite', 1))
+            items.append({
+                "name": ligne.get('designation', 'Article'),
+                "price": prix,
+                "quantity": qte,
+                "taxGroup": "B"
             })
-        else:
-            return jsonify({
-                'success': False, 
-                'message': 'Settings non trouvés',
-                'status': response.status_code,
-                'response': response.text
-            }), 404
-            
+        
+        # Montant total
+        montant_total = float(facture.get('montant', 0))
+        
+        # 7. Préparer le payload
+        invoice_payload = {
+            "ifu": nif_vendeur,
+            "type": "FV",
+            "items": items,
+            "client": {
+                "ifu": ifu_client,
+                "name": client.get('nom', 'Client'),
+                "contact": client.get('telephone', ''),
+                "address": client.get('adresse', '')
+            },
+            "payment": [
+                {
+                    "name": payment_method,
+                    "amount": montant_total
+                }
+            ]
+        }
+        
+        print(f"📤 Payload: {json.dumps(invoice_payload, indent=2)}")
+        
+        # 8. Appeler l'API e-MCF
+        from emcf import EMCFClient
+        emcf = EMCFClient()
+        
+        create_result = emcf.create_invoice(invoice_payload)
+        print(f"📥 Création: {json.dumps(create_result, indent=2)}")
+        
+        if not create_result or 'error' in create_result:
+            error_msg = create_result.get('error', 'Erreur inconnue')
+            return jsonify({'success': False, 'message': f'Erreur API: {error_msg}'}), 500
+        
+        uid = create_result.get('uid')
+        if not uid:
+            return jsonify({'success': False, 'message': 'UID non reçu'}), 500
+        
+        print(f"✅ UID reçu: {uid}")
+        
+        # 9. Confirmer la facture
+        confirm_result = emcf.confirm_invoice(uid)
+        print(f"📥 Confirmation: {json.dumps(confirm_result, indent=2)}")
+        
+        if not confirm_result or 'error' in confirm_result:
+            error_msg = confirm_result.get('error', 'Erreur inconnue')
+            return jsonify({'success': False, 'message': f'Erreur confirmation: {error_msg}'}), 500
+        
+        # 10. Enregistrer dans Supabase
+        update_data = {
+            "type_facture": "normalisee",
+            "statut_fiscal": "normalisee",
+            "num_facture_fiscale": confirm_result.get('nim', ''),
+            "code_securite": confirm_result.get('codeMECeFDGI', ''),
+            "qr_code": confirm_result.get('qrCode', ''),
+            "date_validation_fiscale": datetime.now().isoformat(),
+            "ifu_client": ifu_client,
+            "regime_tva": regime_tva,
+            "uid_facture": uid
+        }
+        
+        print(f"📝 Mise à jour Supabase: {update_data}")
+        
+        patch_response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        print(f"📥 Update status: {patch_response.status_code}")
+        print(f"📥 Update response: {patch_response.text}")
+        
+        if patch_response.status_code not in [200, 204]:
+            return jsonify({'success': False, 'message': f'Erreur mise à jour: {patch_response.text}'}), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Facture normalisée avec succès',
+            'num_fiscal': confirm_result.get('nim', ''),
+            'qr_code': confirm_result.get('qrCode', '')[:50] + '...' if confirm_result.get('qrCode') else '',
+            'code_mecf': confirm_result.get('codeMECeFDGI', '')
+        })
+        
     except Exception as e:
+        print(f"❌ Erreur: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -3989,3 +4135,69 @@ if __name__ == '__main__':
     print("🚀 Démarrage du serveur BTP Devis Pro")
     print("=" * 50)
     app.run(debug=True, port=5000)
+
+@app.route('/api/test-emcf', methods=['GET'])
+@jwt_required()
+def test_emcf():
+    try:
+        from emcf import EMCFClient
+        import json
+        
+        print("=" * 60)
+        print("🧪 TEST DE L'API e-MCF")
+        print("=" * 60)
+        
+        client = EMCFClient()
+        
+        # 1. Tester le statut
+        print("\n1️⃣ Test du statut...")
+        status = client.get_status()
+        print(f"Status: {status}")
+        
+        if not status:
+            return jsonify({'error': 'JWT invalide ou API inaccessible'}), 500
+        
+        # 2. Créer une facture de test
+        print("\n2️⃣ Création d'une facture de test...")
+        test_data = {
+            "ifu": "0202347221089",
+            "type": "FV",
+            "items": [
+                {"name": "Article test", "price": 1000, "quantity": 1, "taxGroup": "B"}
+            ],
+            "client": {
+                "ifu": "0202347221090",
+                "name": "Client Test",
+                "contact": "90000000",
+                "address": "Test"
+            },
+            "payment": [
+                {"name": "ESPECES", "amount": 1180}
+            ]
+        }
+        
+        print(f"📤 Payload: {json.dumps(test_data, indent=2)}")
+        
+        create_result = client.create_invoice(test_data)
+        print(f"📥 Résultat création: {json.dumps(create_result, indent=2)}")
+        
+        result = {
+            'status': status,
+            'create': create_result
+        }
+        
+        # 3. Si création OK, confirmer
+        if create_result and 'uid' in create_result:
+            uid = create_result['uid']
+            print(f"\n3️⃣ Confirmation de la facture {uid}...")
+            confirm_result = client.confirm_invoice(uid)
+            print(f"📥 Résultat confirmation: {json.dumps(confirm_result, indent=2)}")
+            result['confirm'] = confirm_result
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
