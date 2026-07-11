@@ -2833,10 +2833,10 @@ def generate_pdf_normalise(id_facture):
         from datetime import datetime
         import io
         from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
+        from reportlab.lib.units import cm, mm
         from reportlab.lib.utils import ImageReader
         import os
         import qrcode
@@ -2904,167 +2904,289 @@ def generate_pdf_normalise(id_facture):
         
         # Créer le PDF
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                                rightMargin=2*cm, leftMargin=2*cm,
-                                topMargin=2*cm, bottomMargin=2*cm)
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+                                rightMargin=1.5*cm, leftMargin=1.5*cm,
+                                topMargin=1.5*cm, bottomMargin=1.5*cm)
         
         styles = getSampleStyleSheet()
         primary_color = settings.get('primary_color', '#1E3A8A')
         
+        # ===== STYLES PERSONNALISÉS =====
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=18,
+            fontSize=20,
+            fontName='Helvetica-Bold',
             textColor=colors.HexColor(primary_color),
-            alignment=1
+            alignment=1,
+            spaceAfter=5
         )
         
         subtitle_style = ParagraphStyle(
             'Subtitle',
             parent=styles['Normal'],
-            fontSize=10,
+            fontSize=9,
             textColor=colors.HexColor('#6B7280'),
-            alignment=1
+            alignment=1,
+            spaceAfter=10
         )
         
         body_style = ParagraphStyle(
             'Body',
             parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#374151')
+            fontSize=9,
+            textColor=colors.HexColor('#374151'),
+            leading=12
         )
         
-        section_style = ParagraphStyle(
-            'Section',
+        section_title = ParagraphStyle(
+            'SectionTitle',
             parent=styles['Heading2'],
-            fontSize=14,
+            fontSize=11,
+            fontName='Helvetica-Bold',
             textColor=colors.HexColor(primary_color),
-            spaceAfter=12
+            spaceAfter=8,
+            spaceBefore=8
         )
         
+        info_label = ParagraphStyle(
+            'InfoLabel',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.HexColor('#6B7280'),
+            fontName='Helvetica-Bold'
+        )
+        
+        info_value = ParagraphStyle(
+            'InfoValue',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.HexColor('#1F2937'),
+            fontName='Helvetica'
+        )
+        
+        # ===== TABLEAU =====
         story = []
         
+        # ============================================================
+        # 1. EN-TÊTE AVEC LOGO
+        # ============================================================
+        
         # Logo
+        logo_img = None
         if settings.get('company_logo'):
             logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
             if os.path.exists(logo_path):
                 try:
-                    logo_img = Image(logo_path, width=60, height=60)
-                    story.append(logo_img)
+                    logo_img = Image(logo_path, width=50, height=50)
                 except:
                     pass
         
-        # En-tête avec slogan
+        # En-tête : Logo + Titre
+        header_data = []
+        if logo_img:
+            header_data.append([logo_img, Paragraph("FACTURE NORMALISÉE", title_style)])
+        else:
+            header_data.append([Paragraph("FACTURE NORMALISÉE", title_style)])
+        
+        header_table = Table(header_data, colWidths=[2*cm, 14*cm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 0.2*cm))
+        
+        # Nom de l'entreprise
         company_name = settings.get('company_name', 'BTP Devis Pro')
-        story.append(Paragraph(company_name, title_style))
+        story.append(Paragraph(company_name, subtitle_style))
         
         # Slogan
         slogan = settings.get('slogan', '')
         if slogan:
             story.append(Paragraph(slogan, subtitle_style))
         
-        story.append(Spacer(1, 0.2*cm))
-        story.append(Paragraph("FACTURE NORMALISÉE", title_style))
-        story.append(Spacer(1, 0.3*cm))
-        
         # Coordonnées
         coords = []
-        if settings.get('company_email'):
-            coords.append(f"✉ {settings.get('company_email')}")
+        if settings.get('company_address'):
+            coords.append(settings.get('company_address'))
         if settings.get('company_phone'):
             coords.append(f"📞 {settings.get('company_phone')}")
-        if settings.get('company_address'):
-            coords.append(f"📍 {settings.get('company_address')}")
+        if settings.get('company_email'):
+            coords.append(f"✉ {settings.get('company_email')}")
         if settings.get('website'):
             coords.append(f"🌐 {settings.get('website')}")
         
         if coords:
             story.append(Paragraph(" | ".join(coords), subtitle_style))
         
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph("<hr/>", styles['Normal']))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(f"<hr color='{primary_color}' size='2'/>", styles['Normal']))
         story.append(Spacer(1, 0.3*cm))
         
+        # ============================================================
+        # 2. INFORMATIONS VENDEUR ET CLIENT (2 colonnes)
+        # ============================================================
+        
+        # Info vendeur
+        vendeur_info = f"""
+        <b>Vendeur</b><br/>
+        {settings.get('company_name', 'BTP Devis Pro')}<br/>
+        IFU: {settings.get('nif', 'N/A')}<br/>
+        {settings.get('company_address', '')}<br/>
+        Tél: {settings.get('company_phone', '')}
+        """
+        
+        # Info client
+        client_info = f"""
+        <b>Client</b><br/>
+        {client.get('nom', 'Non renseigné')}<br/>
+        IFU: {facture.get('ifu_client', 'N/A')}<br/>
+        {client.get('adresse', '')}<br/>
+        Tél: {client.get('telephone', '')}
+        """
+        
         # Infos facture
+        facture_info = f"""
+        <b>Facture</b><br/>
+        N°: {facture.get('num_facture_fiscale', 'N/A')}<br/>
+        Date: {datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')}<br/>
+        Statut: {facture.get('statut', 'non payée').upper()}
+        """
+        
         info_data = [
-            ['Numéro fiscal', facture.get('num_facture_fiscale', 'N/A')],
-            ['Code sécurité', facture.get('code_securite', 'N/A')],
-            ['Date', datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y')],
-            ['Statut', facture.get('statut', 'non payée').upper()]
+            [Paragraph(vendeur_info, body_style), Paragraph(client_info, body_style), Paragraph(facture_info, body_style)]
         ]
         
-        info_table = Table(info_data, colWidths=[4*cm, 8*cm])
+        info_table = Table(info_data, colWidths=[5*cm, 5*cm, 5*cm])
         info_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor(primary_color)),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#F3F4F6')),
+            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#F3F4F6')),
+            ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#F3F4F6')),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')),
         ]))
         story.append(info_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # Infos client
-        story.append(Paragraph("Informations Client", styles['Heading2']))
-        client_data = [
-            ['Nom', client.get('nom', 'Non renseigné')],
-            ['IFU', facture.get('ifu_client', 'Non renseigné')],
-            ['Email', client.get('email', '-')],
-            ['Téléphone', client.get('telephone', '-')],
-            ['Adresse', client.get('adresse', '-')]
+        # ============================================================
+        # 3. TABLEAU DES ARTICLES
+        # ============================================================
+        
+        story.append(Paragraph("Détail des prestations", section_title))
+        
+        # En-têtes du tableau
+        table_data = [
+            ['Désignation', 'Qté', 'Prix U. (FCFA)', 'Total (FCFA)']
         ]
         
-        client_table = Table(client_data, colWidths=[3*cm, 9*cm])
-        client_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F3F4F6')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        story.append(client_table)
-        story.append(Spacer(1, 0.5*cm))
-        
-        # Tableau des articles
-        story.append(Paragraph("Détail des Articles", styles['Heading2']))
-        
-        data = [['Désignation', 'Qté', 'Prix U.', 'Total']]
-        total = 0
+        total_ht = 0
         for ligne in lignes:
             total_ligne = ligne.get('quantite', 0) * ligne.get('prix_unitaire', 0)
-            total += total_ligne
-            data.append([
-                ligne.get('designation', ''),
+            total_ht += total_ligne
+            table_data.append([
+                Paragraph(ligne.get('designation', ''), body_style),
                 str(ligne.get('quantite', 0)),
-                f"{ligne.get('prix_unitaire', 0):,.0f} F",
-                f"{total_ligne:,.0f} F"
+                f"{ligne.get('prix_unitaire', 0):,.0f}",
+                f"{total_ligne:,.0f}"
             ])
         
-        data.append(['', '', 'TOTAL', f"{total:,.0f} FCFA"])
+        # Calcul des totaux
+        tva = total_ht * 0.18
+        total_ttc = total_ht + tva
         
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor(primary_color)),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        # Lignes de total
+        table_data.append(['', '', '', ''])
+        table_data.append(['', '', 'Sous-total HT', f"{total_ht:,.0f}"])
+        table_data.append(['', '', 'TVA (18%)', f"{tva:,.0f}"])
+        table_data.append(['', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
+        
+        main_table = Table(table_data, colWidths=[7*cm, 2.5*cm, 3.5*cm, 3.5*cm])
+        main_table.setStyle(TableStyle([
+            # En-tête
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(primary_color)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            
+            # Lignes
+            ('FONTNAME', (0, 1), (-1, -4), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -4), 8),
+            ('ALIGN', (1, 1), (-1, -4), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -4), 'LEFT'),
+            
+            # Totaux
+            ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -3), (-1, -1), 9),
+            ('BACKGROUND', (0, -3), (-1, -1), colors.HexColor('#F3F4F6')),
+            ('TEXTCOLOR', (0, -3), (-1, -1), colors.HexColor(primary_color)),
+            ('ALIGN', (2, -3), (-1, -1), 'RIGHT'),
+            
+            # Ligne totale
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+            
+            # Bordures
+            ('GRID', (0, 0), (-1, -4), 0.5, colors.HexColor('#E5E7EB')),
+            ('BOX', (0, -3), (-1, -1), 1, colors.HexColor(primary_color)),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
-        story.append(table)
+        story.append(main_table)
         story.append(Spacer(1, 0.5*cm))
         
-        # ===== QR CODE =====
-        story.append(Paragraph("QR Code Fiscal", section_style))
+        # ============================================================
+        # 4. INFORMATIONS FISCALES - ENCADRÉ DGI
+        # ============================================================
+        
+        story.append(Paragraph("Informations fiscales", section_title))
+        
+        # Encadré avec toutes les infos DGI
+        fiscal_data = [
+            [Paragraph("NIM", info_label), Paragraph(facture.get('num_facture_fiscale', 'N/A'), info_value)],
+            [Paragraph("Code MECeF", info_label), Paragraph(facture.get('code_securite', 'N/A'), info_value)],
+            [Paragraph("Date & Heure", info_label), Paragraph(datetime.fromisoformat(facture['date_facture'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M:%S'), info_value)],
+            [Paragraph("Type", info_label), Paragraph("Facture de vente (FV)", info_value)],
+            [Paragraph("Statut", info_label), Paragraph(facture.get('statut', 'non payée').upper(), info_value)],
+        ]
+        
+        fiscal_table = Table(fiscal_data, colWidths=[4*cm, 10*cm])
+        fiscal_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FEFCE8')),
+            ('BOX', (0, 0), (-1, -1), 2, colors.HexColor('#F59E0B')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#FCD34D')),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#92400E')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(fiscal_table)
+        story.append(Spacer(1, 0.3*cm))
+        
+        # ============================================================
+        # 5. QR CODE
+        # ============================================================
         
         qr_code_data = facture.get('qr_code')
         if qr_code_data:
+            story.append(Paragraph("QR Code fiscal", section_title))
+            
             try:
                 # Générer le QR Code
                 qr = qrcode.QRCode(
                     version=1,
                     error_correction=qrcode.constants.ERROR_CORRECT_L,
-                    box_size=6,
+                    box_size=5,
                     border=2,
                 )
                 qr.add_data(qr_code_data)
@@ -3077,40 +3199,61 @@ def generate_pdf_normalise(id_facture):
                 
                 qr_image = ImageReader(qr_buffer)
                 
-                # Ajouter l'image au PDF
-                story.append(Image(qr_image, width=3*cm, height=3*cm))
-                story.append(Spacer(1, 0.3*cm))
+                # Tableau avec QR Code centré
+                qr_table = Table([[Image(qr_image, width=3.5*cm, height=3.5*cm)]], colWidths=[14*cm])
+                qr_table.setStyle(TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 5),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ]))
+                story.append(qr_table)
+                story.append(Spacer(1, 0.2*cm))
                 
-                # Ajouter le code MECeF
-                code_mecf = facture.get('code_securite', '')
-                if code_mecf:
-                    story.append(Paragraph(f"<b>Code MECeF:</b> {code_mecf}", body_style))
-                
-                # Ajouter le NIM
-                nim = facture.get('num_facture_fiscale', '')
-                if nim:
-                    story.append(Paragraph(f"<b>NIM:</b> {nim}", body_style))
-                
-                story.append(Spacer(1, 0.3*cm))
             except Exception as e:
                 print(f"⚠️ Erreur génération QR Code: {e}")
-                story.append(Paragraph("QR Code non disponible", body_style))
+                story.append(Paragraph("⚠️ QR Code non disponible", body_style))
         else:
-            story.append(Paragraph("Aucun QR Code disponible", body_style))
+            story.append(Paragraph("⚠️ Aucun QR Code disponible", body_style))
         
-        # Pied de page
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph("<hr/>", styles['Normal']))
+        # ============================================================
+        # 6. MENTION DE FACTURE NORMALISÉE
+        # ============================================================
         
-        # Pied de page personnalisé
+        story.append(Spacer(1, 0.3*cm))
+        mention_text = """
+        <b>✔️ Facture normalisée conforme à la réglementation fiscale en vigueur</b><br/>
+        <font color='#6B7280' size='8'>Cette facture a été émise via le système e-MCF de la DGI</font>
+        """
+        mention_style = ParagraphStyle(
+            'Mention',
+            parent=styles['Normal'],
+            alignment=1,
+            fontSize=9,
+            textColor=colors.HexColor('#1F2937'),
+            spaceAfter=5
+        )
+        story.append(Paragraph(mention_text, mention_style))
+        
+        # ============================================================
+        # 7. PIED DE PAGE
+        # ============================================================
+        
+        story.append(Paragraph(f"<hr color='{primary_color}' size='1'/>", styles['Normal']))
+        
         footer_text = settings.get('footer_text', '')
         if footer_text:
             story.append(Paragraph(footer_text, subtitle_style))
         
-        story.append(Paragraph("Facture conforme à la réglementation en vigueur", subtitle_style))
-        story.append(Paragraph(f"© {datetime.now().year} {settings.get('company_name', 'BTP Devis Pro')} - Tous droits réservés", subtitle_style))
+        footer_info = f"""
+        <font color='#6B7280' size='7'>Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}</font>
+        """
+        story.append(Paragraph(footer_info, subtitle_style))
         
-        # Construire le PDF
+        # ============================================================
+        # CONSTRUCTION DU PDF
+        # ============================================================
+        
         doc.build(story)
         buffer.seek(0)
         
