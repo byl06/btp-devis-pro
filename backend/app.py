@@ -2721,7 +2721,7 @@ def normaliser_facture(id_facture):
         # Montant total
         montant_total = float(facture.get('montant', 0))
         
-        # 7. Préparer le payload
+        # 7. Préparer le payload avec le champ operator obligatoire
         invoice_payload = {
             "ifu": nif_vendeur,
             "type": "FV",
@@ -2731,6 +2731,10 @@ def normaliser_facture(id_facture):
                 "name": client.get('nom', 'Client'),
                 "contact": client.get('telephone', ''),
                 "address": client.get('adresse', '')
+            },
+            "operator": {
+                "id": "",
+                "name": settings.get('company_name', 'BTP Devis Pro')
             },
             "payment": [
                 {
