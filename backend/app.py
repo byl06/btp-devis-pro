@@ -2837,13 +2837,27 @@ def generate_pdf_normalise(id_facture):
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm, mm
-        import os
-        import qrcode
-        from io import BytesIO
         from reportlab.lib.utils import ImageReader
+        import os
+        import sys
+        
+        # ============================================================
+        # IMPORT QR CODE AVEC GESTION D'ERREUR
+        # ============================================================
+        try:
+            import qrcode
+            from io import BytesIO
+            QRCODE_AVAILABLE = True
+            print("✅ QRCode library loaded successfully")
+        except ImportError as e:
+            print(f"⚠️ QRCode library not available: {e}")
+            QRCODE_AVAILABLE = False
+            qrcode = None
+            BytesIO = None
         
         print("=" * 60)
         print(f"🔍 Génération PDF normalisé pour facture {id_facture}")
+        print(f"🔍 QRCode disponible: {QRCODE_AVAILABLE}")
         print("=" * 60)
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
@@ -2865,7 +2879,7 @@ def generate_pdf_normalise(id_facture):
             return jsonify({'error': 'Facture non trouvée'}), 404
         
         facture = facture_response.json()[0]
-        print(f"✅ Facture récupérée: {facture.get('id_facture')}")
+        print(f"✅ Facture récupérée: ID {facture.get('id_facture')}")
         
         # Récupérer le devis
         devis_response = requests.get(
@@ -2908,7 +2922,7 @@ def generate_pdf_normalise(id_facture):
             'nif': 'N/A'
         }
         
-        # Créer le PDF - A4 standard
+        # Créer le PDF
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4,
                                 rightMargin=1.5*cm, leftMargin=1.5*cm,
@@ -3097,7 +3111,7 @@ def generate_pdf_normalise(id_facture):
         tva = total_ht * 0.18
         total_ttc = total_ht + tva
         
-        # Lignes de total (compactes)
+        # Lignes de total
         table_data.append(['', '', '', ''])
         table_data.append(['', '', 'Sous-total HT', f"{total_ht:,.0f}"])
         table_data.append(['', '', 'TVA (18%)', f"{tva:,.0f}"])
@@ -3122,7 +3136,7 @@ def generate_pdf_normalise(id_facture):
             ('BACKGROUND', (0, -3), (-1, -1), colors.HexColor('#F1F5F9')),
             ('TEXTCOLOR', (0, -3), (-1, -1), colors.HexColor(primary_color)),
             ('ALIGN', (2, -3), (-1, -1), 'RIGHT'),
-            # Total TTC en vert
+            # Total TTC
             ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
             # Bordures
@@ -3135,14 +3149,15 @@ def generate_pdf_normalise(id_facture):
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # 4. INFORMATIONS FISCALES + QR CODE (sur une ligne)
+        # 4. INFORMATIONS FISCALES + QR CODE
         # ============================================================
         
         # Récupérer le QR Code
-        qr_code_data = facture.get('qr_code')
-        print(f"🔍 QR Code data: {qr_code_data[:50] if qr_code_data else 'None'}")
+        qr_code_data = facture.get('qr_code', '')
+        print(f"🔍 QR Code data: {qr_code_data[:50] if qr_code_data else 'VIDE'}")
+        print(f"🔍 Longueur: {len(qr_code_data) if qr_code_data else 0}")
         
-        # Créer un tableau avec 2 colonnes : Infos fiscales | QR Code
+        # Infos fiscales à gauche
         fiscal_left = f"""
         <b>Informations fiscales</b><br/>
         NIM: {facture.get('num_facture_fiscale', 'N/A')}<br/>
@@ -3153,30 +3168,42 @@ def generate_pdf_normalise(id_facture):
         
         fiscal_left_paragraph = Paragraph(fiscal_left, body_style)
         
-        # QR Code à droite
+        # ===== GÉNÉRATION DU QR CODE =====
         qr_element = None
-        if qr_code_data and len(qr_code_data) > 10:
+        
+        if qr_code_data and len(qr_code_data) > 10 and QRCODE_AVAILABLE:
             try:
-                print("🔍 Génération du QR Code...")
+                print("🔍 Tentative de génération du QR Code...")
+                
+                # Créer le QR Code
                 qr = qrcode.QRCode(
                     version=1,
                     error_correction=qrcode.constants.ERROR_CORRECT_L,
-                    box_size=4,
+                    box_size=5,
                     border=2,
                 )
                 qr.add_data(str(qr_code_data))
                 qr.make(fit=True)
                 
+                # Générer l'image
                 qr_img = qr.make_image(fill_color="black", back_color="white")
                 qr_buffer = BytesIO()
                 qr_img.save(qr_buffer, format='PNG')
                 qr_buffer.seek(0)
+                
+                # Créer l'image ReportLab
                 qr_image = ImageReader(qr_buffer)
                 qr_element = Image(qr_image, width=2.5*cm, height=2.5*cm)
-                print("✅ QR Code généré avec succès")
+                print("✅ QR Code généré avec succès !")
+                
             except Exception as e:
-                print(f"⚠️ Erreur QR Code: {e}")
-                qr_element = Paragraph("⚠️ QR Code non disponible", body_style)
+                print(f"❌ Erreur génération QR Code: {e}")
+                import traceback
+                traceback.print_exc()
+                qr_element = Paragraph(f"⚠️ Erreur QR Code", body_style)
+        elif qr_code_data and len(qr_code_data) > 10 and not QRCODE_AVAILABLE:
+            print("❌ QRCode library non disponible")
+            qr_element = Paragraph("⚠️ QR Code (librairie manquante)", body_style)
         else:
             print("❌ Pas de données QR Code")
             qr_element = Paragraph("⚠️ Aucun QR Code", body_style)
@@ -3192,6 +3219,8 @@ def generate_pdf_normalise(id_facture):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('LEFTPADDING', (0, 0), (-1, -1), 8),
             ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('VALIGN', (1, 0), (1, 0), 'MIDDLE'),
         ]))
         story.append(fiscal_qr_table)
         story.append(Spacer(1, 0.3*cm))
