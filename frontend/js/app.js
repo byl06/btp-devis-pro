@@ -849,7 +849,7 @@ renderFactureTable(factures, type) {
                                         <i class="fas fa-file-invoice"></i>
                                     </button>
                                 ` : `
-                                    <button class="btn-icon" onclick="app.downloadPDFFacture(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
+                                    <button class="btn-icon" onclick="app.downloadPDFNormalisee(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
                                         <i class="fas fa-download"></i>
                                     </button>
                                     <button class="btn-icon" onclick="app.viewFactureNormalisee(${f.id_facture})" title="Voir détails" style="background:#3B82F6;color:white;">
@@ -865,9 +865,10 @@ renderFactureTable(factures, type) {
     `;
 }
 viewFactureNormalisee(id_facture) {
-    // Ouvrir le PDF normalisé directement
-    this.downloadPDFFacture(id_facture);
+    // Ouvrir le PDF normalisé avec le token
+    this.downloadPDFNormalisee(id_facture);
 }
+
     
     renderParametres() {
         return `
@@ -3934,8 +3935,43 @@ async creerFactureNormalisee() {
 // Télécharger PDF facture normalisée
 async downloadPDFFacture(id_facture) {
     try {
-        window.open(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, '_blank');
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Toast.error('❌ Vous devez être connecté');
+            return;
+        }
+        
+        Toast.info('📄 Téléchargement de la facture...');
+        
+        // 🔥 Utiliser fetch avec le token dans les headers
+        const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            Toast.error(error.error || '❌ Erreur');
+            return;
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `facture_${id_facture}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Toast.success('✅ Facture PDF téléchargée');
+        
     } catch (error) {
+        console.error('Erreur downloadFacturePDF:', error);
         Toast.error('❌ Erreur téléchargement');
     }
 }
