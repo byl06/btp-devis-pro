@@ -884,6 +884,9 @@ viewFactureNormalisee(id_facture) {
     }
 
 
+    
+
+
     async reactiverAbonnement(id_user) {
     if (confirm(`Réactiver l'abonnement de l'utilisateur ID ${id_user} ?`)) {
         try {
@@ -4066,7 +4069,54 @@ async saveFiscalSettings() {
         Toast.error('❌ Erreur de connexion');
     }
 }
-
+    // ==================== PDF NORMALISÉ ====================
+    
+    async downloadPDFNormalisee(id_facture) {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('❌ Vous devez être connecté');
+                return;
+            }
+            
+            console.log(`📄 Téléchargement PDF normalisé pour facture ${id_facture}`);
+            
+            const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
+                return;
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `facture_normalisee_${id_facture}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            console.log('✅ PDF normalisé téléchargé');
+            
+        } catch (error) {
+            console.error('Erreur downloadPDFNormalisee:', error);
+            alert('❌ Erreur lors du téléchargement');
+        }
+    }
+    
+    viewFactureNormalisee(id_facture) {
+        console.log(`👁️ Visualisation facture normalisée ${id_facture}`);
+        this.downloadPDFNormalisee(id_facture);
+    }
 // Traduire les textes statiques
 
 }
