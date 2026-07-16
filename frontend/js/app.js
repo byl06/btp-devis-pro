@@ -746,9 +746,14 @@ async exportClientsToExcel() {
         
         console.log("Factures reçues:", factures);
         
-        // 🔥 CORRECTION : Vérifier les deux champs
-        const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee' && f.statut_fiscal !== 'normalisee');
-        const facturesNormalisees = factures.filter(f => f.type_facture === 'normalisee' || f.statut_fiscal === 'normalisee');
+        // Séparer les factures
+        const facturesSimples = factures.filter(f => f.type_facture !== 'normalisee' && f.statut_fiscal !== 'normalisee' && !f.archivee);
+        const facturesNormalisees = factures.filter(f => (f.type_facture === 'normalisee' || f.statut_fiscal === 'normalisee') && !f.archivee);
+        const facturesArchivees = factures.filter(f => f.archivee === true);
+        
+        // Séparer les archives par type
+        const archivesSimples = facturesArchivees.filter(f => f.type_facture !== 'normalisee' && f.statut_fiscal !== 'normalisee');
+        const archivesNormalisees = facturesArchivees.filter(f => f.type_facture === 'normalisee' || f.statut_fiscal === 'normalisee');
         
         // Récupérer l'onglet actif
         const activeTab = this.currentFactureTab || 'simples';
@@ -767,17 +772,22 @@ async exportClientsToExcel() {
                     </div>
                 </div>
                 
-                <!-- Onglets -->
-                <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem;">
+                <!-- Onglets principaux -->
+                <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem; flex-wrap:wrap;">
                     <div class="tab-facture ${activeTab === 'simples' ? 'active' : ''}" 
                          onclick="app.switchFactureTab('simples')" 
-                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'simples' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'simples' ? 'white' : '#94A3B8'};">
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'simples' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'simples' ? 'white' : '#94A3B8'}; transition:all 0.3s;">
                         <i class="fas fa-file-alt"></i> Simples (${facturesSimples.length})
                     </div>
                     <div class="tab-facture ${activeTab === 'normalisees' ? 'active' : ''}" 
                          onclick="app.switchFactureTab('normalisees')" 
-                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'normalisees' ? '#F59E0B' : 'transparent'}; color:${activeTab === 'normalisees' ? '#F59E0B' : '#94A3B8'};">
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'normalisees' ? '#F59E0B' : 'transparent'}; color:${activeTab === 'normalisees' ? '#F59E0B' : '#94A3B8'}; transition:all 0.3s;">
                         <i class="fas fa-check-circle"></i> Normalisées (${facturesNormalisees.length})
+                    </div>
+                    <div class="tab-facture ${activeTab === 'archives' ? 'active' : ''}" 
+                         onclick="app.switchFactureTab('archives')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'archives' ? '#6B7280' : 'transparent'}; color:${activeTab === 'archives' ? 'white' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-archive"></i> Archives (${facturesArchivees.length})
                     </div>
                 </div>
                 
@@ -785,16 +795,131 @@ async exportClientsToExcel() {
                 <div id="factures-content">
                     ${activeTab === 'simples' 
                         ? this.renderFactureTable(facturesSimples, 'simples') 
-                        : this.renderFactureTable(facturesNormalisees, 'normalisees')}
+                        : activeTab === 'normalisees'
+                        ? this.renderFactureTable(facturesNormalisees, 'normalisees')
+                        : this.renderArchivesTable(archivesSimples, archivesNormalisees)}
                 </div>
             </div>
         `;
     } catch (error) {
         console.error('Erreur factures:', error);
-        return '<div class="glass-card">Erreur chargement des factures</div>';
+        return '<div class="glass-card">❌ Erreur chargement des factures</div>';
     }
 }
 
+renderArchivesTable(archivesSimples, archivesNormalisees) {
+    const totalArchives = archivesSimples.length + archivesNormalisees.length;
+    
+    if (totalArchives === 0) {
+        return `
+            <div class="glass-card" style="text-align:center; padding:60px;">
+                <i class="fas fa-archive" style="font-size:48px; opacity:0.5;"></i>
+                <h3>Aucune facture archivée</h3>
+                <p style="color:#94A3B8;">Les factures que vous archivez apparaîtront ici</p>
+            </div>
+        `;
+    }
+    
+    // Récupérer l'onglet actif des archives
+    const activeArchiveTab = this.currentArchiveTab || 'simples';
+    
+    return `
+        <div class="glass-card" style="padding:1.5rem;">
+            <!-- Sous-onglets des archives -->
+            <div style="display:flex; gap:0; border-bottom:2px solid #334155; margin-bottom:1.5rem; flex-wrap:wrap;">
+                <div class="tab-archive ${activeArchiveTab === 'simples' ? 'active' : ''}" 
+                     onclick="app.switchArchiveTab('simples')" 
+                     style="padding:8px 16px; cursor:pointer; border-bottom:3px solid ${activeArchiveTab === 'simples' ? '#06B6D4' : 'transparent'}; color:${activeArchiveTab === 'simples' ? 'white' : '#94A3B8'}; transition:all 0.3s; font-size:0.85rem;">
+                    <i class="fas fa-file-alt"></i> Simples archivées (${archivesSimples.length})
+                </div>
+                <div class="tab-archive ${activeArchiveTab === 'normalisees' ? 'active' : ''}" 
+                     onclick="app.switchArchiveTab('normalisees')" 
+                     style="padding:8px 16px; cursor:pointer; border-bottom:3px solid ${activeArchiveTab === 'normalisees' ? '#F59E0B' : 'transparent'}; color:${activeArchiveTab === 'normalisees' ? '#F59E0B' : '#94A3B8'}; transition:all 0.3s; font-size:0.85rem;">
+                    <i class="fas fa-check-circle"></i> Normalisées archivées (${archivesNormalisees.length})
+                </div>
+            </div>
+            
+            <!-- Contenu des archives -->
+            <div id="archives-content">
+                ${activeArchiveTab === 'simples' 
+                    ? this.renderArchiveTable(archivesSimples, 'simples')
+                    : this.renderArchiveTable(archivesNormalisees, 'normalisees')}
+            </div>
+        </div>
+    `;
+}
+
+renderArchiveTable(archives, type) {
+    if (!archives || archives.length === 0) {
+        return `
+            <div style="text-align:center; padding:40px; color:#94A3B8;">
+                <i class="fas fa-archive" style="font-size:32px; opacity:0.5;"></i>
+                <p>Aucune facture ${type === 'simples' ? 'simple' : 'normalisée'} archivée</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="table-container" style="padding:0; background:transparent; backdrop-filter:none;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>N° Facture</th>
+                        <th>Client</th>
+                        <th>Date</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th>Date archivage</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${archives.map(f => `
+                        <tr>
+                            <td>#${f.id_facture}</td>
+                            <td>${f.client_nom || '-'}</td>
+                            <td>${new Date(f.date_facture).toLocaleDateString()}</td>
+                            <td>${(f.montant || 0).toLocaleString()} FCFA</td>
+                            <td>
+                                <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
+                                    ${f.statut === 'payée' ? '✅ Payée' : '⏳ Non payée'}
+                                </span>
+                                ${type === 'normalisees' ? '<span class="status-badge" style="background:rgba(16,185,129,0.2);color:#10B981;margin-left:5px;">📄 Normalisée</span>' : ''}
+                            </td>
+                            <td>${f.date_archivage ? new Date(f.date_archivage).toLocaleDateString() : '-'}</td>
+                            <td>
+                                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                    <!-- Restaurer -->
+                                    <button class="btn-icon" onclick="app.desarchiverFacture(${f.id_facture})" title="Restaurer" style="background:#10B981;color:white;">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                    <!-- PDF -->
+                                    <button class="btn-icon" onclick="app.download${type === 'normalisees' ? 'PDFNormalisee' : 'FacturePDF'}(${f.id_facture})" title="PDF" style="background:#EF4444;color:white;">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </button>
+                                    ${type === 'normalisees' ? `
+                                        <button class="btn-icon" onclick="app.viewFactureNormalisee(${f.id_facture})" title="Voir QR Code" style="background:#3B82F6;color:white;">
+                                            <i class="fas fa-qrcode"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// ==================== NAVIGATION ONGLETS ====================
+
+
+
+switchArchiveTab(tab) {
+    this.currentArchiveTab = tab;
+    this.loadPage('factures');
+}
 
 renderFactureTable(factures, type) {
     if (!factures || factures.length === 0) {
@@ -807,19 +932,10 @@ renderFactureTable(factures, type) {
         `;
     }
     
-    // Séparer les factures actives et archivées
-    const facturesActives = factures.filter(f => !f.archivee);
-    const facturesArchivees = factures.filter(f => f.archivee);
-    
-    let html = `
+    return `
         <div class="table-container">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
-                <h3>Factures actives (${facturesActives.length})</h3>
-                ${facturesArchivees.length > 0 ? `
-                    <button class="btn-secondary" onclick="app.afficherArchivees()" style="background:#6B7280; border-color:#6B7280;">
-                        <i class="fas fa-archive"></i> Archives (${facturesArchivees.length})
-                    </button>
-                ` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
+                <h3>${type === 'simples' ? 'Factures simples' : 'Factures normalisées'} (${factures.length})</h3>
             </div>
             <table class="data-table">
                 <thead>
@@ -834,24 +950,11 @@ renderFactureTable(factures, type) {
                     </tr>
                 </thead>
                 <tbody>
-    `;
-    
-    // Factures actives
-    if (facturesActives.length === 0) {
-        html += `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94A3B8;">Aucune facture active</td></tr>`;
-    } else {
-        facturesActives.forEach(f => {
-            html += this.renderFactureRow(f, type);
-        });
-    }
-    
-    html += `
+                    ${factures.map(f => this.renderFactureRow(f, type)).join('')}
                 </tbody>
             </table>
         </div>
     `;
-    
-    return html;
 }
 
 renderFactureRow(f, type) {
@@ -871,7 +974,6 @@ renderFactureRow(f, type) {
                     ${estPayee ? '✅ Payée' : '⏳ Non payée'}
                 </span>
                 ${estNormalisee ? '<span class="status-badge" style="background:rgba(16,185,129,0.2);color:#10B981;margin-left:5px;">📄 Normalisée</span>' : ''}
-                ${estArchivee ? '<span class="status-badge" style="background:rgba(107,114,128,0.2);color:#6B7280;margin-left:5px;">📦 Archivée</span>' : ''}
             </td>
             <td>
                 <div style="display:flex; gap:4px; flex-wrap:wrap;">
@@ -904,17 +1006,10 @@ renderFactureRow(f, type) {
                         </span>
                     `}
                     
-                    ${!estArchivee ? `
-                        <!-- Archiver -->
-                        <button class="btn-icon" onclick="app.archiverFacture(${f.id_facture})" title="Archiver" style="background:#6B7280;color:white;">
-                            <i class="fas fa-archive"></i>
-                        </button>
-                    ` : `
-                        <!-- Désarchiver -->
-                        <button class="btn-icon" onclick="app.desarchiverFacture(${f.id_facture})" title="Restaurer" style="background:#10B981;color:white;">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                    `}
+                    <!-- Archiver -->
+                    <button class="btn-icon" onclick="app.archiverFacture(${f.id_facture})" title="Archiver" style="background:#6B7280;color:white;">
+                        <i class="fas fa-archive"></i>
+                    </button>
                 </div>
             </td>
         </tr>
