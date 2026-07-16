@@ -1191,6 +1191,16 @@ viewFactureNormalisee(id_facture) {
         const response = await apiRequest(`/api/devis/${id}`);
         const devis = await response.json();
         
+        // Récupérer les situations si disponibles
+        let situations = [];
+        try {
+            const situationsResponse = await apiRequest(`/api/devis/${id}/situations`);
+            situations = await situationsResponse.json();
+            devis.situations = situations;
+        } catch (e) {
+            devis.situations = [];
+        }
+        
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -1223,7 +1233,7 @@ viewFactureNormalisee(id_facture) {
                                     <th style="padding:10px; text-align:center;">Qté</th>
                                     <th style="padding:10px; text-align:right;">Prix unitaire</th>
                                     <th style="padding:10px; text-align:right;">Total</th>
-                                 </tr>
+                                </tr>
                             </thead>
                             <tbody>
                                 ${devis.lignes.map(ligne => `
@@ -1252,21 +1262,87 @@ viewFactureNormalisee(id_facture) {
                         </table>
                     </div>
                     
+                    <!-- ========================================================== -->
+                    <!-- 🔥 NOUVELLE SECTION : SITUATIONS DE TRAVAUX ET ACOMPTE      -->
+                    <!-- ========================================================== -->
+                    
+                    ${devis.situations && devis.situations.length > 0 ? `
+                    <div style="margin:20px 0;">
+                        <h3><i class="fas fa-chart-bar"></i> Situations de travaux</h3>
+                        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                            <thead>
+                                <tr style="background:rgba(255,255,255,0.05);">
+                                    <th style="padding:10px; text-align:left;">N°</th>
+                                    <th style="padding:10px; text-align:left;">Pourcentage</th>
+                                    <th style="padding:10px; text-align:right;">Montant</th>
+                                    <th style="padding:10px; text-align:left;">Statut</th>
+                                    <th style="padding:10px; text-align:left;">Travaux</th>
+                                    <th style="padding:10px; text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${devis.situations.map(s => `
+                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                                        <td style="padding:10px;">#${s.numero}</td>
+                                        <td style="padding:10px;">${s.pourcentage}%</td>
+                                        <td style="padding:10px; text-align:right;">${s.montant.toLocaleString()} FCFA</td>
+                                        <td style="padding:10px;">
+                                            <span class="status-badge ${s.statut === 'payee' ? 'success' : 'warning'}">
+                                                ${s.statut === 'payee' ? '✅ Payée' : '⏳ En attente'}
+                                            </span>
+                                        </td>
+                                        <td style="padding:10px; max-width:200px; word-wrap:break-word;">${s.travaux_realises || '-'}</td>
+                                        <td style="padding:10px; text-align:center;">
+                                            ${s.statut !== 'payee' ? `
+                                                <button class="btn-icon" onclick="app.payerSituation(${s.id_situation})" title="Marquer payée" style="background:#10B981;color:white;">
+                                                    <i class="fas fa-credit-card"></i>
+                                                </button>
+                                            ` : `
+                                                <span style="color:#10B981;">✅ Payé</span>
+                                            `}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- Boutons pour l'acompte et les situations -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
-    <button onclick="app.downloadPDF(${devis.id_devis})" class="btn-primary">
-        <i class="fas fa-download"></i> Télécharger PDF
-    </button>
-    
-    ${devis.statut === 'brouillon' ? `
-        <button onclick="app.validateDevis(${devis.id_devis})" class="btn-secondary" style="background:#F59E0B; border-color:#F59E0B;">
-            <i class="fas fa-check"></i> Valider le devis
-        </button>
-    ` : `
-        <button onclick="app.createFacture(${devis.id_devis})" class="btn-secondary" style="background:#8B5CF6; border-color:#8B5CF6;">
-            <i class="fas fa-receipt"></i> Générer facture
-        </button>
-    `}
-</div>
+                        ${devis.acompte_pourcentage === 0 ? `
+                            <button onclick="app.configurerAcompte(${devis.id_devis})" class="btn-secondary" style="background:#F59E0B; border-color:#F59E0B;">
+                                <i class="fas fa-hand-holding-usd"></i> Configurer l'acompte
+                            </button>
+                        ` : `
+                            <span style="background:rgba(16,185,129,0.2); color:#10B981; padding:8px 16px; border-radius:8px; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-check-circle"></i> Acompte ${devis.acompte_pourcentage}% (${devis.acompte_montant.toLocaleString()} FCFA)
+                                ${devis.acompte_paye ? '✅ Payé' : '⏳ En attente'}
+                            </span>
+                            <button onclick="app.creerSituation(${devis.id_devis})" class="btn-primary" style="background:#8B5CF6; border-color:#8B5CF6;">
+                                <i class="fas fa-plus"></i> Ajouter une situation
+                            </button>
+                        `}
+                    </div>
+                    
+                    <!-- ========================================================== -->
+                    <!-- FIN NOUVELLE SECTION                                       -->
+                    <!-- ========================================================== -->
+                    
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
+                        <button onclick="app.downloadPDF(${devis.id_devis})" class="btn-primary">
+                            <i class="fas fa-download"></i> Télécharger PDF
+                        </button>
+                        ${devis.statut === 'brouillon' ? `
+                            <button onclick="app.validateDevis(${devis.id_devis})" class="btn-secondary" style="background:#F59E0B; border-color:#F59E0B;">
+                                <i class="fas fa-check"></i> Valider le devis
+                            </button>
+                        ` : `
+                            <button onclick="app.createFacture(${devis.id_devis})" class="btn-secondary" style="background:#8B5CF6; border-color:#8B5CF6;">
+                                <i class="fas fa-receipt"></i> Générer facture
+                            </button>
+                        `}
+                    </div>
                 </div>
             </div>
         `;
@@ -2805,6 +2881,124 @@ async previewImportedHeader() {
     } catch (error) {
         console.error('Erreur previewImportedHeader:', error);
         Toast.error('❌ Erreur génération aperçu');
+    }
+}
+
+async configurerAcompte(id_devis) {
+    try {
+        const response = await apiRequest(`/api/devis/${id_devis}`);
+        const devis = await response.json();
+        
+        const pourcentage = prompt(
+            `💰 Configuration de l'acompte\n\n` +
+            `Devis #${id_devis}\n` +
+            `Montant total: ${devis.total.toLocaleString()} FCFA\n\n` +
+            `Entrez le pourcentage d'acompte (0-100) :`,
+            '20'
+        );
+        
+        if (pourcentage === null) return;
+        
+        const pct = parseInt(pourcentage);
+        if (isNaN(pct) || pct < 0 || pct > 100) {
+            Toast.error('❌ Pourcentage invalide (0-100)');
+            return;
+        }
+        
+        const result = await apiRequest(`/api/devis/${id_devis}/acompte`, {
+            method: 'POST',
+            body: JSON.stringify({ pourcentage: pct })
+        });
+        const data = await result.json();
+        
+        if (data.success) {
+            Toast.success(`✅ Acompte configuré : ${pct}% (${data.acompte_montant.toLocaleString()} FCFA)`);
+            this.loadPage('devis');
+        } else {
+            Toast.error(data.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+async creerSituation(id_devis) {
+    try {
+        // Récupérer les situations existantes
+        const situationsResponse = await apiRequest(`/api/devis/${id_devis}/situations`);
+        const situations = await situationsResponse.json();
+        
+        const devisResponse = await apiRequest(`/api/devis/${id_devis}`);
+        const devis = await devisResponse.json();
+        
+        const total = devis.total || 0;
+        const acompte = devis.acompte_montant || 0;
+        const montantRestant = total - acompte;
+        const situationsExistantes = situations.length;
+        
+        const pourcentage = prompt(
+            `📊 Nouvelle situation de travaux\n\n` +
+            `Devis #${id_devis}\n` +
+            `Montant total: ${total.toLocaleString()} FCFA\n` +
+            `Acompte: ${acompte.toLocaleString()} FCFA\n` +
+            `Montant restant: ${montantRestant.toLocaleString()} FCFA\n` +
+            `Situations déjà créées: ${situationsExistantes}\n\n` +
+            `Entrez le pourcentage pour cette situation (0-100) :`,
+            '30'
+        );
+        
+        if (pourcentage === null) return;
+        
+        const pct = parseInt(pourcentage);
+        if (isNaN(pct) || pct < 0 || pct > 100) {
+            Toast.error('❌ Pourcentage invalide (0-100)');
+            return;
+        }
+        
+        const travaux = prompt(
+            `📝 Travaux réalisés pour cette situation :\n` +
+            `(Décrivez les travaux effectués)`,
+            ''
+        );
+        
+        const result = await apiRequest(`/api/devis/${id_devis}/situation`, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                pourcentage: pct,
+                travaux_realises: travaux || ''
+            })
+        });
+        const data = await result.json();
+        
+        if (data.success) {
+            Toast.success(`✅ Situation ${data.numero} créée : ${data.montant.toLocaleString()} FCFA`);
+            this.loadPage('devis');
+        } else {
+            Toast.error(data.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+
+async payerSituation(id_situation) {
+    if (!confirm('💰 Marquer cette situation comme payée ?')) return;
+    
+    try {
+        const response = await apiRequest(`/api/situation/${id_situation}/payer`, {
+            method: 'PUT'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Situation marquée comme payée');
+            this.loadPage('devis');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
     }
 }
 

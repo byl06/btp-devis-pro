@@ -2,6 +2,8 @@ from flask_mail import Mail, Message
 from emcf import EMCFClient
 import qrcode
 from io import BytesIO
+from datetime import datetime, timedelta
+import json
 from emcf import EMCFClient, build_invoice_data
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -3201,6 +3203,177 @@ def generate_pdf_normalise(id_facture):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/devis/<int:id_devis>/acompte', methods=['POST'])
+@jwt_required()
+def configurer_acompte(id_devis):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis existe
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,total",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        pourcentage = data.get('pourcentage', 0)
+        montant = float(devis.get('total', 0)) * (pourcentage / 100)
+        
+        update_data = {
+            "acompte_pourcentage": pourcentage,
+            "acompte_montant": round(montant, 2),
+            "acompte_paye": False
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({
+                'success': True,
+                'message': 'Acompte configuré avec succès',
+                'acompte_montant': round(montant, 2)
+            })
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur configurer_acompte: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+    
+
+@app.route('/api/devis/<int:id_devis>/situations', methods=['GET'])
+@jwt_required()
+def get_situations(id_devis):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'error': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        # Récupérer les situations
+        response = requests.get(
+            f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}&order=numero.asc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([]), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur get_situations: {e}")
+        return jsonify([]), 500
+
+@app.route('/api/situation/<int:id_situation>/payer', methods=['PUT'])
+@jwt_required()
+def payer_situation(id_situation):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que la situation existe
+        situation_response = requests.get(
+            f"{supabase_url}/rest/v1/situation_devis?id_situation=eq.{id_situation}&select=id_devis",
+            headers=headers
+        )
+        
+        if situation_response.status_code != 200 or not situation_response.json():
+            return jsonify({'success': False, 'message': 'Situation non trouvée'}), 404
+        
+        situation = situation_response.json()[0]
+        id_devis = situation.get('id_devis')
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Marquer comme payée
+        update_data = {
+            "statut": "payee",
+            "date_paiement": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/situation_devis?id_situation=eq.{id_situation}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Situation marquée comme payée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur payer_situation: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 # ==================== ARCHIVAGE FACTURES ====================
