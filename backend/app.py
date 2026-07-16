@@ -480,11 +480,15 @@ def create_projet():
         if not ok:
             return jsonify({'success': False, 'message': message}), 403
         
-        # Créer le projet
+        # Créer le projet avec les nouveaux champs
         projet_data = {
             "nom_projet": data.get('nom_projet'),
             "description": data.get('description'),
             "localisation": data.get('localisation'),
+            "statut": data.get('statut', 'en_attente'),
+            "date_debut": data.get('date_debut'),
+            "date_fin": data.get('date_fin'),
+            "progression": data.get('progression', 0),
             "id_user": user_id
         }
         
@@ -498,10 +502,6 @@ def create_projet():
             return jsonify({'success': True, 'message': 'Projet créé'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
-        
-    except Exception as e:
-        print(f"❌ Erreur create_projet: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
         
     except Exception as e:
         print(f"❌ Erreur create_projet: {e}")
@@ -540,11 +540,15 @@ def update_projet(id_projet):
         if projet.get('id_user') != user_id:
             return jsonify({'success': False, 'message': 'Non autorisé'}), 403
         
-        # Mettre à jour le projet
+        # Mettre à jour le projet avec tous les champs
         update_data = {
             "nom_projet": data.get('nom_projet'),
             "description": data.get('description'),
-            "localisation": data.get('localisation')
+            "localisation": data.get('localisation'),
+            "statut": data.get('statut', 'en_attente'),
+            "date_debut": data.get('date_debut'),
+            "date_fin": data.get('date_fin'),
+            "progression": data.get('progression', 0)
         }
         
         response = requests.patch(

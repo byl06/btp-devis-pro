@@ -709,32 +709,79 @@ async exportClientsToExcel() {
 }
 
     async renderProjets() {
-        const projets = this.safeArray(await this.fetchProjets());
-        
-        if (projets.length === 0) {
-            return `<div class="glass-card"><p>Aucun projet</p><button class="btn-primary" onclick="app.openCreateProjetModal()">+ Ajouter un projet</button></div>`;
-        }
-        
+    const projets = this.safeArray(await this.fetchProjets());
+    
+    if (projets.length === 0) {
         return `
-            <div class="cards-grid">
-                ${projets.map(p => `
-                    <div class="glass-card">
-                        <div class="card-icon"><i class="fas fa-hard-hat"></i></div>
-                        <div class="card-title">${p.nom_projet}</div>
-                        <p>${p.description || ''}</p>
-                        <p>${p.localisation || ''}</p>
-                        <div style="margin-top:1rem; display:flex; gap:0.5rem">
-                            <button class="btn-icon" onclick="app.editProjet(${p.id_projet})"><i class="fas fa-edit"></i></button>
-                            <button class="btn-icon" onclick="app.deleteProjet(${p.id_projet})"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </div>
-                `).join('')}
-                <div class="glass-card" style="display:flex; justify-content:center; align-items:center">
-                    <button class="btn-primary" onclick="app.openCreateProjetModal()">+ Ajouter</button>
-                </div>
+            <div class="glass-card" style="text-align:center; padding:60px;">
+                <p>Aucun projet</p>
+                <button class="btn-primary" onclick="app.openCreateProjetModal()">+ Ajouter un projet</button>
             </div>
         `;
     }
+    
+    // Fonction pour le statut avec badge
+    const getStatusBadge = (statut) => {
+        const statusMap = {
+            'en_attente': { label: '⏳ En attente', color: '#F59E0B' },
+            'en_cours': { label: '🔄 En cours', color: '#06B6D4' },
+            'termine': { label: '✅ Terminé', color: '#10B981' }
+        };
+        const s = statusMap[statut] || statusMap['en_attente'];
+        return `<span style="background:${s.color}22; color:${s.color}; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600;">${s.label}</span>`;
+    };
+    
+    // Fonction pour la barre de progression
+    const getProgressBar = (progression) => {
+        const color = progression < 33 ? '#F59E0B' : progression < 66 ? '#06B6D4' : '#10B981';
+        return `
+            <div style="width:100%; background:#1E293B; border-radius:10px; height:8px; overflow:hidden;">
+                <div style="width:${progression}%; background:${color}; height:100%; border-radius:10px; transition:width 0.5s;"></div>
+            </div>
+            <span style="font-size:0.7rem; color:#94A3B8; margin-top:2px;">${progression}%</span>
+        `;
+    };
+    
+    return `
+        <div class="cards-grid">
+            ${projets.map(p => `
+                <div class="glass-card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
+                        <div class="card-icon" style="background:linear-gradient(135deg, var(--primary), var(--secondary));">
+                            <i class="fas fa-hard-hat"></i>
+                        </div>
+                        ${getStatusBadge(p.statut)}
+                    </div>
+                    <div class="card-title" style="font-size:1.1rem; font-weight:600;">${p.nom_projet}</div>
+                    <p style="font-size:0.85rem; color:#94A3B8; margin:5px 0;">${p.description || ''}</p>
+                    <p style="font-size:0.85rem; color:#94A3B8; margin:5px 0;">
+                        <i class="fas fa-map-marker-alt"></i> ${p.localisation || 'Non renseignée'}
+                    </p>
+                    <div style="margin:10px 0; display:flex; gap:1rem; font-size:0.8rem; color:#94A3B8; flex-wrap:wrap;">
+                        ${p.date_debut ? `<span><i class="fas fa-calendar-alt"></i> Début: ${new Date(p.date_debut).toLocaleDateString()}</span>` : ''}
+                        ${p.date_fin ? `<span><i class="fas fa-calendar-check"></i> Fin: ${new Date(p.date_fin).toLocaleDateString()}</span>` : ''}
+                    </div>
+                    <div style="margin:10px 0;">
+                        ${getProgressBar(p.progression || 0)}
+                    </div>
+                    <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn-icon" onclick="app.editProjet(${p.id_projet})" title="Modifier">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon" onclick="app.deleteProjet(${p.id_projet})" title="Supprimer">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+            <div class="glass-card" style="display:flex; justify-content:center; align-items:center; min-height:200px; border:2px dashed #334155;">
+                <button class="btn-primary" onclick="app.openCreateProjetModal()" style="padding:15px 30px;">
+                    <i class="fas fa-plus"></i> Nouveau projet
+                </button>
+            </div>
+        </div>
+    `;
+}
     
     async renderFactures() {
     try {
@@ -1341,9 +1388,7 @@ async exportDevisToExcel() {
         alert('Fonctionnalité à implémenter');
     }
     
-    openCreateProjetModal() {
-        alert('Fonctionnalité à implémenter');
-    }
+    
     
     openCreateDevisModal() {
         alert('Fonctionnalité à implémenter');
@@ -1489,9 +1534,9 @@ openCreateProjetModal() {
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
-                <h2>Nouveau projet</h2>
+                <h2><i class="fas fa-hard-hat"></i> Nouveau projet</h2>
                 <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
             </div>
             <div class="modal-body">
@@ -1508,6 +1553,34 @@ openCreateProjetModal() {
                         <label>Localisation</label>
                         <input type="text" id="projet-localisation">
                     </div>
+                    <div class="form-group">
+                        <label>Statut</label>
+                        <select id="projet-statut">
+                            <option value="en_attente">⏳ En attente</option>
+                            <option value="en_cours">🔄 En cours</option>
+                            <option value="termine">✅ Terminé</option>
+                        </select>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Date de début</label>
+                            <input type="date" id="projet-date-debut">
+                        </div>
+                        <div class="form-group">
+                            <label>Date de fin</label>
+                            <input type="date" id="projet-date-fin">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Progression (%)</label>
+                        <input type="range" id="projet-progression" min="0" max="100" value="0" 
+                               oninput="document.getElementById('progression-value').textContent = this.value + '%'">
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94A3B8;">
+                            <span>0%</span>
+                            <span id="progression-value">0%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-primary">Créer</button>
                         <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -1519,61 +1592,63 @@ openCreateProjetModal() {
     
     document.body.appendChild(modal);
     
+    // Fermeture
     const closeBtns = modal.querySelectorAll('.close-modal');
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     
-    // Soumission avec verrou anti-doublon
-const form = modal.querySelector('#projet-form');
-let isSubmitting = false;
-
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+    // Soumission
+    const form = modal.querySelector('#projet-form');
+    let isSubmitting = false;
     
-    if (isSubmitting) {
-        console.log("⏳ Déjà en cours...");
-        return;
-    }
-    
-    const limitesOk = await this.checkLimites('projet');
-    if (!limitesOk) return;
-    
-    const projetData = {
-        nom_projet: document.getElementById('projet-nom').value,
-        description: document.getElementById('projet-description').value,
-        localisation: document.getElementById('projet-localisation').value
-    };
-    
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    
-    isSubmitting = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
-    submitBtn.disabled = true;
-    
-    try {
-        const response = await apiRequest('/api/projets', {
-            method: 'POST',
-            body: JSON.stringify(projetData)
-        });
-        const result = await response.json();
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        if (result.success) {
-            Toast.success('Projet créé avec succès');
-            modal.remove();
-            this.loadPage('projets');
-        } else {
-            Toast.error(result.message || 'Erreur lors de la création');
+        if (isSubmitting) return;
+        
+        const limitesOk = await this.checkLimites('projet');
+        if (!limitesOk) return;
+        
+        const projetData = {
+            nom_projet: document.getElementById('projet-nom').value,
+            description: document.getElementById('projet-description').value,
+            localisation: document.getElementById('projet-localisation').value,
+            statut: document.getElementById('projet-statut').value,
+            date_debut: document.getElementById('projet-date-debut').value || null,
+            date_fin: document.getElementById('projet-date-fin').value || null,
+            progression: parseInt(document.getElementById('projet-progression').value) || 0
+        };
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        isSubmitting = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await apiRequest('/api/projets', {
+                method: 'POST',
+                body: JSON.stringify(projetData)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                Toast.success('Projet créé avec succès');
+                modal.remove();
+                this.loadPage('projets');
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+                isSubmitting = false;
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            Toast.error('❌ Erreur de connexion');
             isSubmitting = false;
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         }
-    } catch (error) {
-        alert('❌ Erreur de connexion');
-        isSubmitting = false;
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-});
+    });
 }
 
 openCreateDevisModal() {
@@ -1982,12 +2057,11 @@ async editClient(id) {
 
 async editProjet(id) {
     try {
-        // Récupérer les infos du projet
         const projets = await this.fetchProjets();
         const projet = projets.find(p => p.id_projet === id);
         
         if (!projet) {
-            alert('Projet non trouvé');
+            Toast.error('Projet non trouvé');
             return;
         }
         
@@ -1995,7 +2069,7 @@ async editProjet(id) {
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width:500px;">
+            <div class="modal-content" style="max-width:600px;">
                 <div class="modal-header">
                     <h2><i class="fas fa-edit"></i> Modifier le projet</h2>
                     <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
@@ -2013,6 +2087,34 @@ async editProjet(id) {
                         <div class="form-group">
                             <label>Localisation</label>
                             <input type="text" id="edit-projet-localisation" value="${projet.localisation || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Statut</label>
+                            <select id="edit-projet-statut">
+                                <option value="en_attente" ${projet.statut === 'en_attente' ? 'selected' : ''}>⏳ En attente</option>
+                                <option value="en_cours" ${projet.statut === 'en_cours' ? 'selected' : ''}>🔄 En cours</option>
+                                <option value="termine" ${projet.statut === 'termine' ? 'selected' : ''}>✅ Terminé</option>
+                            </select>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                            <div class="form-group">
+                                <label>Date de début</label>
+                                <input type="date" id="edit-projet-date-debut" value="${projet.date_debut || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Date de fin</label>
+                                <input type="date" id="edit-projet-date-fin" value="${projet.date_fin || ''}">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Progression (%)</label>
+                            <input type="range" id="edit-projet-progression" min="0" max="100" value="${projet.progression || 0}" 
+                                   oninput="document.getElementById('edit-progression-value').textContent = this.value + '%'">
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94A3B8;">
+                                <span>0%</span>
+                                <span id="edit-progression-value">${projet.progression || 0}%</span>
+                                <span>100%</span>
+                            </div>
                         </div>
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">Enregistrer</button>
@@ -2037,7 +2139,11 @@ async editProjet(id) {
             const projetData = {
                 nom_projet: document.getElementById('edit-projet-nom').value,
                 description: document.getElementById('edit-projet-description').value,
-                localisation: document.getElementById('edit-projet-localisation').value
+                localisation: document.getElementById('edit-projet-localisation').value,
+                statut: document.getElementById('edit-projet-statut').value,
+                date_debut: document.getElementById('edit-projet-date-debut').value || null,
+                date_fin: document.getElementById('edit-projet-date-fin').value || null,
+                progression: parseInt(document.getElementById('edit-projet-progression').value) || 0
             };
             
             try {
@@ -2048,20 +2154,20 @@ async editProjet(id) {
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('✅ Projet modifié avec succès !');
+                    Toast.success('✅ Projet modifié avec succès');
                     modal.remove();
                     this.loadPage('projets');
                 } else {
-                    alert('❌ Erreur: ' + result.message);
+                    Toast.error('❌ Erreur: ' + result.message);
                 }
             } catch (error) {
-                alert('❌ Erreur de connexion');
+                Toast.error('❌ Erreur de connexion');
             }
         });
         
     } catch (error) {
         console.error('Erreur:', error);
-        alert('Erreur lors du chargement du projet');
+        Toast.error('Erreur lors du chargement du projet');
     }
 }
 
