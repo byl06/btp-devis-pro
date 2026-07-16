@@ -3776,20 +3776,22 @@ getOffreColor(offre) {
 getAbonnementActions(a) {
     const actions = [];
     
-    // Offres disponibles
+    // 🔥 OFFRES DISPONIBLES AVEC ARTISAN
     const offres = [
-        { type: 'artisan', icon: 'fa-hammer', color: '#D97706', label: 'Artisan' },
-        { type: 'starter', icon: 'fa-leaf', color: '#10B981', label: 'Starter' },
-        { type: 'pro', icon: 'fa-crown', color: '#3B82F6', label: 'Pro' },
-        { type: 'annuel', icon: 'fa-gem', color: '#F59E0B', label: 'Annuel' }
+        { type: 'artisan', icon: 'fa-hammer', color: '#D97706', label: 'Artisan', prix: '7 000' },
+        { type: 'starter', icon: 'fa-leaf', color: '#10B981', label: 'Starter', prix: '15 000' },
+        { type: 'pro', icon: 'fa-crown', color: '#3B82F6', label: 'Pro', prix: '30 000' },
+        { type: 'annuel', icon: 'fa-gem', color: '#F59E0B', label: 'Annuel', prix: '250 000' }
     ];
     
     // Boutons pour chaque offre
     offres.forEach(o => {
         if (a.type_abonnement !== o.type) {
             actions.push(`
-                <button class="btn-icon" onclick="app.changerOffre(${a.id_user}, '${o.type}')" 
-                        title="Passer à ${o.label}" style="background:${o.color}; color:white; width:32px; height:32px;">
+                <button class="btn-icon" onclick="app.prolongerAbonnement(${a.id_user}, ${this.getOffreDuree(o.type)}, ${this.getOffrePrix(o.type)}, '${o.type}')" 
+                        title="Passer à ${o.label} (${o.prix} FCFA)" 
+                        style="background:${o.color}; color:white; width:34px; height:34px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.3s;"
+                        onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                     <i class="fas ${o.icon}"></i>
                 </button>
             `);
@@ -3800,14 +3802,16 @@ getAbonnementActions(a) {
     if (a.statut === 'actif') {
         actions.push(`
             <button class="btn-icon" onclick="app.suspendreAbonnement(${a.id_user})" 
-                    title="Suspendre" style="background:#EF4444; color:white; width:32px; height:32px;">
+                    title="Suspendre" style="background:#EF4444; color:white; width:34px; height:34px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.3s;"
+                    onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                 <i class="fas fa-pause"></i>
             </button>
         `);
     } else if (a.statut === 'suspendu') {
         actions.push(`
             <button class="btn-icon" onclick="app.reactiverAbonnement(${a.id_user})" 
-                    title="Réactiver" style="background:#10B981; color:white; width:32px; height:32px;">
+                    title="Réactiver" style="background:#10B981; color:white; width:34px; height:34px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.3s;"
+                    onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                 <i class="fas fa-play"></i>
             </button>
         `);
@@ -3816,13 +3820,34 @@ getAbonnementActions(a) {
     // Bouton historique
     actions.push(`
         <button class="btn-icon" onclick="app.voirPaiements(${a.id_user})" 
-                title="Historique" style="background:#6B7280; color:white; width:32px; height:32px;">
+                title="Historique" style="background:#6B7280; color:white; width:34px; height:34px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.3s;"
+                onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-history"></i>
         </button>
     `);
     
     return actions.join('');
 }
+getOffreDuree(type) {
+    const durees = {
+        artisan: 30,
+        starter: 30,
+        pro: 30,
+        annuel: 365
+    };
+    return durees[type] || 30;
+}
+
+getOffrePrix(type) {
+    const prix = {
+        artisan: 7000,
+        starter: 15000,
+        pro: 30000,
+        annuel: 250000
+    };
+    return prix[type] || 0;
+}
+
 
 calculerRevenusMensuels(abonnements) {
     const prix = {
@@ -3902,7 +3927,7 @@ async prolongerAbonnement(id_user, jours, montant, offreType) {
     const methode = prompt(
         `💰 Confirmation paiement\n\n` +
         `Client: ID ${id_user}\n` +
-        `Offre: ${offreType}\n` +
+        `Offre: ${this.getOffreLabel(offreType)}\n` +
         `Durée: ${jours} jours\n` +
         `Montant: ${montant.toLocaleString()} FCFA\n\n` +
         `Méthode de paiement reçue ?\n` +
@@ -3914,7 +3939,7 @@ async prolongerAbonnement(id_user, jours, montant, offreType) {
     
     if (!methode) return;
     
-    if (confirm(`✅ Confirmer le paiement de ${montant.toLocaleString()} FCFA pour l'offre ${offreType} ?`)) {
+    if (confirm(`✅ Confirmer le paiement de ${montant.toLocaleString()} FCFA pour l'offre ${this.getOffreLabel(offreType)} ?`)) {
         try {
             const response = await apiRequest(`/api/admin/abonnement/${id_user}/prolonger`, {
                 method: 'POST',
@@ -3922,7 +3947,7 @@ async prolongerAbonnement(id_user, jours, montant, offreType) {
             });
             const result = await response.json();
             if (result.success) {
-                Toast.success(`✅ Abonnement ${offreType} prolongé de ${jours} jours !`);
+                Toast.success(`✅ Abonnement ${this.getOffreLabel(offreType)} prolongé de ${jours} jours !`);
                 this.loadPage('admin');
             } else {
                 Toast.error(result.error || 'Erreur');
@@ -3932,6 +3957,8 @@ async prolongerAbonnement(id_user, jours, montant, offreType) {
         }
     }
 }
+
+
 
 // Afficher le bandeau d'abonnement dans le dashboard
 translatePage() {
@@ -4434,7 +4461,6 @@ safeArray(data) {
 async checkLimites(operation) {
     const user = this.currentUser;
     
-    // Admin = illimité (mais on vérifie quand même son statut)
     if (user && (user.email === 'admin@btp.com' || user.email === 'bylgaitb@gmail.com')) {
         console.log("👑 Admin détecté - pas de limites");
         return true;
@@ -4446,25 +4472,21 @@ async checkLimites(operation) {
         
         console.log("🔍 checkLimites - data:", data);
         
-        // ❌ PAS D'ABONNEMENT
         if (!data.success) {
             Toast.warning('⚠️ Aucun abonnement trouvé. Contactez l\'administrateur.');
             return false;
         }
         
-        // ❌ ABONNEMENT EXPIRÉ
         if (data.statut === 'expiré') {
             Toast.error('⛔ Votre abonnement a expiré. Contactez l\'administrateur pour le renouveler.');
             return false;
         }
         
-        // ❌ ABONNEMENT SUSPENDU
         if (data.statut === 'suspendu') {
             Toast.error('⛔ Votre abonnement est suspendu. Vous ne pouvez pas effectuer cette action.');
             return false;
         }
         
-        // ❌ ABONNEMENT INACTIF
         if (data.statut !== 'actif') {
             Toast.warning('⚠️ Abonnement inactif. Contactez l\'administrateur.');
             return false;
@@ -4472,7 +4494,10 @@ async checkLimites(operation) {
         
         // ✅ ABONNEMENT ACTIF - Vérifier les limites
         const offre = data.type || 'starter';
+        
+        // 🔥 OFFRES AVEC ARTISAN
         const limites = {
+            artisan: { clients: 5, projets: 5, devis: 10 },
             starter: { clients: 10, projets: 10, devis: 20 },
             pro: { clients: 999999, projets: 999999, devis: 999999 },
             annuel: { clients: 999999, projets: 999999, devis: 999999 },
@@ -4491,15 +4516,21 @@ async checkLimites(operation) {
         };
         
         if (operation === 'client' && counts.clients >= limites[offre].clients) {
-            Toast.warning(`❌ Limite de clients atteinte (${limites[offre].clients}).`);
+            const maxClients = limites[offre].clients;
+            const maxDisplay = maxClients === 999999 ? 'illimité' : maxClients;
+            Toast.warning(`❌ Limite de clients atteinte (${maxDisplay}). Passez à l'offre supérieure !`);
             return false;
         }
         if (operation === 'projet' && counts.projets >= limites[offre].projets) {
-            Toast.warning(`❌ Limite de projets atteinte (${limites[offre].projets}).`);
+            const maxProjets = limites[offre].projets;
+            const maxDisplay = maxProjets === 999999 ? 'illimité' : maxProjets;
+            Toast.warning(`❌ Limite de projets atteinte (${maxDisplay}). Passez à l'offre supérieure !`);
             return false;
         }
         if (operation === 'devis' && counts.devis >= limites[offre].devis) {
-            Toast.warning(`❌ Limite de devis atteinte (${limites[offre].devis}).`);
+            const maxDevis = limites[offre].devis;
+            const maxDisplay = maxDevis === 999999 ? 'illimité' : maxDevis;
+            Toast.warning(`❌ Limite de devis atteinte (${maxDisplay}). Passez à l'offre supérieure !`);
             return false;
         }
         
@@ -4507,7 +4538,7 @@ async checkLimites(operation) {
         
     } catch (error) {
         console.error('❌ Erreur checkLimites:', error);
-        return false; // 🔥 En cas d'erreur, on bloque pour sécurité
+        return false;
     }
 }
 
