@@ -1188,18 +1188,23 @@ viewFactureNormalisee(id_facture) {
     // Actions rapides
    async viewDevis(id) {
     try {
+        console.log("🔍 Chargement du devis:", id);
+        
         const response = await apiRequest(`/api/devis/${id}`);
         const devis = await response.json();
+        console.log("✅ Devis chargé:", devis);
         
-        // Récupérer les situations si disponibles
+        // 🔥 Récupérer les situations avec gestion d'erreur
         let situations = [];
         try {
             const situationsResponse = await apiRequest(`/api/devis/${id}/situations`);
             situations = await situationsResponse.json();
-            devis.situations = situations;
+            console.log("✅ Situations chargées:", situations);
         } catch (e) {
-            devis.situations = [];
+            console.log("⚠️ Erreur chargement situations:", e.message);
+            situations = [];
         }
+        devis.situations = situations;
         
         const modal = document.createElement('div');
         modal.className = 'modal';
@@ -1213,14 +1218,14 @@ viewFactureNormalisee(id_facture) {
                 <div class="modal-body">
                     <div style="margin-bottom:20px;">
                         <h3>Informations client</h3>
-                        <p><strong>Nom:</strong> ${devis.client_nom}</p>
+                        <p><strong>Nom:</strong> ${devis.client_nom || 'Non renseigné'}</p>
                         <p><strong>Email:</strong> ${devis.client_email || '-'}</p>
                         <p><strong>Téléphone:</strong> ${devis.client_telephone || '-'}</p>
                     </div>
                     
                     <div style="margin-bottom:20px;">
                         <h3>Informations projet</h3>
-                        <p><strong>Nom:</strong> ${devis.nom_projet}</p>
+                        <p><strong>Nom:</strong> ${devis.nom_projet || 'Non renseigné'}</p>
                         <p><strong>Description:</strong> ${devis.projet_description || '-'}</p>
                     </div>
                     
@@ -1236,34 +1241,34 @@ viewFactureNormalisee(id_facture) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${devis.lignes.map(ligne => `
+                                ${(devis.lignes || []).map(ligne => `
                                     <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
-                                        <td style="padding:10px;">${ligne.designation}</td>
-                                        <td style="padding:10px; text-align:center;">${ligne.quantite}</td>
-                                        <td style="padding:10px; text-align:right;">${ligne.prix_unitaire.toLocaleString()} FCFA</td>
-                                        <td style="padding:10px; text-align:right;">${ligne.total_ligne.toLocaleString()} FCFA</td>
+                                        <td style="padding:10px;">${ligne.designation || 'Article'}</td>
+                                        <td style="padding:10px; text-align:center;">${ligne.quantite || 0}</td>
+                                        <td style="padding:10px; text-align:right;">${(ligne.prix_unitaire || 0).toLocaleString()} FCFA</td>
+                                        <td style="padding:10px; text-align:right;">${(ligne.total_ligne || 0).toLocaleString()} FCFA</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                             <tfoot>
                                 <tr style="border-top:2px solid rgba(255,255,255,0.2);">
                                     <td colspan="3" style="padding:10px; text-align:right;"><strong>Sous-total:</strong></td>
-                                    <td style="padding:10px; text-align:right;">${(devis.total / 1.2).toLocaleString()} FCFA</td>
+                                    <td style="padding:10px; text-align:right;">${((devis.total || 0) / 1.2).toLocaleString()} FCFA</td>
                                 </tr>
                                 <tr>
                                     <td colspan="3" style="padding:10px; text-align:right;"><strong>Main d'œuvre (20%):</strong></td>
-                                    <td style="padding:10px; text-align:right;">${(devis.total - devis.total / 1.2).toLocaleString()} FCFA</td>
+                                    <td style="padding:10px; text-align:right;">${((devis.total || 0) - (devis.total || 0) / 1.2).toLocaleString()} FCFA</td>
                                 </tr>
                                 <tr style="background:rgba(6,182,212,0.2);">
                                     <td colspan="3" style="padding:10px; text-align:right;"><strong>TOTAL TTC:</strong></td>
-                                    <td style="padding:10px; text-align:right; font-size:1.2rem; font-weight:bold; color:#06B6D4;">${devis.total.toLocaleString()} FCFA</td>
+                                    <td style="padding:10px; text-align:right; font-size:1.2rem; font-weight:bold; color:#06B6D4;">${(devis.total || 0).toLocaleString()} FCFA</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
                     
                     <!-- ========================================================== -->
-                    <!-- 🔥 NOUVELLE SECTION : SITUATIONS DE TRAVAUX ET ACOMPTE      -->
+                    <!-- SITUATIONS DE TRAVAUX (si disponibles)                     -->
                     <!-- ========================================================== -->
                     
                     ${devis.situations && devis.situations.length > 0 ? `
@@ -1283,9 +1288,9 @@ viewFactureNormalisee(id_facture) {
                             <tbody>
                                 ${devis.situations.map(s => `
                                     <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
-                                        <td style="padding:10px;">#${s.numero}</td>
-                                        <td style="padding:10px;">${s.pourcentage}%</td>
-                                        <td style="padding:10px; text-align:right;">${s.montant.toLocaleString()} FCFA</td>
+                                        <td style="padding:10px;">#${s.numero || 0}</td>
+                                        <td style="padding:10px;">${s.pourcentage || 0}%</td>
+                                        <td style="padding:10px; text-align:right;">${(s.montant || 0).toLocaleString()} FCFA</td>
                                         <td style="padding:10px;">
                                             <span class="status-badge ${s.statut === 'payee' ? 'success' : 'warning'}">
                                                 ${s.statut === 'payee' ? '✅ Payée' : '⏳ En attente'}
@@ -1308,15 +1313,15 @@ viewFactureNormalisee(id_facture) {
                     </div>
                     ` : ''}
                     
-                    <!-- Boutons pour l'acompte et les situations -->
+                    <!-- Boutons acompte et situations -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
-                        ${devis.acompte_pourcentage === 0 ? `
+                        ${(devis.acompte_pourcentage || 0) === 0 ? `
                             <button onclick="app.configurerAcompte(${devis.id_devis})" class="btn-secondary" style="background:#F59E0B; border-color:#F59E0B;">
                                 <i class="fas fa-hand-holding-usd"></i> Configurer l'acompte
                             </button>
                         ` : `
                             <span style="background:rgba(16,185,129,0.2); color:#10B981; padding:8px 16px; border-radius:8px; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-check-circle"></i> Acompte ${devis.acompte_pourcentage}% (${devis.acompte_montant.toLocaleString()} FCFA)
+                                <i class="fas fa-check-circle"></i> Acompte ${devis.acompte_pourcentage}% (${(devis.acompte_montant || 0).toLocaleString()} FCFA)
                                 ${devis.acompte_paye ? '✅ Payé' : '⏳ En attente'}
                             </span>
                             <button onclick="app.creerSituation(${devis.id_devis})" class="btn-primary" style="background:#8B5CF6; border-color:#8B5CF6;">
@@ -1325,10 +1330,7 @@ viewFactureNormalisee(id_facture) {
                         `}
                     </div>
                     
-                    <!-- ========================================================== -->
-                    <!-- FIN NOUVELLE SECTION                                       -->
-                    <!-- ========================================================== -->
-                    
+                    <!-- Actions principales -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
                         <button onclick="app.downloadPDF(${devis.id_devis})" class="btn-primary">
                             <i class="fas fa-download"></i> Télécharger PDF
@@ -1354,8 +1356,8 @@ viewFactureNormalisee(id_facture) {
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
         
     } catch (error) {
-        console.error('Erreur:', error);
-        alert('Erreur lors du chargement du devis');
+        console.error('❌ Erreur viewDevis:', error);
+        Toast.error('Erreur lors du chargement du devis: ' + error.message);
     }
 }
 
