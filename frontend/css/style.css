@@ -1355,6 +1355,81 @@ body {
     }
 }
 
+
+
+/* ===== ONGLETS ADMIN ===== */
+.tab-admin {
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 8px 8px 0 0;
+    position: relative;
+}
+
+.tab-admin:hover {
+    color: white !important;
+    background: rgba(255,255,255,0.05);
+}
+
+.tab-admin.active {
+    color: white !important;
+}
+
+.tab-admin.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 20%;
+    width: 60%;
+    height: 3px;
+    background: #06B6D4;
+    border-radius: 4px;
+}
+
+/* ===== CARTES ADMIN ===== */
+.admin-overview .glass-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.admin-overview .glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+/* ===== BOUTONS ADMIN ===== */
+.btn-icon-admin {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-size: 0.8rem;
+}
+
+.btn-icon-admin:hover {
+    transform: scale(1.1);
+}
+
+/* ===== RESPONSIVE ADMIN ===== */
+@media (max-width: 768px) {
+    .tab-admin {
+        padding: 8px 12px !important;
+        font-size: 0.75rem !important;
+    }
+    
+    .tab-admin span {
+        display: none;
+    }
+    
+    .admin-overview .cards-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
 /* ===== ONGLETS FACTURES ===== */
 .tab-facture {
     transition: all 0.3s ease;
