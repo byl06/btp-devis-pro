@@ -807,8 +807,20 @@ renderFactureTable(factures, type) {
         `;
     }
     
-    return `
+    // Séparer les factures actives et archivées
+    const facturesActives = factures.filter(f => !f.archivee);
+    const facturesArchivees = factures.filter(f => f.archivee);
+    
+    let html = `
         <div class="table-container">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                <h3>Factures actives (${facturesActives.length})</h3>
+                ${facturesArchivees.length > 0 ? `
+                    <button class="btn-secondary" onclick="app.afficherArchivees()" style="background:#6B7280; border-color:#6B7280;">
+                        <i class="fas fa-archive"></i> Archives (${facturesArchivees.length})
+                    </button>
+                ` : ''}
+            </div>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -822,48 +834,94 @@ renderFactureTable(factures, type) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${factures.map(f => `
-                        <tr>
-                            <td>#${f.id_facture}</td>
-                            <td>DEVIS-${f.id_devis}</td>
-                            <td>${f.client_nom || '-'}</td>
-                            <td>${new Date(f.date_facture).toLocaleDateString()}</td>
-                            <td>${(f.montant || 0).toLocaleString()} FCFA</td>
-                            <td>
-                                <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
-                                    ${f.statut === 'payée' ? 'Payée' : 'Non payée'}
-                                </span>
-                                ${type === 'normalisees' ? '<span class="status-badge" style="background:rgba(16,185,129,0.2);color:#10B981;margin-left:5px;">✅ Normalisée</span>' : ''}
-                            </td>
-                            <td>
-                                ${type === 'simples' ? `
-                                    <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="Télécharger PDF" style="background:#EF4444;color:white;">
-                                        <i class="fas fa-file-pdf"></i>
-                                    </button>
-                                    ${f.statut !== 'payée' ? `
-                                    <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée">
-                                        <i class="fas fa-credit-card"></i>
-                                    </button>
-                                    ` : ''}
-                                    <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
-                                        <i class="fas fa-file-invoice"></i>
-                                    </button>
-                                ` : `
-                                    <button class="btn-icon" onclick="app.downloadPDFNormalisee(${f.id_facture})" title="PDF normalisé" style="background:#10B981;color:white;">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                    <button class="btn-icon" onclick="app.viewFactureNormalisee(${f.id_facture})" title="Voir détails" style="background:#3B82F6;color:white;">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                `}
-                            </td>
-                        </tr>
-                    `).join('')}
+    `;
+    
+    // Factures actives
+    if (facturesActives.length === 0) {
+        html += `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94A3B8;">Aucune facture active</td></tr>`;
+    } else {
+        facturesActives.forEach(f => {
+            html += this.renderFactureRow(f, type);
+        });
+    }
+    
+    html += `
                 </tbody>
             </table>
         </div>
     `;
+    
+    return html;
 }
+
+renderFactureRow(f, type) {
+    const estPayee = f.statut === 'payée';
+    const estNormalisee = type === 'normalisees' || f.type_facture === 'normalisee';
+    const estArchivee = f.archivee === true;
+    
+    return `
+        <tr>
+            <td>#${f.id_facture}</td>
+            <td>DEVIS-${f.id_devis}</td>
+            <td>${f.client_nom || '-'}</td>
+            <td>${new Date(f.date_facture).toLocaleDateString()}</td>
+            <td>${(f.montant || 0).toLocaleString()} FCFA</td>
+            <td>
+                <span class="status-badge ${estPayee ? 'success' : 'warning'}">
+                    ${estPayee ? '✅ Payée' : '⏳ Non payée'}
+                </span>
+                ${estNormalisee ? '<span class="status-badge" style="background:rgba(16,185,129,0.2);color:#10B981;margin-left:5px;">📄 Normalisée</span>' : ''}
+                ${estArchivee ? '<span class="status-badge" style="background:rgba(107,114,128,0.2);color:#6B7280;margin-left:5px;">📦 Archivée</span>' : ''}
+            </td>
+            <td>
+                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                    <!-- PDF -->
+                    <button class="btn-icon" onclick="app.download${estNormalisee ? 'PDFNormalisee' : 'FacturePDF'}(${f.id_facture})" title="PDF" style="background:#EF4444;color:white;">
+                        <i class="fas fa-file-pdf"></i>
+                    </button>
+                    
+                    ${!estNormalisee ? `
+                        <!-- Normaliser -->
+                        <button class="btn-icon" onclick="app.normaliserFacture(${f.id_facture})" title="Normaliser" style="background:#F59E0B;color:white;">
+                            <i class="fas fa-file-invoice"></i>
+                        </button>
+                    ` : `
+                        <!-- Voir QR Code -->
+                        <button class="btn-icon" onclick="app.viewFactureNormalisee(${f.id_facture})" title="Voir QR Code" style="background:#3B82F6;color:white;">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                    `}
+                    
+                    ${!estPayee ? `
+                        <!-- Payer -->
+                        <button class="btn-icon" onclick="app.payFacture(${f.id_facture})" title="Marquer payée" style="background:#10B981;color:white;">
+                            <i class="fas fa-credit-card"></i>
+                        </button>
+                    ` : `
+                        <!-- Déjà payée -->
+                        <span style="background:rgba(16,185,129,0.2); color:#10B981; padding:4px 8px; border-radius:4px; font-size:0.7rem; display:inline-flex; align-items:center;">
+                            <i class="fas fa-check-circle"></i> Payée
+                        </span>
+                    `}
+                    
+                    ${!estArchivee ? `
+                        <!-- Archiver -->
+                        <button class="btn-icon" onclick="app.archiverFacture(${f.id_facture})" title="Archiver" style="background:#6B7280;color:white;">
+                            <i class="fas fa-archive"></i>
+                        </button>
+                    ` : `
+                        <!-- Désarchiver -->
+                        <button class="btn-icon" onclick="app.desarchiverFacture(${f.id_facture})" title="Restaurer" style="background:#10B981;color:white;">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    `}
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+
 viewFactureNormalisee(id_facture) {
     // Ouvrir le PDF normalisé avec le token
     this.downloadPDFNormalisee(id_facture);
@@ -882,6 +940,87 @@ viewFactureNormalisee(id_facture) {
             </div>
         `;
     }
+
+
+
+
+    async renderFacturesArchivees() {
+    try {
+        const userId = this.currentUser.id;
+        const response = await apiRequest(`/api/factures/${userId}`);
+        const factures = this.safeArray(await response.json());
+        const archivees = factures.filter(f => f.archivee);
+        
+        return `
+            <div class="page-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                    <h3><i class="fas fa-archive"></i> Archives (${archivees.length})</h3>
+                    <button class="btn-secondary" onclick="app.loadPage('factures')" style="background:#3B82F6; border-color:#3B82F6;">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </button>
+                </div>
+                
+                ${archivees.length === 0 ? `
+                    <div class="glass-card" style="text-align:center; padding:60px;">
+                        <i class="fas fa-archive" style="font-size:48px; opacity:0.5;"></i>
+                        <h3>Aucune facture archivée</h3>
+                        <p style="color:#94A3B8;">Les factures que vous archiveront apparaîtront ici</p>
+                    </div>
+                ` : `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>N° Facture</th>
+                                    <th>Client</th>
+                                    <th>Date</th>
+                                    <th>Montant</th>
+                                    <th>Statut</th>
+                                    <th>Date archivage</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${archivees.map(f => `
+                                    <tr>
+                                        <td>#${f.id_facture}</td>
+                                        <td>${f.client_nom || '-'}</td>
+                                        <td>${new Date(f.date_facture).toLocaleDateString()}</td>
+                                        <td>${(f.montant || 0).toLocaleString()} FCFA</td>
+                                        <td>
+                                            <span class="status-badge ${f.statut === 'payée' ? 'success' : 'warning'}">
+                                                ${f.statut === 'payée' ? 'Payée' : 'Non payée'}
+                                            </span>
+                                        </td>
+                                        <td>${f.date_archivage ? new Date(f.date_archivage).toLocaleDateString() : '-'}</td>
+                                        <td>
+                                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                                <button class="btn-icon" onclick="app.desarchiverFacture(${f.id_facture})" title="Restaurer" style="background:#10B981;color:white;">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                                <button class="btn-icon" onclick="app.downloadFacturePDF(${f.id_facture})" title="PDF" style="background:#EF4444;color:white;">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </button>
+                                                ${f.type_facture === 'normalisee' ? `
+                                                    <button class="btn-icon" onclick="app.downloadPDFNormalisee(${f.id_facture})" title="PDF Normalisé" style="background:#10B981;color:white;">
+                                                        <i class="fas fa-file-invoice"></i>
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Erreur archives:', error);
+        return '<div class="glass-card">❌ Erreur chargement des archives</div>';
+    }
+}
 
 
     
@@ -3976,6 +4115,74 @@ async downloadPDFFacture(id_facture) {
     } catch (error) {
         console.error('Erreur downloadFacturePDF:', error);
         Toast.error('❌ Erreur téléchargement');
+    }
+}
+
+// ==================== ARCHIVAGE ====================
+
+async archiverFacture(id_facture) {
+    if (!confirm('📦 Archiver cette facture ? Elle sera déplacée dans les archives.')) return;
+    
+    try {
+        const response = await apiRequest(`/api/facture/${id_facture}/archiver`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Facture archivée avec succès');
+            setTimeout(() => this.loadPage('factures'), 500);
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+async desarchiverFacture(id_facture) {
+    if (!confirm('📤 Restaurer cette facture depuis les archives ?')) return;
+    
+    try {
+        const response = await apiRequest(`/api/facture/${id_facture}/desarchiver`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Facture restaurée');
+            setTimeout(() => this.loadPage('factures'), 500);
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+afficherArchivees() {
+    this.loadPage('factures-archivees');
+}
+
+// ==================== PAIEMENT ====================
+
+async payFacture(id_facture) {
+    if (!confirm('💰 Marquer cette facture comme payée ? Cette action est irréversible.')) return;
+    
+    try {
+        const response = await apiRequest(`/api/facture/${id_facture}/pay`, {
+            method: 'PUT'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success(`✅ Facture payée le ${new Date(result.date_paiement).toLocaleDateString()}`);
+            setTimeout(() => this.loadPage('factures'), 500);
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
     }
 }
 

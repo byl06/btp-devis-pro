@@ -2542,7 +2542,7 @@ def get_factures(id_user):
             "Content-Type": "application/json"
         }
         
-        # 1. Récupérer TOUTES les factures
+        # Récupérer TOUTES les factures
         response = requests.get(
             f"{supabase_url}/rest/v1/facture?select=*",
             headers=headers
@@ -2561,7 +2561,7 @@ def get_factures(id_user):
             if not id_devis:
                 continue
             
-            # 2. Récupérer le devis pour vérifier l'utilisateur
+            # Récupérer le devis pour vérifier l'utilisateur
             devis_response = requests.get(
                 f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,id_client",
                 headers=headers
@@ -2578,7 +2578,7 @@ def get_factures(id_user):
                 print(f"⏭️ Devis {id_devis} appartient à un autre utilisateur")
                 continue
             
-            # 3. Récupérer le nom du client
+            # Récupérer le nom du client
             client_nom = "Inconnu"
             id_client = devis.get('id_client')
             if id_client:
@@ -2590,7 +2590,7 @@ def get_factures(id_user):
                     client = client_response.json()[0]
                     client_nom = client.get('nom', 'Inconnu')
             
-            # 🔥 INCLURE TOUS LES CHAMPS FISCAUX
+            # 🔥 AJOUT DES CHAMPS D'ARCHIVAGE ET PAIEMENT
             result.append({
                 'id_facture': facture.get('id_facture'),
                 'id_devis': id_devis,
@@ -2598,14 +2598,17 @@ def get_factures(id_user):
                 'montant': facture.get('montant', 0),
                 'statut': facture.get('statut', 'non payée'),
                 'client_nom': client_nom,
-                # 🔥 CHAMPS FISCAUX - CRUCIALS
                 'type_facture': facture.get('type_facture', 'simple'),
                 'statut_fiscal': facture.get('statut_fiscal', 'non_normalisee'),
                 'num_facture_fiscale': facture.get('num_facture_fiscale', ''),
                 'code_securite': facture.get('code_securite', ''),
                 'qr_code': facture.get('qr_code', ''),
                 'ifu_client': facture.get('ifu_client', ''),
-                'uid_facture': facture.get('uid_facture', '')
+                'uid_facture': facture.get('uid_facture', ''),
+                # 🔥 NOUVEAUX CHAMPS
+                'archivee': facture.get('archivee', False),
+                'date_archivage': facture.get('date_archivage'),
+                'date_paiement': facture.get('date_paiement')
             })
         
         print(f"📋 {len(result)} factures trouvées pour l'utilisateur {current_user}")
@@ -3254,6 +3257,185 @@ def generate_pdf_normalise(id_facture):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== ARCHIVAGE FACTURES ====================
+
+@app.route('/api/facture/<int:id_facture>/archiver', methods=['POST'])
+@jwt_required()
+def archiver_facture(id_facture):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que la facture existe
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}&select=id_facture,id_devis",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Archiver la facture
+        update_data = {
+            "archivee": True,
+            "date_archivage": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Facture archivée avec succès'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur archiver: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/facture/<int:id_facture>/desarchiver', methods=['POST'])
+@jwt_required()
+def desarchiver_facture(id_facture):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {
+            "archivee": False,
+            "date_archivage": None
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Facture désarchivée avec succès'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur désarchiver: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ==================== PAIEMENT FACTURES ====================
+
+@app.route('/api/facture/<int:id_facture>/pay', methods=['PUT'])
+@jwt_required()
+def pay_facture(id_facture):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que la facture existe
+        facture_response = requests.get(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}&select=id_facture,id_devis,statut",
+            headers=headers
+        )
+        
+        if facture_response.status_code != 200 or not facture_response.json():
+            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
+        
+        facture = facture_response.json()[0]
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Si déjà payée
+        if facture.get('statut') == 'payée':
+            return jsonify({'success': False, 'message': 'Cette facture est déjà payée'}), 400
+        
+        # Marquer comme payée
+        update_data = {
+            "statut": "payée",
+            "date_paiement": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({
+                'success': True,
+                'message': 'Facture marquée comme payée',
+                'date_paiement': update_data['date_paiement']
+            })
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur pay_facture: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/facture/<int:id_facture>/pdf', methods=['GET'])
 @jwt_required()
