@@ -12,6 +12,8 @@ if (!token) {
     window.location.href = 'login.html';
 }
 
+
+
 // Fonction pour les requêtes API
 async function apiRequest(url, options = {}) {
     const headers = {
@@ -138,6 +140,10 @@ class BTPDevisApp {
         setTimeout(() => {
         this.showSubscriptionBanner();
     }, 1000);
+    // Afficher la notification d'abonnement
+setTimeout(() => {
+    this.showAbonnementNotification();
+}, 3000);
     }
     
    updateUserInfo() {
@@ -2024,6 +2030,211 @@ calculateTotal();
     });
 }
 
+
+async renderAbonnementContent() {
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        
+        const container = document.getElementById('abonnement-content');
+        if (!container) return;
+        
+        const isAdmin = this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com');
+        
+        if (isAdmin) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:30px; background:rgba(139,92,246,0.1); border-radius:12px;">
+                    <i class="fas fa-infinity" style="font-size:48px; color:#8B5CF6;"></i>
+                    <h3 style="color:#8B5CF6; margin-top:10px;">👑 Abonnement Illimité</h3>
+                    <p style="color:#94A3B8;">Vous êtes administrateur, vous bénéficiez d'un accès illimité.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        if (!data.success || data.statut !== 'actif') {
+            container.innerHTML = `
+                <div style="text-align:center; padding:30px; background:rgba(239,68,68,0.1); border-radius:12px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#EF4444;"></i>
+                    <h3 style="color:#EF4444; margin-top:10px;">⚠️ Aucun abonnement actif</h3>
+                    <p style="color:#94A3B8;">Contactez l'administrateur pour souscrire à un abonnement.</p>
+                    <button class="btn-primary" onclick="app.showPricingModal()" style="margin-top:15px;">
+                        <i class="fas fa-crown"></i> Voir les offres
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        const offre = data.type || 'starter';
+        const joursRestants = data.jours_restants || 0;
+        const dateFin = data.date_fin ? new Date(data.date_fin).toLocaleDateString('fr-FR') : 'inconnue';
+        
+        const configs = {
+            artisan: { icon: 'fa-hammer', color: '#D97706', bg: 'rgba(217,119,6,0.1)', label: 'Artisan', price: '7 000 FCFA/mois', features: ['5 clients', '5 projets', '10 devis'] },
+            essai: { icon: 'fa-gift', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', label: 'Essai gratuit', price: 'Gratuit', features: ['Toutes les fonctionnalités', '14 jours'] },
+            starter: { icon: 'fa-leaf', color: '#10B981', bg: 'rgba(16,185,129,0.1)', label: 'Starter', price: '15 000 FCFA/mois', features: ['10 clients', '10 projets', '20 devis', 'Factures normalisées'] },
+            pro: { icon: 'fa-crown', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', label: 'Pro', price: '30 000 FCFA/mois', features: ['Illimité', 'Export Excel', 'Personnalisation'] },
+            annuel: { icon: 'fa-gem', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', label: 'Annuel', price: '250 000 FCFA/an', features: ['Illimité', '2 mois offerts', 'Support prioritaire'] }
+        };
+        
+        const config = configs[offre] || configs.starter;
+        const isExpiringSoon = joursRestants < 7 && joursRestants > 0;
+        const isEssai = offre === 'essai';
+        const maxJours = isEssai ? 14 : 30;
+        const progression = Math.min((maxJours - joursRestants) / maxJours * 100, 100);
+        
+        container.innerHTML = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+                <div style="background:${config.bg}; border-radius:12px; padding:1.5rem; border:1px solid ${config.color}33;">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
+                        <div style="width:50px;height:50px;background:${config.color}22; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:${config.color};">
+                            <i class="fas ${config.icon}"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:bold; font-size:1.1rem;">${config.label}</div>
+                            <div style="color:${config.color}; font-weight:600;">${config.price}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                        ${config.features.map(f => `
+                            <span style="background:rgba(255,255,255,0.05); padding:4px 12px; border-radius:20px; font-size:0.75rem; color:#94A3B8;">
+                                <i class="fas fa-check-circle" style="color:${config.color}; font-size:0.6rem;"></i> ${f}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:1.5rem; border:1px solid ${isExpiringSoon ? '#EF4444' : '#334155'};">
+                    <div style="text-align:center;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Temps restant</div>
+                        <div style="font-size:2.5rem; font-weight:700; color:${isExpiringSoon ? '#EF4444' : 'white'};">
+                            ${joursRestants}
+                            <span style="font-size:1rem; color:#94A3B8;">jours</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:#94A3B8; margin-top:5px;">
+                            Jusqu'au <strong>${dateFin}</strong>
+                        </div>
+                        ${isExpiringSoon ? `<div style="margin-top:10px; padding:8px; background:rgba(239,68,68,0.15); border-radius:8px; color:#EF4444; font-size:0.8rem;">⚠️ Votre abonnement expire bientôt !</div>` : ''}
+                        ${isEssai ? `<div style="margin-top:10px; padding:8px; background:rgba(139,92,246,0.15); border-radius:8px; color:#8B5CF6; font-size:0.8rem;">🎁 Profitez de votre essai gratuit !</div>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom:1.5rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-bottom:4px;">
+                    <span>0%</span>
+                    <span>${Math.round(progression)}%</span>
+                    <span>100%</span>
+                </div>
+                <div style="background:#1E293B; border-radius:10px; height:6px; overflow:hidden;">
+                    <div style="width:${progression}%; background:${isExpiringSoon ? '#EF4444' : config.color}; height:100%; border-radius:10px; transition:width 0.5s;"></div>
+                </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:1.5rem; border:1px solid #334155;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h4 style="font-weight:600;"><i class="fas fa-crown" style="color:#F59E0B;"></i> Changer d'offre</h4>
+                    <span style="font-size:0.7rem; color:#94A3B8;">Sans engagement</span>
+                </div>
+                
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:1rem;">
+                    <div style="background:rgba(217,119,6,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(217,119,6,0.2);">
+                        <div style="font-size:1.5rem;">🛠️</div>
+                        <div style="font-weight:bold; font-size:0.9rem;">Artisan</div>
+                        <div style="font-size:1.1rem; font-weight:600; color:#D97706;">7 000 FCFA</div>
+                        <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                        <button class="btn-primary" onclick="app.contactAdmin('artisan')" style="margin-top:10px; padding:6px 12px; font-size:0.75rem; background:#D97706;">Contacter</button>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(16,185,129,0.2);">
+                        <div style="font-size:1.5rem;">🟢</div>
+                        <div style="font-weight:bold; font-size:0.9rem;">Starter</div>
+                        <div style="font-size:1.1rem; font-weight:600; color:#10B981;">15 000 FCFA</div>
+                        <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                        <button class="btn-primary" onclick="app.contactAdmin('starter')" style="margin-top:10px; padding:6px 12px; font-size:0.75rem; background:#10B981;">Contacter</button>
+                    </div>
+                    <div style="background:rgba(6,182,212,0.05); border-radius:10px; padding:1rem; text-align:center; border:2px solid rgba(6,182,212,0.3); position:relative;">
+                        <div style="position:absolute; top:-8px; right:-8px; background:#06B6D4; color:white; font-size:0.6rem; padding:2px 8px; border-radius:20px;">⭐ POPULAIRE</div>
+                        <div style="font-size:1.5rem;">🔵</div>
+                        <div style="font-weight:bold; font-size:0.9rem;">Pro</div>
+                        <div style="font-size:1.1rem; font-weight:600; color:#06B6D4;">30 000 FCFA</div>
+                        <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                        <button class="btn-primary" onclick="app.contactAdmin('pro')" style="margin-top:10px; padding:6px 12px; font-size:0.75rem; background:#06B6D4;">Contacter</button>
+                    </div>
+                    <div style="background:rgba(245,158,11,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(245,158,11,0.2);">
+                        <div style="font-size:1.5rem;">🔴</div>
+                        <div style="font-weight:bold; font-size:0.9rem;">Annuel</div>
+                        <div style="font-size:1.1rem; font-weight:600; color:#F59E0B;">250 000 FCFA</div>
+                        <div style="font-size:0.7rem; color:#94A3B8;">/an (2 mois offerts)</div>
+                        <button class="btn-primary" onclick="app.contactAdmin('annuel')" style="margin-top:10px; padding:6px 12px; font-size:0.75rem; background:#F59E0B;">Contacter</button>
+                    </div>
+                </div>
+                
+                <div style="text-align:center; margin-top:1rem; font-size:0.75rem; color:#94A3B8;">
+                    <i class="fas fa-phone"></i> Besoin d'aide ? Contactez l'administrateur : <strong style="color:white;">+229 0143733706</strong>
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Erreur renderAbonnementContent:', error);
+        const container = document.getElementById('abonnement-content');
+        if (container) {
+            container.innerHTML = `<div style="text-align:center; padding:30px; color:#EF4444;">❌ Erreur chargement de l'abonnement</div>`;
+        }
+    }
+}
+async showAbonnementNotification() {
+    if (this.currentUser && (this.currentUser.email === 'admin@btp.com' || this.currentUser.email === 'bylgaitb@gmail.com')) {
+        return;
+    }
+    
+    try {
+        const response = await apiRequest('/api/abonnement/statut');
+        const data = await response.json();
+        
+        if (!data.success || data.statut !== 'actif') return;
+        
+        const joursRestants = data.jours_restants || 0;
+        const isEssai = data.type === 'essai';
+        const isExpiringSoon = joursRestants < 7 && joursRestants > 0;
+        
+        if (isEssai || isExpiringSoon) {
+            const message = isEssai 
+                ? `🎁 Vous êtes en période d'essai gratuit (${joursRestants} jours restants)`
+                : `⚠️ Votre abonnement expire dans ${joursRestants} jours`;
+            
+            const toast = Toast.show(message, 'info', '📋 Abonnement');
+            
+            setTimeout(() => {
+                const toastEl = document.querySelector('.toast:last-child');
+                if (toastEl) {
+                    const btn = document.createElement('button');
+                    btn.innerHTML = '👁️ Consulter';
+                    btn.style.cssText = `
+                        background: rgba(255,255,255,0.15);
+                        border: 1px solid rgba(255,255,255,0.3);
+                        color: white;
+                        padding: 4px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 0.75rem;
+                        margin-left: 10px;
+                    `;
+                    btn.onclick = () => {
+                        this.currentSettingsTab = 'abonnement';
+                        this.loadPage('parametres');
+                        toastEl.remove();
+                    };
+                    toastEl.querySelector('.toast-content').appendChild(btn);
+                }
+            }, 100);
+        }
+    } catch (error) {
+        console.error('Erreur notification abonnement:', error);
+    }
+}
+
 async downloadPDF(id) {
     try {
         const token = localStorage.getItem('token');
@@ -2549,11 +2760,9 @@ async renderParametres() {
         const data = await response.json();
         const settings = data.settings || {};
 
-        // 🔥 Sauvegarder les settings pour les utiliser dans les onglets
         this.currentSettings = settings;
         
-        // Onglet actif (par défaut: 'entreprise')
-        let activeTab = 'entreprise';
+        let activeTab = this.currentSettingsTab || 'entreprise';
         
         return `
             <div class="page-content">
@@ -2577,6 +2786,11 @@ async renderParametres() {
                          style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'securite' ? '#EF4444' : 'transparent'}; color:${activeTab === 'securite' ? '#EF4444' : '#94A3B8'}; transition:all 0.3s;">
                         <i class="fas fa-key"></i> Sécurité
                     </div>
+                    <div class="tab-parametre ${activeTab === 'abonnement' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('abonnement')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'abonnement' ? '#8B5CF6' : 'transparent'}; color:${activeTab === 'abonnement' ? '#8B5CF6' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-crown"></i> Espace Abonnement
+                    </div>
                     <div class="tab-parametre ${activeTab === 'backup' ? 'active' : ''}" 
                          onclick="app.switchParametreTab('backup')" 
                          style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'backup' ? '#10B981' : 'transparent'}; color:${activeTab === 'backup' ? '#10B981' : '#94A3B8'}; transition:all 0.3s;">
@@ -2584,7 +2798,7 @@ async renderParametres() {
                     </div>
                 </div>
                 
-                <!-- ===== CONTENU DES ONGLETS ===== -->
+                <!-- ===== CONTENU ===== -->
                 <div id="parametres-content">
                     ${this.renderParametreContent(activeTab, settings)}
                 </div>
@@ -2818,30 +3032,45 @@ renderParametreContent(tab, settings) {
                 </p>
             </div>
         `
+
+        
     };
     
     return tabs[tab] || tabs.entreprise;
 }
 switchParametreTab(tab) {
-    // Mettre à jour les onglets visuellement
+    // Mettre à jour les onglets
     const tabs = document.querySelectorAll('.tab-parametre');
-    const colors = ['#06B6D4', '#F59E0B', '#EF4444', '#10B981'];
-    const tabNames = ['entreprise', 'fiscal', 'securite', 'backup'];
+    const colors = {
+        entreprise: '#06B6D4',
+        fiscal: '#F59E0B',
+        securite: '#EF4444',
+        abonnement: '#8B5CF6',
+        backup: '#10B981'
+    };
+    const tabNames = ['entreprise', 'fiscal', 'securite', 'abonnement', 'backup'];
     
     tabs.forEach((t, i) => {
         t.style.borderBottom = '3px solid transparent';
         t.style.color = '#94A3B8';
         if (tabNames[i] === tab) {
-            t.style.borderBottom = `3px solid ${colors[i]}`;
+            t.style.borderBottom = `3px solid ${colors[tab]}`;
             t.style.color = 'white';
         }
     });
     
-    // Mettre à jour le contenu sans recharger toute la page
+    // Mettre à jour le contenu
     const settings = this.currentSettings || {};
     const contentArea = document.getElementById('parametres-content');
     if (contentArea) {
         contentArea.innerHTML = this.renderParametreContent(tab, settings);
+        
+        // Si onglet abonnement, charger les données
+        if (tab === 'abonnement') {
+            setTimeout(() => {
+                this.renderAbonnementContent();
+            }, 200);
+        }
     }
 }
 
