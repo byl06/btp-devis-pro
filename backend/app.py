@@ -897,6 +897,116 @@ def get_devis_detail(id_devis):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/devis/<int:id_devis>/situation', methods=['POST'])
+@jwt_required()
+def creer_situation(id_devis):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        print(f"🔍 Création situation pour devis {id_devis}, user {user_id}")
+        print(f"🔍 Données reçues: {data}")
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis existe et appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,total,acompte_montant",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Calculer le montant restant après acompte
+        total = float(devis.get('total', 0))
+        acompte = float(devis.get('acompte_montant', 0))
+        montant_restant = total - acompte
+        
+        # Récupérer les situations existantes
+        situations_response = requests.get(
+            f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}&order=numero.desc&limit=1",
+            headers=headers
+        )
+        
+        situations = situations_response.json() if situations_response.status_code == 200 else []
+        dernier_numero = situations[0].get('numero', 0) if situations else 0
+        nouveau_numero = dernier_numero + 1
+        
+        # Calculer le pourcentage et le montant
+        pourcentage = data.get('pourcentage', 0)
+        montant = montant_restant * (pourcentage / 100)
+        travaux_realises = data.get('travaux_realises', '')
+        
+        print(f"🔍 Nouvelle situation: numero={nouveau_numero}, pourcentage={pourcentage}%, montant={montant}")
+        
+        # Créer la situation
+        situation_data = {
+            "id_devis": id_devis,
+            "numero": nouveau_numero,
+            "pourcentage": pourcentage,
+            "montant": round(montant, 2),
+            "statut": "en_attente",
+            "date_creation": datetime.now().isoformat(),
+            "travaux_realises": travaux_realises
+        }
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/situation_devis",
+            headers=headers,
+            json=situation_data
+        )
+        
+        print(f"🔍 Status création situation: {response.status_code}")
+        print(f"🔍 Réponse: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                id_situation = result[0].get('id_situation')
+            elif isinstance(result, dict):
+                id_situation = result.get('id_situation')
+            else:
+                id_situation = None
+            
+            # Mettre à jour le nombre de situations dans le devis
+            requests.patch(
+                f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+                headers=headers,
+                json={"nombre_situations": nouveau_numero}
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Situation créée avec succès',
+                'id_situation': id_situation,
+                'numero': nouveau_numero,
+                'montant': round(montant, 2)
+            })
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur creer_situation: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # ==================== BACKUP & RESTORE ====================
 @app.route('/api/backup', methods=['GET'])
