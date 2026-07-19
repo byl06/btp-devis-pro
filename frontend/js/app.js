@@ -1187,6 +1187,9 @@ viewFactureNormalisee(id_facture) {
     
     // Actions rapides
    async viewDevis(id) {
+    // 🔥 Stocker l'ID du devis pour le rafraîchissement
+    this.currentDevisId = id;
+    
     try {
         console.log("🔍 Chargement du devis:", id);
         
@@ -1194,7 +1197,7 @@ viewFactureNormalisee(id_facture) {
         const devis = await response.json();
         console.log("✅ Devis chargé:", devis);
         
-        // 🔥 Récupérer les situations avec gestion d'erreur
+        // Récupérer les situations
         let situations = [];
         try {
             const situationsResponse = await apiRequest(`/api/devis/${id}/situations`);
@@ -1206,6 +1209,24 @@ viewFactureNormalisee(id_facture) {
         }
         devis.situations = situations;
         
+        // ============================================================
+        // CALCUL DES MONTANTS
+        // ============================================================
+        const total = devis.total || 0;
+        const acompte = devis.acompte_montant || 0;
+        const montantRestant = total - acompte;
+        
+        // Calculer le total des situations payées
+        const totalPaye = (devis.situations || [])
+            .filter(s => s.statut === 'payee')
+            .reduce((sum, s) => sum + (s.montant || 0), 0);
+        
+        const resteAPayer = montantRestant - totalPaye;
+        const progression = montantRestant > 0 ? Math.round((totalPaye / montantRestant) * 100) : 0;
+        
+        // ============================================================
+        // CRÉATION DU MODAL
+        // ============================================================
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -1216,6 +1237,7 @@ viewFactureNormalisee(id_facture) {
                     <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
                 </div>
                 <div class="modal-body">
+                    <!-- Informations client -->
                     <div style="margin-bottom:20px;">
                         <h3>Informations client</h3>
                         <p><strong>Nom:</strong> ${devis.client_nom || 'Non renseigné'}</p>
@@ -1223,12 +1245,14 @@ viewFactureNormalisee(id_facture) {
                         <p><strong>Téléphone:</strong> ${devis.client_telephone || '-'}</p>
                     </div>
                     
+                    <!-- Informations projet -->
                     <div style="margin-bottom:20px;">
                         <h3>Informations projet</h3>
                         <p><strong>Nom:</strong> ${devis.nom_projet || 'Non renseigné'}</p>
                         <p><strong>Description:</strong> ${devis.projet_description || '-'}</p>
                     </div>
                     
+                    <!-- Tableau des articles -->
                     <div style="margin-bottom:20px;">
                         <h3>Matériaux et travaux</h3>
                         <table style="width:100%; border-collapse:collapse;">
@@ -1268,9 +1292,39 @@ viewFactureNormalisee(id_facture) {
                     </div>
                     
                     <!-- ========================================================== -->
-                    <!-- SITUATIONS DE TRAVAUX (si disponibles)                     -->
+                    <!-- BARRE DE PROGRESSION ET RÉCAPITULATIF                       -->
                     <!-- ========================================================== -->
+                    <div style="margin:15px 0; padding:15px; background:rgba(255,255,255,0.05); border-radius:12px;">
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:10px;">
+                            <div>
+                                <span style="color:#94A3B8; font-size:0.8rem;">Montant total</span>
+                                <div style="font-weight:bold; font-size:1.1rem;">${total.toLocaleString()} FCFA</div>
+                            </div>
+                            <div>
+                                <span style="color:#94A3B8; font-size:0.8rem;">Acompte</span>
+                                <div style="font-weight:bold; color:#10B981;">${acompte.toLocaleString()} FCFA</div>
+                            </div>
+                            <div>
+                                <span style="color:#94A3B8; font-size:0.8rem;">Payé</span>
+                                <div style="font-weight:bold; color:#10B981;">${(acompte + totalPaye).toLocaleString()} FCFA</div>
+                            </div>
+                            <div>
+                                <span style="color:#94A3B8; font-size:0.8rem;">Reste à payer</span>
+                                <div style="font-weight:bold; color:#F59E0B;">${resteAPayer.toLocaleString()} FCFA</div>
+                            </div>
+                            <div>
+                                <span style="color:#94A3B8; font-size:0.8rem;">Progression</span>
+                                <div style="font-weight:bold; color:#06B6D4;">${progression}%</div>
+                            </div>
+                        </div>
+                        <div style="background:#1E293B; border-radius:10px; height:8px; overflow:hidden;">
+                            <div style="width:${progression}%; background:${progression < 33 ? '#F59E0B' : progression < 66 ? '#06B6D4' : '#10B981'}; height:100%; border-radius:10px; transition:width 0.5s;"></div>
+                        </div>
+                    </div>
                     
+                    <!-- ========================================================== -->
+                    <!-- SITUATIONS DE TRAVAUX                                       -->
+                    <!-- ========================================================== -->
                     ${devis.situations && devis.situations.length > 0 ? `
                     <div style="margin:20px 0;">
                         <h3><i class="fas fa-chart-bar"></i> Situations de travaux</h3>
@@ -1313,8 +1367,10 @@ viewFactureNormalisee(id_facture) {
                     </div>
                     ` : ''}
                     
-                    <!-- Boutons acompte et situations -->
-                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
+                    <!-- ========================================================== -->
+                    <!-- BOUTONS ACOMPTE ET SITUATIONS                              -->
+                    <!-- ========================================================== -->
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap; align-items:center;">
                         ${(devis.acompte_pourcentage || 0) === 0 ? `
                             <button onclick="app.configurerAcompte(${devis.id_devis})" class="btn-secondary" style="background:#F59E0B; border-color:#F59E0B;">
                                 <i class="fas fa-hand-holding-usd"></i> Configurer l'acompte
@@ -1324,13 +1380,20 @@ viewFactureNormalisee(id_facture) {
                                 <i class="fas fa-check-circle"></i> Acompte ${devis.acompte_pourcentage}% (${(devis.acompte_montant || 0).toLocaleString()} FCFA)
                                 ${devis.acompte_paye ? '✅ Payé' : '⏳ En attente'}
                             </span>
+                            ${!devis.acompte_paye ? `
+                                <button onclick="app.payerAcompte(${devis.id_devis})" class="btn-secondary" style="background:#10B981; border-color:#10B981;">
+                                    <i class="fas fa-credit-card"></i> Marquer payé
+                                </button>
+                            ` : ''}
                             <button onclick="app.creerSituation(${devis.id_devis})" class="btn-primary" style="background:#8B5CF6; border-color:#8B5CF6;">
                                 <i class="fas fa-plus"></i> Ajouter une situation
                             </button>
                         `}
                     </div>
                     
-                    <!-- Actions principales -->
+                    <!-- ========================================================== -->
+                    <!-- ACTIONS PRINCIPALES                                        -->
+                    <!-- ========================================================== -->
                     <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
                         <button onclick="app.downloadPDF(${devis.id_devis})" class="btn-primary">
                             <i class="fas fa-download"></i> Télécharger PDF
@@ -1351,6 +1414,7 @@ viewFactureNormalisee(id_facture) {
         
         document.body.appendChild(modal);
         
+        // Fermeture du modal
         const closeBtns = modal.querySelectorAll('.close-modal');
         closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
@@ -2938,22 +3002,27 @@ async creerSituation(id_devis) {
         const montantRestant = total - acompte;
         const situationsExistantes = situations.length;
         
+        // Calculer le pourcentage automatique restant
+        const totalSitPourcent = situations.reduce((sum, s) => sum + (s.pourcentage || 0), 0);
+        const pourcentageRestant = 100 - totalSitPourcent;
+        
         const pourcentage = prompt(
             `📊 Nouvelle situation de travaux\n\n` +
             `Devis #${id_devis}\n` +
             `Montant total: ${total.toLocaleString()} FCFA\n` +
             `Acompte: ${acompte.toLocaleString()} FCFA\n` +
             `Montant restant: ${montantRestant.toLocaleString()} FCFA\n` +
-            `Situations déjà créées: ${situationsExistantes}\n\n` +
-            `Entrez le pourcentage pour cette situation (0-100) :`,
-            '30'
+            `Situations déjà créées: ${situationsExistantes}\n` +
+            `Pourcentage restant: ${pourcentageRestant}%\n\n` +
+            `Entrez le pourcentage pour cette situation (0-${pourcentageRestant}) :`,
+            Math.min(30, pourcentageRestant)
         );
         
         if (pourcentage === null) return;
         
         const pct = parseInt(pourcentage);
-        if (isNaN(pct) || pct < 0 || pct > 100) {
-            Toast.error('❌ Pourcentage invalide (0-100)');
+        if (isNaN(pct) || pct < 0 || pct > pourcentageRestant) {
+            Toast.error(`❌ Pourcentage invalide (0-${pourcentageRestant})`);
             return;
         }
         
@@ -2962,6 +3031,8 @@ async creerSituation(id_devis) {
             `(Décrivez les travaux effectués)`,
             ''
         );
+        
+        if (travaux === null) return;
         
         const result = await apiRequest(`/api/devis/${id_devis}/situation`, {
             method: 'POST',
@@ -2974,11 +3045,17 @@ async creerSituation(id_devis) {
         
         if (data.success) {
             Toast.success(`✅ Situation ${data.numero} créée : ${data.montant.toLocaleString()} FCFA`);
-            this.loadPage('devis');
+            // 🔥 Rafraîchir automatiquement
+            if (this.currentDevisId) {
+                await this.viewDevis(this.currentDevisId);
+            } else {
+                this.loadPage('devis');
+            }
         } else {
             Toast.error(data.message || '❌ Erreur');
         }
     } catch (error) {
+        console.error('❌ Erreur creerSituation:', error);
         Toast.error('❌ Erreur de connexion');
     }
 }
@@ -2995,11 +3072,43 @@ async payerSituation(id_situation) {
         
         if (result.success) {
             Toast.success('✅ Situation marquée comme payée');
-            this.loadPage('devis');
+            // 🔥 Rafraîchir automatiquement la vue du devis
+            if (this.currentDevisId) {
+                await this.viewDevis(this.currentDevisId);
+            } else {
+                this.loadPage('devis');
+            }
         } else {
             Toast.error(result.message || '❌ Erreur');
         }
     } catch (error) {
+        console.error('❌ Erreur payerSituation:', error);
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+async payerAcompte(id_devis) {
+    if (!confirm('💰 Marquer l\'acompte comme payé ?')) return;
+    
+    try {
+        const response = await apiRequest(`/api/devis/${id_devis}/payer-acompte`, {
+            method: 'PUT'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Acompte marqué comme payé');
+            // 🔥 Rafraîchir automatiquement
+            if (this.currentDevisId) {
+                await this.viewDevis(this.currentDevisId);
+            } else {
+                this.loadPage('devis');
+            }
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        console.error('❌ Erreur payerAcompte:', error);
         Toast.error('❌ Erreur de connexion');
     }
 }

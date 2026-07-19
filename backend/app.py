@@ -1026,6 +1026,60 @@ def creer_situation(id_devis):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@app.route('/api/devis/<int:id_devis>/payer-acompte', methods=['PUT'])
+@jwt_required()
+def payer_acompte(id_devis):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le devis appartient à l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user",
+            headers=headers
+        )
+        
+        if devis_response.status_code != 200 or not devis_response.json():
+            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
+        
+        devis = devis_response.json()[0]
+        if devis.get('id_user') != user_id:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        # Marquer l'acompte comme payé
+        update_data = {
+            "acompte_paye": True,
+            "date_acompte": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Acompte marqué comme payé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur payer_acompte: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 # ==================== BACKUP & RESTORE ====================
 @app.route('/api/backup', methods=['GET'])
 @jwt_required()
