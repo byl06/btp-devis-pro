@@ -863,7 +863,7 @@ def get_devis_detail(id_devis):
         )
         lignes = lignes_response.json() if lignes_response.status_code == 200 else []
         
-        # 5. Construire le résultat
+        # 5. Construire le résultat avec TOUS les champs
         result = {
             'id_devis': devis.get('id_devis'),
             'date_creation': devis.get('date_creation'),
@@ -879,10 +879,16 @@ def get_devis_detail(id_devis):
             'nom_projet': projet_nom,
             'projet_description': projet_description,
             'localisation': localisation,
-            'lignes': lignes
+            'lignes': lignes,
+            # 🔥 CHAMPS ACOMPTE - AJOUTÉS
+            'acompte_pourcentage': devis.get('acompte_pourcentage', 0),
+            'acompte_montant': devis.get('acompte_montant', 0),
+            'acompte_paye': devis.get('acompte_paye', False),
+            'date_acompte': devis.get('date_acompte'),
+            'nombre_situations': devis.get('nombre_situations', 0)
         }
         
-        print(f"✅ Détail devis {id_devis} retourné")
+        print(f"✅ Détail devis {id_devis} - Acompte: {result['acompte_pourcentage']}%")
         return jsonify(result)
         
     except Exception as e:
