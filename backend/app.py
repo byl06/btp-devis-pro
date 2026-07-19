@@ -1532,7 +1532,7 @@ def generate_pdf(id_devis):
         title_style = ParagraphStyle(
             'CustomTitle', 
             parent=styles['Heading1'], 
-            fontSize=16, 
+            fontSize=14, 
             textColor=colors.HexColor(primary_color),
             alignment=1,
             spaceAfter=2
@@ -1632,7 +1632,7 @@ def generate_pdf(id_devis):
         # ============================================================
         info_data = [
             [
-                Paragraph("<b>Référence</b>", label_style),
+                Paragraph("<b>Réf</b>", label_style),
                 Paragraph(f"DEVIS-{devis['id_devis']:06d}", value_style),
                 Paragraph("<b>Date</b>", label_style),
                 Paragraph(datetime.fromisoformat(devis['date_creation'].replace('Z', '+00:00')).strftime('%d/%m/%Y'), value_style),
@@ -1643,14 +1643,14 @@ def generate_pdf(id_devis):
             ]
         ]
         
-        info_table = Table(info_data, colWidths=[1.2*cm, 2.5*cm, 0.8*cm, 2*cm, 1.2*cm, 2*cm, 1*cm, 2.5*cm])
+        info_table = Table(info_data, colWidths=[0.8*cm, 2.8*cm, 0.8*cm, 2*cm, 1.2*cm, 1.8*cm, 1*cm, 2.5*cm])
         info_table.setStyle(TableStyle([
             ('FONTSIZE', (0, 0), (-1, -1), 7),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
             ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
         ]))
@@ -1681,14 +1681,14 @@ def generate_pdf(id_devis):
             ]
         ]
         
-        client_table = Table(client_data, colWidths=[0.8*cm, 4*cm, 1.2*cm, 4*cm])
+        client_table = Table(client_data, colWidths=[0.8*cm, 4.2*cm, 1.2*cm, 4.2*cm])
         client_table.setStyle(TableStyle([
             ('FONTSIZE', (0, 0), (-1, -1), 7),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 1),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
             ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
         ]))
@@ -1720,7 +1720,7 @@ def generate_pdf(id_devis):
         table_data.append(['', '', 'Main d\'œuvre (20%)', f"{main_oeuvre:,.0f}"])
         table_data.append(['', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
         
-        table = Table(table_data, colWidths=[5.5*cm, 1.8*cm, 2.5*cm, 2.8*cm])
+        table = Table(table_data, colWidths=[5.8*cm, 1.6*cm, 2.4*cm, 2.8*cm])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
