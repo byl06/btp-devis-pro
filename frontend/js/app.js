@@ -343,6 +343,12 @@ async saveHeaderSettings() {
                 case 'parametres':
     pageTitle.textContent = 'Paramètres';
     contentArea.innerHTML = await this.renderParametres();
+    // 🔥 AJOUTE CETTE LIGNE - Si l'onglet actif est abonnement, charger le contenu
+    if (this.currentSettingsTab === 'abonnement') {
+        setTimeout(() => {
+            this.renderAbonnementContent();
+        }, 300);
+    }
     break;
                 default:
                     contentArea.innerHTML = '<div class="glass-card">Page en construction</div>';
@@ -3065,7 +3071,7 @@ switchParametreTab(tab) {
     if (contentArea) {
         contentArea.innerHTML = this.renderParametreContent(tab, settings);
         
-        // Si onglet abonnement, charger les données
+        // 🔥 SI ON CLIQUE SUR ABONNEMENT, CHARGER LE CONTENU
         if (tab === 'abonnement') {
             setTimeout(() => {
                 this.renderAbonnementContent();
