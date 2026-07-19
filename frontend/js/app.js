@@ -3017,6 +3017,21 @@ renderParametreContent(tab, settings) {
                 </div>
             </div>
         `,
+        abonnement: `
+            <div class="glass-card" style="border:1px solid rgba(139,92,246,0.3);">
+                <h3><i class="fas fa-crown" style="color:#8B5CF6;"></i> Mon abonnement</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1rem;">
+                    Gérez votre abonnement et suivez votre période d'essai ou d'abonnement.
+                </p>
+                
+                <div id="abonnement-content">
+                    <div style="text-align:center; padding:20px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size:24px; color:#8B5CF6;"></i>
+                        <p>Chargement de vos informations...</p>
+                    </div>
+                </div>
+            </div>
+        `,
         
         backup: `
             <!-- ===== ONGLET SAUVEGARDE ===== -->
