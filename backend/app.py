@@ -1457,6 +1457,13 @@ def generate_pdf(id_devis):
         
         devis = devis_response.json()[0]
         
+        # Récupérer les situations
+        situations_response = requests.get(
+            f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}&order=numero.asc",
+            headers=headers
+        )
+        situations = situations_response.json() if situations_response.status_code == 200 else []
+        
         # Récupérer le client
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
@@ -1510,6 +1517,7 @@ def generate_pdf(id_devis):
         devis['projet_description'] = projet.get('description', '-')
         devis['localisation'] = projet.get('localisation', '-')
         devis['lignes'] = lignes
+        devis['situations'] = situations
         
         # Conversion des types
         for ligne in devis['lignes']:
@@ -1747,6 +1755,74 @@ def generate_pdf(id_devis):
         story.append(Spacer(1, 0.1*cm))
         
         # ============================================================
+        # ACOMPTE ET SITUATIONS - NOUVEAU
+        # ============================================================
+        if devis.get('acompte_pourcentage', 0) > 0 or len(devis['situations']) > 0:
+            story.append(Paragraph("Conditions de paiement", section_style))
+            
+            paiement_data = []
+            
+            # Acompte
+            if devis.get('acompte_pourcentage', 0) > 0:
+                acompte_montant = devis.get('acompte_montant', 0)
+                acompte_paye = "✅ Payé" if devis.get('acompte_paye') else "⏳ En attente"
+                paiement_data.append([
+                    Paragraph("Acompte", label_style),
+                    Paragraph(f"{devis.get('acompte_pourcentage', 0)}%", value_style),
+                    Paragraph(f"{acompte_montant:,.0f} FCFA", value_style),
+                    Paragraph(acompte_paye, value_style)
+                ])
+            
+            # Situations
+            for s in devis['situations']:
+                statut = "✅ Payée" if s.get('statut') == 'payee' else "⏳ En attente"
+                paiement_data.append([
+                    Paragraph(f"Situation #{s.get('numero', 0)}", label_style),
+                    Paragraph(f"{s.get('pourcentage', 0)}%", value_style),
+                    Paragraph(f"{s.get('montant', 0):,.0f} FCFA", value_style),
+                    Paragraph(statut, value_style)
+                ])
+            
+            # Total payé / Reste
+            total_paye = 0
+            if devis.get('acompte_paye'):
+                total_paye += devis.get('acompte_montant', 0)
+            for s in devis['situations']:
+                if s.get('statut') == 'payee':
+                    total_paye += s.get('montant', 0)
+            
+            reste = total_ttc - total_paye
+            
+            paiement_data.append([
+                Paragraph("<b>Total payé</b>", label_style),
+                "",
+                Paragraph(f"<b>{total_paye:,.0f} FCFA</b>", value_style),
+                ""
+            ])
+            paiement_data.append([
+                Paragraph("<b>Reste à payer</b>", label_style),
+                "",
+                Paragraph(f"<b>{reste:,.0f} FCFA</b>", value_style),
+                ""
+            ])
+            
+            paiement_table = Table(paiement_data, colWidths=[3*cm, 1.5*cm, 3*cm, 2.5*cm])
+            paiement_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+                ('BACKGROUND', (0, -2), (-1, -1), colors.HexColor('#F3F4F6')),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
+                ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+            ]))
+            story.append(paiement_table)
+            story.append(Spacer(1, 0.1*cm))
+        
+        # ============================================================
         # CONDITIONS - Compactes
         # ============================================================
         story.append(Paragraph("Conditions", section_style))
@@ -1754,6 +1830,9 @@ def generate_pdf(id_devis):
         conditions = [
             "• Valable 30 jours. • Commencement des travaux = acceptation. • Matériaux propriété de l'entreprise jusqu'au paiement intégral."
         ]
+        
+        if devis.get('acompte_pourcentage', 0) > 0:
+            conditions[0] += f" • Acompte de {devis.get('acompte_pourcentage', 0)}% à la commande."
         
         for condition in conditions:
             story.append(Paragraph(condition, condition_style))
