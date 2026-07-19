@@ -1434,12 +1434,7 @@ def generate_pdf(id_devis):
         from reportlab.lib.pagesizes import A4
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.lib.utils import ImageReader
-        from reportlab.platypus import Image
-        from reportlab.graphics.shapes import Drawing, String, Rect
-        from reportlab.graphics import renderPDF
-        from reportlab.lib.colors import Color, red
+        from reportlab.lib.units import cm, mm
         import os
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
@@ -1451,7 +1446,7 @@ def generate_pdf(id_devis):
             "Content-Type": "application/json"
         }
         
-        # 1. Récupérer le devis
+        # Récupérer le devis
         devis_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
             headers=headers
@@ -1462,28 +1457,28 @@ def generate_pdf(id_devis):
         
         devis = devis_response.json()[0]
         
-        # 2. Récupérer le client
+        # Récupérer le client
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
             headers=headers
         )
         client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
         
-        # 3. Récupérer le projet
+        # Récupérer le projet
         projet_response = requests.get(
             f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
             headers=headers
         )
         projet = projet_response.json()[0] if projet_response.status_code == 200 and projet_response.json() else {}
         
-        # 4. Récupérer les lignes
+        # Récupérer les lignes
         lignes_response = requests.get(
             f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
             headers=headers
         )
         lignes = lignes_response.json() if lignes_response.status_code == 200 else []
         
-        # 5. Récupérer les settings
+        # Récupérer les settings
         settings_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
@@ -1506,7 +1501,7 @@ def generate_pdf(id_devis):
                 'footer_text': ''
             }
         
-        # Ajouter les infos au devis
+        # Ajouter les infos
         devis['client_nom'] = client.get('nom', 'Non renseigné')
         devis['client_email'] = client.get('email', '-')
         devis['client_telephone'] = client.get('telephone', '-')
@@ -1523,181 +1518,196 @@ def generate_pdf(id_devis):
             ligne['total_ligne'] = float(ligne['total_ligne']) if ligne['total_ligne'] else 0
         
         # ============================================================
-        # CRÉATION DU TAMPON "PAYÉ" (pour les devis payés)
+        # CRÉATION DU PDF - 1 PAGE
         # ============================================================
-        def create_stamp_paye():
-            d = Drawing(280, 180)
-            
-            # Rectangle rouge
-            rect = Rect(0, 20, 280, 140, 
-                        fillColor=Color(1, 0, 0, 0.12),
-                        strokeColor=Color(1, 0, 0, 0.7),
-                        strokeWidth=3)
-            d.add(rect)
-            
-            # Texte PAYÉ
-            text = String(140, 90, "PAYÉ", 
-                          fontSize=46, 
-                          fillColor=Color(1, 0, 0, 0.75),
-                          fontName='Helvetica-Bold')
-            text.rotateAngle = -25
-            text.textAnchor = 'middle'
-            d.add(text)
-            
-            # Date
-            date_text = String(140, 110, datetime.now().strftime('%d/%m/%Y'),
-                               fontSize=11,
-                               fillColor=Color(1, 0, 0, 0.5),
-                               fontName='Helvetica')
-            date_text.rotateAngle = -25
-            date_text.textAnchor = 'middle'
-            d.add(date_text)
-            
-            return d
-        
-        # ========== CRÉATION DU PDF ==========
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                                rightMargin=2*cm, leftMargin=2*cm, 
-                                topMargin=2*cm, bottomMargin=2*cm)
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+                                rightMargin=1.2*cm, leftMargin=1.2*cm,
+                                topMargin=1.2*cm, bottomMargin=1.2*cm)
         
         styles = getSampleStyleSheet()
         primary_color = settings.get('primary_color', '#1E3A8A')
         
+        # ===== STYLES COMPACTS =====
         title_style = ParagraphStyle(
             'CustomTitle', 
             parent=styles['Heading1'], 
-            fontSize=24, 
+            fontSize=16, 
             textColor=colors.HexColor(primary_color),
-            alignment=1
+            alignment=1,
+            spaceAfter=2
         )
         
         subtitle_style = ParagraphStyle(
             'Subtitle',
             parent=styles['Normal'],
-            fontSize=10,
+            fontSize=7,
             textColor=colors.HexColor('#6B7280'),
-            alignment=1
+            alignment=1,
+            spaceAfter=2
         )
         
         section_style = ParagraphStyle(
             'Section',
             parent=styles['Heading2'],
-            fontSize=14,
+            fontSize=9,
             textColor=colors.HexColor(primary_color),
-            spaceAfter=12
+            spaceAfter=3,
+            spaceBefore=3
+        )
+        
+        label_style = ParagraphStyle(
+            'Label',
+            parent=styles['Normal'],
+            fontSize=7,
+            textColor=colors.HexColor('#4B5563'),
+            fontName='Helvetica-Bold',
+            alignment=0
+        )
+        
+        value_style = ParagraphStyle(
+            'Value',
+            parent=styles['Normal'],
+            fontSize=7,
+            textColor=colors.HexColor('#1F2937'),
+            alignment=0
+        )
+        
+        body_style = ParagraphStyle(
+            'Body',
+            parent=styles['Normal'],
+            fontSize=7,
+            leading=8,
+            textColor=colors.HexColor('#374151')
+        )
+        
+        condition_style = ParagraphStyle(
+            'Condition',
+            parent=styles['Normal'],
+            fontSize=6,
+            leading=8,
+            textColor=colors.HexColor('#6B7280')
         )
         
         story = []
+        
+        # ============================================================
+        # EN-TÊTE
+        # ============================================================
         
         # Logo
         if settings.get('company_logo'):
             logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
             if os.path.exists(logo_path):
                 try:
-                    logo_img = Image(logo_path, width=60, height=60)
+                    from reportlab.platypus import Image
+                    logo_img = Image(logo_path, width=40, height=40)
                     story.append(logo_img)
                 except:
                     pass
         
-        # En-tête
-        company_name = settings.get('company_name', 'BTP Devis Pro')
-        story.append(Paragraph(company_name, styles['Normal']))
-        
-        slogan = settings.get('slogan', '')
-        if slogan:
-            story.append(Paragraph(slogan, subtitle_style))
-        
-        story.append(Spacer(1, 0.2*cm))
+        # Titre
         story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
-        story.append(Spacer(1, 0.3*cm))
         
-        company_info = f"{settings.get('company_email', '')} | {settings.get('company_phone', '')}"
-        story.append(Paragraph(company_info, subtitle_style))
-        
-        website = settings.get('website', '')
-        if website:
-            story.append(Paragraph(f"🌐 {website}", subtitle_style))
-        
+        # Coordonnées entreprise
+        coords = []
+        if settings.get('company_email'):
+            coords.append(settings.get('company_email'))
+        if settings.get('company_phone'):
+            coords.append(settings.get('company_phone'))
         if settings.get('company_address'):
-            story.append(Paragraph(settings.get('company_address'), subtitle_style))
+            coords.append(settings.get('company_address'))
+        if settings.get('website'):
+            coords.append(settings.get('website'))
         
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph("<hr/>", styles['Normal']))
-        story.append(Spacer(1, 0.3*cm))
+        if coords:
+            story.append(Paragraph(" | ".join(coords), subtitle_style))
         
-        # Infos devis
+        story.append(Spacer(1, 0.1*cm))
+        story.append(Paragraph(f"<hr color='{primary_color}' size='1'/>", styles['Normal']))
+        story.append(Spacer(1, 0.1*cm))
+        
+        # ============================================================
+        # INFOS DEVIS - 4 colonnes compactes
+        # ============================================================
         info_data = [
-            ['Référence', f"DEVIS-{devis['id_devis']:06d}"],
-            ['Date d\'émission', datetime.fromisoformat(devis['date_creation'].replace('Z', '+00:00')).strftime('%d/%m/%Y')],
-            ['Validité', '30 jours'],
-            ['Statut', devis.get('statut', 'brouillon').upper()]
+            [
+                Paragraph("<b>Référence</b>", label_style),
+                Paragraph(f"DEVIS-{devis['id_devis']:06d}", value_style),
+                Paragraph("<b>Date</b>", label_style),
+                Paragraph(datetime.fromisoformat(devis['date_creation'].replace('Z', '+00:00')).strftime('%d/%m/%Y'), value_style),
+                Paragraph("<b>Validité</b>", label_style),
+                Paragraph("30 jours", value_style),
+                Paragraph("<b>Statut</b>", label_style),
+                Paragraph(devis.get('statut', 'brouillon').upper(), value_style)
+            ]
         ]
         
-        info_table = Table(info_data, colWidths=[4*cm, 8*cm])
+        info_table = Table(info_data, colWidths=[1.2*cm, 2.5*cm, 0.8*cm, 2*cm, 1.2*cm, 2*cm, 1*cm, 2.5*cm])
         info_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor(primary_color)),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
         ]))
         story.append(info_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.15*cm))
         
-        # Infos client
-        story.append(Paragraph("Informations Client", section_style))
+        # ============================================================
+        # INFOS CLIENT - 2 colonnes compactes
+        # ============================================================
         client_data = [
-            ['Nom', devis['client_nom']],
-            ['Email', devis.get('client_email', '-') or '-'],
-            ['Téléphone', devis.get('client_telephone', '-') or '-'],
-            ['Adresse', devis.get('client_adresse', '-') or '-']
+            [
+                Paragraph("<b>Client</b>", label_style),
+                Paragraph(devis['client_nom'], value_style),
+                Paragraph("<b>Projet</b>", label_style),
+                Paragraph(devis['nom_projet'], value_style)
+            ],
+            [
+                Paragraph("<b>Email</b>", label_style),
+                Paragraph(devis.get('client_email', '-'), value_style),
+                Paragraph("<b>Description</b>", label_style),
+                Paragraph(devis.get('projet_description', '-'), value_style)
+            ],
+            [
+                Paragraph("<b>Tél</b>", label_style),
+                Paragraph(devis.get('client_telephone', '-'), value_style),
+                Paragraph("<b>Localisation</b>", label_style),
+                Paragraph(devis.get('localisation', '-'), value_style)
+            ]
         ]
         
-        client_table = Table(client_data, colWidths=[3*cm, 9*cm])
+        client_table = Table(client_data, colWidths=[0.8*cm, 4*cm, 1.2*cm, 4*cm])
         client_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4B5563')),
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F3F4F6')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
         ]))
         story.append(client_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.1*cm))
         
-        # Infos projet
-        story.append(Paragraph("Informations Projet", section_style))
-        projet_data = [
-            ['Nom du projet', devis['nom_projet']],
-            ['Description', devis.get('projet_description', '-') or '-'],
-            ['Localisation', devis.get('localisation', '-') or '-']
-        ]
+        # ============================================================
+        # TABLEAU DES ARTICLES - Compact
+        # ============================================================
+        story.append(Paragraph("Détail des prestations", section_style))
         
-        projet_table = Table(projet_data, colWidths=[3*cm, 9*cm])
-        projet_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4B5563')),
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F3F4F6')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        story.append(projet_table)
-        story.append(Spacer(1, 0.5*cm))
-        
-        # Tableau des matériaux
-        story.append(Paragraph("Détail des Travaux et Matériaux", section_style))
-        
-        data = [['Désignation', 'Quantité', 'Prix unitaire (FCFA)', 'Total (FCFA)']]
+        table_data = [['Désignation', 'Qté', 'Prix U.', 'Total']]
         total_materiaux = 0
         
         for ligne in devis['lignes']:
             total_ligne = ligne['quantite'] * ligne['prix_unitaire']
             total_materiaux += total_ligne
-            data.append([
-                ligne['designation'],
+            table_data.append([
+                Paragraph(ligne['designation'], body_style),
                 str(ligne['quantite']),
                 f"{ligne['prix_unitaire']:,.0f}",
                 f"{total_ligne:,.0f}"
@@ -1706,90 +1716,84 @@ def generate_pdf(id_devis):
         main_oeuvre = total_materiaux * 0.2
         total_ttc = total_materiaux + main_oeuvre
         
-        data.append(['', '', 'Sous-total matériaux', f"{total_materiaux:,.0f}"])
-        data.append(['', '', 'Main d\'œuvre (20%)', f"{main_oeuvre:,.0f}"])
-        data.append(['', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
+        table_data.append(['', '', 'Sous-total', f"{total_materiaux:,.0f}"])
+        table_data.append(['', '', 'Main d\'œuvre (20%)', f"{main_oeuvre:,.0f}"])
+        table_data.append(['', '', 'TOTAL TTC', f"{total_ttc:,.0f}"])
         
-        table = Table(data, colWidths=[7*cm, 2.5*cm, 3.5*cm, 3.5*cm])
+        table = Table(table_data, colWidths=[5.5*cm, 1.8*cm, 2.5*cm, 2.8*cm])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(primary_color)),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('FONTNAME', (0, 1), (-1, -3), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -3), 9),
+            ('FONTSIZE', (0, 1), (-1, -3), 6),
             ('ALIGN', (1, 1), (-1, -3), 'CENTER'),
             ('ALIGN', (0, 1), (0, -3), 'LEFT'),
             ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -3), (-1, -1), 7),
             ('BACKGROUND', (0, -3), (-1, -1), colors.HexColor('#F3F4F6')),
             ('TEXTCOLOR', (0, -3), (-1, -1), colors.HexColor(primary_color)),
-            ('FONTSIZE', (0, -3), (-1, -1), 10),
+            ('ALIGN', (2, -3), (-1, -1), 'RIGHT'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
             ('GRID', (0, 0), (-1, -4), 0.5, colors.HexColor('#E5E7EB')),
-            ('BOX', (0, -3), (-1, -1), 1, colors.HexColor(primary_color)),
+            ('BOX', (0, -3), (-1, -1), 0.5, colors.HexColor(primary_color)),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
-        
         story.append(table)
-        story.append(Spacer(1, 0.8*cm))
+        story.append(Spacer(1, 0.1*cm))
         
-        # Conditions
-        story.append(Paragraph("Conditions et Modalités", section_style))
+        # ============================================================
+        # CONDITIONS - Compactes
+        # ============================================================
+        story.append(Paragraph("Conditions", section_style))
         
         conditions = [
-            "• Le présent devis est valable pour une durée de 30 jours à compter de sa date d'émission.",
-            "• Tout commencement des travaux vaut acceptation du devis.",
-            "• Les matériaux fournis restent la propriété de l'entreprise jusqu'au paiement intégral.",
-            "• Délai de livraison : à convenir selon planning du projet.",
+            "• Valable 30 jours. • Commencement des travaux = acceptation. • Matériaux propriété de l'entreprise jusqu'au paiement intégral."
         ]
         
         for condition in conditions:
-            story.append(Paragraph(condition, styles['Normal']))
-            story.append(Spacer(1, 0.2*cm))
+            story.append(Paragraph(condition, condition_style))
         
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.1*cm))
         
-        # Signatures
+        # ============================================================
+        # SIGNATURES
+        # ============================================================
         entreprise_name = settings.get("company_name", "l'entreprise")
         signature_data = [
-            [f'Pour {entreprise_name}', 'Pour el client'],
+            [f'Pour {entreprise_name}', 'Pour le client'],
             ['_________________________', '_________________________'],
             ['Date et signature', 'Date et signature']
         ]
         
-        signature_table = Table(signature_data, colWidths=[8*cm, 8*cm])
+        signature_table = Table(signature_data, colWidths=[7*cm, 7*cm])
         signature_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTSIZE', (0, 1), (-1, 2), 9),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('FONTSIZE', (0, 1), (-1, 2), 6),
             ('TEXTCOLOR', (0, 1), (-1, 2), colors.HexColor('#6B7280')),
-            ('TOPPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
         story.append(signature_table)
-        story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.1*cm))
         
-        # Pied de page
-        story.append(Paragraph("<hr/>", styles['Normal']))
+        # ============================================================
+        # PIED DE PAGE
+        # ============================================================
+        story.append(Paragraph(f"<hr color='{primary_color}' size='0.5'/>", styles['Normal']))
         
-        footer_text = settings.get('footer_text', '')
-        if footer_text:
-            story.append(Paragraph(footer_text, subtitle_style))
-        
-        footer_info = f"Devis généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
+        footer_info = f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} - {settings.get('company_name', 'BTP Devis Pro')}"
         story.append(Paragraph(footer_info, subtitle_style))
         
         # ============================================================
-        # AJOUT DU TAMPON "PAYÉ" SI LE DEVIS EST PAYÉ
+        # CONSTRUCTION
         # ============================================================
-        # Pour un devis, le statut "payé" n'existe pas normalement,
-        # mais on peut l'ajouter si jamais
-        if devis.get('statut') == 'payé' or devis.get('statut') == 'paye':
-            stamp = create_stamp_paye()
-            story.append(Spacer(1, 0.5*cm))
-            story.append(stamp)
-        
         doc.build(story)
         buffer.seek(0)
         
