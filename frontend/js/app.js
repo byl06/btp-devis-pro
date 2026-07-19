@@ -3071,11 +3071,11 @@ switchParametreTab(tab) {
     if (contentArea) {
         contentArea.innerHTML = this.renderParametreContent(tab, settings);
         
-        // 🔥 SI ON CLIQUE SUR ABONNEMENT, CHARGER LE CONTENU
+        // 🔥 AJOUTE CETTE LIGNE ICI
         if (tab === 'abonnement') {
             setTimeout(() => {
                 this.renderAbonnementContent();
-            }, 200);
+            }, 300);
         }
     }
 }
