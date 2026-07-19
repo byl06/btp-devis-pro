@@ -903,7 +903,10 @@ def creer_situation(id_devis):
     try:
         user_id = get_jwt_identity()
         user_id = int(user_id)
-        data = request.json
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Données JSON invalides'}), 400
         
         print(f"🔍 Création situation pour devis {id_devis}, user {user_id}")
         print(f"🔍 Données reçues: {data}")
@@ -917,10 +920,11 @@ def creer_situation(id_devis):
         headers = {
             "Authorization": f"Bearer {supabase_key}",
             "apikey": supabase_key,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"  # 🔥 Demander à Supabase de retourner les données
         }
         
-        # Vérifier que le devis existe et appartient à l'utilisateur
+        # Vérifier que le devis existe
         devis_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,total,acompte_montant",
             headers=headers
@@ -933,7 +937,7 @@ def creer_situation(id_devis):
         if devis.get('id_user') != user_id:
             return jsonify({'success': False, 'message': 'Non autorisé'}), 403
         
-        # Calculer le montant restant après acompte
+        # Calculer le montant restant
         total = float(devis.get('total', 0))
         acompte = float(devis.get('acompte_montant', 0))
         montant_restant = total - acompte
@@ -948,10 +952,14 @@ def creer_situation(id_devis):
         dernier_numero = situations[0].get('numero', 0) if situations else 0
         nouveau_numero = dernier_numero + 1
         
-        # Calculer le pourcentage et le montant
+        # Récupérer les données
         pourcentage = data.get('pourcentage', 0)
-        montant = montant_restant * (pourcentage / 100)
         travaux_realises = data.get('travaux_realises', '')
+        
+        if pourcentage < 0 or pourcentage > 100:
+            return jsonify({'success': False, 'message': 'Pourcentage invalide (0-100)'}), 400
+        
+        montant = montant_restant * (pourcentage / 100)
         
         print(f"🔍 Nouvelle situation: numero={nouveau_numero}, pourcentage={pourcentage}%, montant={montant}")
         
@@ -973,18 +981,28 @@ def creer_situation(id_devis):
         )
         
         print(f"🔍 Status création situation: {response.status_code}")
-        print(f"🔍 Réponse: {response.text}")
+        print(f"🔍 Réponse brute: '{response.text}'")
         
-        if response.status_code in [200, 201]:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                id_situation = result[0].get('id_situation')
-            elif isinstance(result, dict):
-                id_situation = result.get('id_situation')
+        # 🔥 Gérer la réponse - même si vide, la création a réussi
+        if response.status_code in [200, 201, 204]:
+            # La création a réussi, maintenant on récupère la situation créée
+            # Récupérer la dernière situation créée
+            get_response = requests.get(
+                f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}&order=id_situation.desc&limit=1",
+                headers=headers
+            )
+            
+            if get_response.status_code == 200 and get_response.json():
+                nouvelle_situation = get_response.json()[0]
+                id_situation = nouvelle_situation.get('id_situation')
+                montant_created = nouvelle_situation.get('montant', montant)
+                numero_created = nouvelle_situation.get('numero', nouveau_numero)
             else:
                 id_situation = None
+                montant_created = round(montant, 2)
+                numero_created = nouveau_numero
             
-            # Mettre à jour le nombre de situations dans le devis
+            # Mettre à jour le nombre de situations
             requests.patch(
                 f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
                 headers=headers,
@@ -995,11 +1013,11 @@ def creer_situation(id_devis):
                 'success': True,
                 'message': 'Situation créée avec succès',
                 'id_situation': id_situation,
-                'numero': nouveau_numero,
-                'montant': round(montant, 2)
+                'numero': numero_created,
+                'montant': montant_created
             })
         else:
-            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+            return jsonify({'success': False, 'message': f'Erreur Supabase: {response.text}'}), 500
         
     except Exception as e:
         print(f"❌ Erreur creer_situation: {e}")
