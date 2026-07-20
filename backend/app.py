@@ -308,17 +308,16 @@ def create_client():
         user_id = int(user_id)
         data = request.json
         
-        # 🔥 Vérifier l'abonnement
         ok, message, headers, supabase_url = verifier_abonnement(user_id)
         if not ok:
             return jsonify({'success': False, 'message': message}), 403
         
-        # Créer le client
         client_data = {
             "nom": data.get('nom'),
             "telephone": data.get('telephone'),
             "email": data.get('email'),
             "adresse": data.get('adresse'),
+            "ifu": data.get('ifu', ''),  # 🔥 AJOUT
             "id_user": user_id
         }
         
@@ -355,7 +354,6 @@ def update_client(id_client):
             "Content-Type": "application/json"
         }
         
-        # Vérifier que le client appartient à l'utilisateur
         check_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}&select=id_user",
             headers=headers
@@ -368,12 +366,12 @@ def update_client(id_client):
         if client.get('id_user') != user_id:
             return jsonify({'success': False, 'message': 'Non autorisé'}), 403
         
-        # Mettre à jour le client
         update_data = {
             "nom": data.get('nom'),
             "telephone": data.get('telephone'),
             "email": data.get('email'),
-            "adresse": data.get('adresse')
+            "adresse": data.get('adresse'),
+            "ifu": data.get('ifu', '')  # 🔥 AJOUT
         }
         
         response = requests.patch(

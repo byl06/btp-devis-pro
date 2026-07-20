@@ -1607,10 +1607,15 @@ openCreateClientModal() {
                         <textarea id="client-adresse" rows="3"></textarea>
                     </div>
                     
-<div class="form-group">
-    <label>IFU (Numéro d'Identification Fiscale)</label>
-    <input type="text" id="client-ifu" placeholder="13 caractères">
-</div>
+                    <!-- 🔥 AJOUTER LE CHAMP IFU ICI -->
+                    <div class="form-group">
+                        <label>IFU (Numéro d'Identification Fiscale)</label>
+                        <input type="text" id="client-ifu" placeholder="13 caractères" maxlength="13">
+                        <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
+                            <i class="fas fa-info-circle"></i> Obligatoire pour les factures normalisées
+                        </p>
+                    </div>
+                    
                     <div class="form-actions">
                         <button type="submit" class="btn-primary">Enregistrer</button>
                         <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -1622,64 +1627,59 @@ openCreateClientModal() {
     
     document.body.appendChild(modal);
     
-    // Fermeture
     const closeBtns = modal.querySelectorAll('.close-modal');
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     
-    // Soumission avec verrou anti-doublon
-const form = modal.querySelector('#client-form');
-let isSubmitting = false;
-
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+    const form = modal.querySelector('#client-form');
+    let isSubmitting = false;
     
-    if (isSubmitting) {
-        console.log("⏳ Déjà en cours...");
-        return;
-    }
-
-    const limitesOk = await this.checkLimites('client');
-    if (!limitesOk) return;
-    
-    const clientData = {
-        nom: document.getElementById('client-nom').value,
-        telephone: document.getElementById('client-telephone').value,
-        email: document.getElementById('client-email').value,
-        adresse: document.getElementById('client-adresse').value,
-        ifu: document.getElementById('client-ifu').value || ''  // Ajout  // Ajout de l'IFU avec valeur par défaut vide
-    };
-    
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    
-    isSubmitting = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
-    submitBtn.disabled = true;
-    
-    try {
-        const response = await apiRequest('/api/clients', {
-            method: 'POST',
-            body: JSON.stringify(clientData)
-        });
-        const result = await response.json();
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        if (result.success) {
-            Toast.success('Client ajouté avec succès');
-            modal.remove();
-            setTimeout(() => this.loadPage('clients'), 1000);
-        } else {
-            Toast.error(result.message || 'Erreur lors de la création');
+        if (isSubmitting) return;
+        
+        const limitesOk = await this.checkLimites('client');
+        if (!limitesOk) return;
+        
+        const clientData = {
+            nom: document.getElementById('client-nom').value,
+            telephone: document.getElementById('client-telephone').value,
+            email: document.getElementById('client-email').value,
+            adresse: document.getElementById('client-adresse').value,
+            ifu: document.getElementById('client-ifu').value || ''  // 🔥 AJOUT
+        };
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        isSubmitting = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await apiRequest('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(clientData)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                Toast.success('Client ajouté avec succès');
+                modal.remove();
+                setTimeout(() => this.loadPage('clients'), 1000);
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+                isSubmitting = false;
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            Toast.error('❌ Erreur de connexion');
             isSubmitting = false;
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         }
-    } catch (error) {
-        alert('❌ Erreur de connexion');
-        isSubmitting = false;
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-});
+    });
 }
 
 
@@ -2326,7 +2326,6 @@ async payFacture(id_facture) {
 
 async editClient(id) {
     try {
-        // Récupérer les infos du client
         const clients = await this.fetchClients();
         const client = clients.find(c => c.id_client === id);
         
@@ -2362,6 +2361,16 @@ async editClient(id) {
                             <label>Adresse</label>
                             <textarea id="edit-client-adresse" rows="3">${client.adresse || ''}</textarea>
                         </div>
+                        
+                        <!-- 🔥 AJOUTER LE CHAMP IFU ICI -->
+                        <div class="form-group">
+                            <label>IFU (Numéro d'Identification Fiscale)</label>
+                            <input type="text" id="edit-client-ifu" value="${client.ifu || ''}" placeholder="13 caractères" maxlength="13">
+                            <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
+                                <i class="fas fa-info-circle"></i> Obligatoire pour les factures normalisées
+                            </p>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">Enregistrer</button>
                             <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -2386,7 +2395,8 @@ async editClient(id) {
                 nom: document.getElementById('edit-client-nom').value,
                 telephone: document.getElementById('edit-client-telephone').value,
                 email: document.getElementById('edit-client-email').value,
-                adresse: document.getElementById('edit-client-adresse').value
+                adresse: document.getElementById('edit-client-adresse').value,
+                ifu: document.getElementById('edit-client-ifu').value || ''  // 🔥 AJOUT
             };
             
             try {
@@ -2397,20 +2407,20 @@ async editClient(id) {
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('✅ Client modifié avec succès !');
+                    Toast.success('✅ Client modifié avec succès !');
                     modal.remove();
                     this.loadPage('clients');
                 } else {
-                    alert('❌ Erreur: ' + result.message);
+                    Toast.error('❌ Erreur: ' + result.message);
                 }
             } catch (error) {
-                alert('❌ Erreur de connexion');
+                Toast.error('❌ Erreur de connexion');
             }
         });
         
     } catch (error) {
         console.error('Erreur:', error);
-        alert('Erreur lors du chargement du client');
+        Toast.error('Erreur lors du chargement du client');
     }
 }
 
