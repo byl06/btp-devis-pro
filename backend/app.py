@@ -2348,6 +2348,7 @@ def update_settings():
             headers=headers
         )
         
+        # 🔥 RÉCUPÉRER TOUS LES CHAMPS (incluant nif)
         update_data = {
             "company_name": data.get('company_name', ''),
             "company_email": data.get('company_email', ''),
@@ -2359,8 +2360,15 @@ def update_settings():
             "updated_at": datetime.now().isoformat(),
             "slogan": data.get('slogan', ''),
             "website": data.get('website', ''),
-            "footer_text": data.get('footer_text', '')
+            "footer_text": data.get('footer_text', ''),
+            # 🔥 CHAMPS FISCAUX - AJOUTER ICI
+            "nif": data.get('nif', ''),  # ← CE CHAMP ÉTAIT MANQUANT !
+            "regime_tva": data.get('regime_tva', 'non assujetti'),
+            "numero_contribuable": data.get('numero_contribuable', ''),
+            "adresse_fiscale": data.get('adresse_fiscale', '')
         }
+        
+        print(f"🔍 Mise à jour settings: {update_data}")
         
         # Si settings existe, mettre à jour
         if check_response.status_code == 200 and check_response.json():
