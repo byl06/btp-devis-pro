@@ -1430,9 +1430,10 @@ def generate_pdf(id_devis):
         import io
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm, mm
+        from reportlab.lib.units import cm
+        from reportlab.lib.utils import ImageReader
         import os
         
         supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
@@ -1454,13 +1455,6 @@ def generate_pdf(id_devis):
             return jsonify({'error': 'Devis non trouvé'}), 404
         
         devis = devis_response.json()[0]
-        
-        # Récupérer les situations
-        situations_response = requests.get(
-            f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}&order=numero.asc",
-            headers=headers
-        )
-        situations = situations_response.json() if situations_response.status_code == 200 else []
         
         # Récupérer le client
         client_response = requests.get(
@@ -1503,7 +1497,8 @@ def generate_pdf(id_devis):
                 'accent_color': '#06B6D4',
                 'slogan': '',
                 'website': '',
-                'footer_text': ''
+                'footer_text': '',
+                'custom_header': None
             }
         
         # Ajouter les infos
@@ -1515,7 +1510,6 @@ def generate_pdf(id_devis):
         devis['projet_description'] = projet.get('description', '-')
         devis['localisation'] = projet.get('localisation', '-')
         devis['lignes'] = lignes
-        devis['situations'] = situations
         
         # Conversion des types
         for ligne in devis['lignes']:
@@ -1534,7 +1528,7 @@ def generate_pdf(id_devis):
         styles = getSampleStyleSheet()
         primary_color = settings.get('primary_color', '#1E3A8A')
         
-        # ===== STYLES COMPACTS =====
+        # ===== STYLES =====
         title_style = ParagraphStyle(
             'CustomTitle', 
             parent=styles['Heading1'], 
@@ -1598,36 +1592,68 @@ def generate_pdf(id_devis):
         story = []
         
         # ============================================================
-        # EN-TÊTE
+        # EN-TÊTE PERSONNALISÉ (si importé)
         # ============================================================
         
-        # Logo
-        if settings.get('company_logo'):
-            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
-            if os.path.exists(logo_path):
+        custom_header = settings.get('custom_header')
+        header_imported = False
+        
+        if custom_header:
+            header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
+            if os.path.exists(header_path):
                 try:
-                    from reportlab.platypus import Image
-                    logo_img = Image(logo_path, width=40, height=40)
-                    story.append(logo_img)
-                except:
-                    pass
+                    # Charger l'image et garder ses proportions
+                    img = ImageReader(header_path)
+                    img_width, img_height = img.getSize()
+                    
+                    max_width = 17 * cm
+                    max_height = 3 * cm
+                    
+                    # Calcul du ratio pour garder les proportions
+                    ratio = min(max_width / img_width, max_height / img_height)
+                    new_width = img_width * ratio
+                    new_height = img_height * ratio
+                    
+                    header_img = Image(header_path, width=new_width, height=new_height)
+                    story.append(header_img)
+                    story.append(Spacer(1, 0.2*cm))
+                    header_imported = True
+                    print(f"✅ En-tête importé: {new_width} x {new_height}")
+                except Exception as e:
+                    print(f"⚠️ Erreur chargement en-tête: {e}")
+                    header_imported = False
         
-        # Titre
-        story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
+        # ============================================================
+        # EN-TÊTE STANDARD (si pas d'en-tête importé)
+        # ============================================================
         
-        # Coordonnées entreprise
-        coords = []
-        if settings.get('company_email'):
-            coords.append(settings.get('company_email'))
-        if settings.get('company_phone'):
-            coords.append(settings.get('company_phone'))
-        if settings.get('company_address'):
-            coords.append(settings.get('company_address'))
-        if settings.get('website'):
-            coords.append(settings.get('website'))
-        
-        if coords:
-            story.append(Paragraph(" | ".join(coords), subtitle_style))
+        if not header_imported:
+            # Logo
+            if settings.get('company_logo'):
+                logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+                if os.path.exists(logo_path):
+                    try:
+                        logo_img = Image(logo_path, width=40, height=40)
+                        story.append(logo_img)
+                    except:
+                        pass
+            
+            # Titre
+            story.append(Paragraph("DEVIS PROFESSIONNEL", title_style))
+            
+            # Coordonnées entreprise
+            coords = []
+            if settings.get('company_email'):
+                coords.append(settings.get('company_email'))
+            if settings.get('company_phone'):
+                coords.append(settings.get('company_phone'))
+            if settings.get('company_address'):
+                coords.append(settings.get('company_address'))
+            if settings.get('website'):
+                coords.append(settings.get('website'))
+            
+            if coords:
+                story.append(Paragraph(" | ".join(coords), subtitle_style))
         
         story.append(Spacer(1, 0.1*cm))
         story.append(Paragraph(f"<hr color='{primary_color}' size='1'/>", styles['Normal']))
@@ -1753,74 +1779,6 @@ def generate_pdf(id_devis):
         story.append(Spacer(1, 0.1*cm))
         
         # ============================================================
-        # ACOMPTE ET SITUATIONS - NOUVEAU
-        # ============================================================
-        if devis.get('acompte_pourcentage', 0) > 0 or len(devis['situations']) > 0:
-            story.append(Paragraph("Conditions de paiement", section_style))
-            
-            paiement_data = []
-            
-            # Acompte
-            if devis.get('acompte_pourcentage', 0) > 0:
-                acompte_montant = devis.get('acompte_montant', 0)
-                acompte_paye = "✅ Payé" if devis.get('acompte_paye') else "⏳ En attente"
-                paiement_data.append([
-                    Paragraph("Acompte", label_style),
-                    Paragraph(f"{devis.get('acompte_pourcentage', 0)}%", value_style),
-                    Paragraph(f"{acompte_montant:,.0f} FCFA", value_style),
-                    Paragraph(acompte_paye, value_style)
-                ])
-            
-            # Situations
-            for s in devis['situations']:
-                statut = "✅ Payée" if s.get('statut') == 'payee' else "⏳ En attente"
-                paiement_data.append([
-                    Paragraph(f"Situation #{s.get('numero', 0)}", label_style),
-                    Paragraph(f"{s.get('pourcentage', 0)}%", value_style),
-                    Paragraph(f"{s.get('montant', 0):,.0f} FCFA", value_style),
-                    Paragraph(statut, value_style)
-                ])
-            
-            # Total payé / Reste
-            total_paye = 0
-            if devis.get('acompte_paye'):
-                total_paye += devis.get('acompte_montant', 0)
-            for s in devis['situations']:
-                if s.get('statut') == 'payee':
-                    total_paye += s.get('montant', 0)
-            
-            reste = total_ttc - total_paye
-            
-            paiement_data.append([
-                Paragraph("<b>Total payé</b>", label_style),
-                "",
-                Paragraph(f"<b>{total_paye:,.0f} FCFA</b>", value_style),
-                ""
-            ])
-            paiement_data.append([
-                Paragraph("<b>Reste à payer</b>", label_style),
-                "",
-                Paragraph(f"<b>{reste:,.0f} FCFA</b>", value_style),
-                ""
-            ])
-            
-            paiement_table = Table(paiement_data, colWidths=[3*cm, 1.5*cm, 3*cm, 2.5*cm])
-            paiement_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
-                ('BACKGROUND', (0, -2), (-1, -1), colors.HexColor('#F3F4F6')),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(primary_color)),
-                ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
-            ]))
-            story.append(paiement_table)
-            story.append(Spacer(1, 0.1*cm))
-        
-        # ============================================================
         # CONDITIONS - Compactes
         # ============================================================
         story.append(Paragraph("Conditions", section_style))
@@ -1828,9 +1786,6 @@ def generate_pdf(id_devis):
         conditions = [
             "• Valable 30 jours. • Commencement des travaux = acceptation. • Matériaux propriété de l'entreprise jusqu'au paiement intégral."
         ]
-        
-        if devis.get('acompte_pourcentage', 0) > 0:
-            conditions[0] += f" • Acompte de {devis.get('acompte_pourcentage', 0)}% à la commande."
         
         for condition in conditions:
             story.append(Paragraph(condition, condition_style))
@@ -3145,7 +3100,8 @@ def generate_pdf_normalise(id_facture):
             'slogan': '',
             'website': '',
             'footer_text': '',
-            'nif': 'N/A'
+            'nif': 'N/A',
+            'custom_header': None
         }
         
         # Créer le PDF
@@ -3200,59 +3156,93 @@ def generate_pdf_normalise(id_facture):
         story = []
         
         # ============================================================
-        # 1. EN-TÊTE
+        # 1. EN-TÊTE PERSONNALISÉ (si importé)
         # ============================================================
         
-        # Logo
-        logo_img = None
-        if settings.get('company_logo'):
-            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
-            if os.path.exists(logo_path):
+        custom_header = settings.get('custom_header')
+        header_imported = False
+        
+        if custom_header:
+            header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
+            if os.path.exists(header_path):
                 try:
-                    logo_img = Image(logo_path, width=40, height=40)
-                except:
-                    pass
+                    # Charger l'image et garder ses proportions
+                    img = ImageReader(header_path)
+                    img_width, img_height = img.getSize()
+                    
+                    max_width = 17 * cm
+                    max_height = 3 * cm
+                    
+                    # Calcul du ratio pour garder les proportions
+                    ratio = min(max_width / img_width, max_height / img_height)
+                    new_width = img_width * ratio
+                    new_height = img_height * ratio
+                    
+                    header_img = Image(header_path, width=new_width, height=new_height)
+                    story.append(header_img)
+                    story.append(Spacer(1, 0.2*cm))
+                    header_imported = True
+                    print(f"✅ En-tête importé: {new_width} x {new_height}")
+                except Exception as e:
+                    print(f"⚠️ Erreur chargement en-tête: {e}")
+                    header_imported = False
         
-        # Titre avec logo
-        if logo_img:
-            header_data = [[logo_img, Paragraph("FACTURE NORMALISÉE", title_style)]]
-            header_table = Table(header_data, colWidths=[2*cm, 14*cm])
-            header_table.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-                ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ]))
-            story.append(header_table)
-        else:
-            story.append(Paragraph("FACTURE NORMALISÉE", title_style))
+        # ============================================================
+        # 1bis. EN-TÊTE STANDARD (si pas d'en-tête importé)
+        # ============================================================
         
-        # Nom de l'entreprise
-        company_name = settings.get('company_name', 'BTP Devis Pro')
-        story.append(Paragraph(company_name, subtitle_style))
-        
-        # Slogan
-        slogan = settings.get('slogan', '')
-        if slogan:
-            story.append(Paragraph(slogan, subtitle_style))
-        
-        # Coordonnées
-        coords = []
-        if settings.get('company_address'):
-            coords.append(settings.get('company_address'))
-        if settings.get('company_phone'):
-            coords.append(f"📞 {settings.get('company_phone')}")
-        if settings.get('company_email'):
-            coords.append(f"✉ {settings.get('company_email')}")
-        if settings.get('website'):
-            coords.append(f"🌐 {settings.get('website')}")
-        
-        if coords:
-            story.append(Paragraph(" | ".join(coords), subtitle_style))
+        if not header_imported:
+            # Logo
+            logo_img = None
+            if settings.get('company_logo'):
+                logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+                if os.path.exists(logo_path):
+                    try:
+                        logo_img = Image(logo_path, width=40, height=40)
+                    except:
+                        pass
+            
+            # Titre avec logo
+            if logo_img:
+                header_data = [[logo_img, Paragraph("FACTURE NORMALISÉE", title_style)]]
+                header_table = Table(header_data, colWidths=[2*cm, 14*cm])
+                header_table.setStyle(TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+                    ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ]))
+                story.append(header_table)
+            else:
+                story.append(Paragraph("FACTURE NORMALISÉE", title_style))
+            
+            # Nom de l'entreprise
+            company_name = settings.get('company_name', 'BTP Devis Pro')
+            story.append(Paragraph(company_name, subtitle_style))
+            
+            # Slogan
+            slogan = settings.get('slogan', '')
+            if slogan:
+                story.append(Paragraph(slogan, subtitle_style))
+            
+            # Coordonnées
+            coords = []
+            if settings.get('company_address'):
+                coords.append(settings.get('company_address'))
+            if settings.get('company_phone'):
+                coords.append(f"📞 {settings.get('company_phone')}")
+            if settings.get('company_email'):
+                coords.append(f"✉ {settings.get('company_email')}")
+            if settings.get('website'):
+                coords.append(f"🌐 {settings.get('website')}")
+            
+            if coords:
+                story.append(Paragraph(" | ".join(coords), subtitle_style))
+            story.append(Paragraph(f"NIF: {settings.get('nif', 'N/A')}", subtitle_style))
         
         story.append(Spacer(1, 0.2*cm))
-        story.append(Paragraph(f"<hr color='{primary_color}' size='1'/>", styles['Normal']))
+        story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
         story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
