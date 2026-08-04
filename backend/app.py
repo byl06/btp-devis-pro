@@ -2801,208 +2801,6 @@ def get_factures(id_user):
 
 # ==================== FACTURE NORMALISÉE ====================
 
-@app.route('/api/facture/<int:id_facture>/normaliser', methods=['POST'])
-@jwt_required()
-def normaliser_facture(id_facture):
-    try:
-        user_id = get_jwt_identity()
-        user_id = int(user_id)
-        data = request.json
-        
-        ifu_client = data.get('ifu_client', '').strip()
-        payment_method = data.get('payment_method', 'ESPECES')
-        regime_tva = data.get('regime_tva', 'non assujetti')
-        
-        print("=" * 60)
-        print(f"🔍 Normalisation facture {id_facture} pour user {user_id}")
-        print(f"🔍 IFU client: {ifu_client}")
-        print(f"🔍 Méthode paiement: {payment_method}")
-        print("=" * 60)
-        
-        if not ifu_client or len(ifu_client) != 13:
-            return jsonify({'success': False, 'message': 'IFU client invalide (13 caractères requis)'}), 400
-        
-        import requests
-        from datetime import datetime
-        import json
-        
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
-        
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json"
-        }
-        
-        # 1. Récupérer la facture
-        facture_response = requests.get(
-            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
-            headers=headers
-        )
-        
-        if facture_response.status_code != 200 or not facture_response.json():
-            return jsonify({'success': False, 'message': 'Facture non trouvée'}), 404
-        
-        facture = facture_response.json()[0]
-        print(f"✅ Facture récupérée: ID {facture.get('id_facture')}")
-        
-        # 2. Récupérer le devis
-        devis_response = requests.get(
-            f"{supabase_url}/rest/v1/devis?id_devis=eq.{facture.get('id_devis')}",
-            headers=headers
-        )
-        
-        if devis_response.status_code != 200 or not devis_response.json():
-            return jsonify({'success': False, 'message': 'Devis non trouvé'}), 404
-        
-        devis = devis_response.json()[0]
-        print(f"✅ Devis récupéré: ID {devis.get('id_devis')}")
-        
-        # Vérifier que le devis appartient à l'utilisateur
-        if devis.get('id_user') != user_id:
-            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
-        
-        # 3. Récupérer le client
-        client_response = requests.get(
-            f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
-            headers=headers
-        )
-        client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
-        print(f"✅ Client récupéré: {client.get('nom')}")
-        
-        # 4. Récupérer les lignes du devis
-        lignes_response = requests.get(
-            f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{devis.get('id_devis')}",
-            headers=headers
-        )
-        lignes = lignes_response.json() if lignes_response.status_code == 200 else []
-        print(f"✅ {len(lignes)} lignes récupérées")
-        
-        # 5. Récupérer les settings (pour le NIF du vendeur)
-        settings_response = requests.get(
-            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
-            headers=headers
-        )
-        
-        if settings_response.status_code != 200 or not settings_response.json():
-            return jsonify({'success': False, 'message': 'Paramètres non trouvés. Configurez votre NIF dans les paramètres.'}), 404
-        
-        settings = settings_response.json()[0]
-        nif_vendeur = settings.get('nif', '').strip()
-        
-        print(f"✅ NIF vendeur: {nif_vendeur}")
-        
-        if not nif_vendeur or len(nif_vendeur) != 13:
-            return jsonify({'success': False, 'message': f'NIF vendeur invalide ({len(nif_vendeur)} caractères). Configurez un NIF de 13 caractères.'}), 400
-        
-        # 6. Construire les items
-        items = []
-        for ligne in lignes:
-            prix = float(ligne.get('prix_unitaire', 0))
-            qte = float(ligne.get('quantite', 1))
-            items.append({
-                "name": ligne.get('designation', 'Article'),
-                "price": prix,
-                "quantity": qte,
-                "taxGroup": "B"
-            })
-        
-        # Montant total
-        montant_total = float(facture.get('montant', 0))
-        
-        # 7. Préparer le payload avec le champ operator obligatoire
-        invoice_payload = {
-            "ifu": nif_vendeur,
-            "type": "FV",
-            "items": items,
-            "client": {
-                "ifu": ifu_client,
-                "name": client.get('nom', 'Client'),
-                "contact": client.get('telephone', ''),
-                "address": client.get('adresse', '')
-            },
-            "operator": {
-                "id": "",
-                "name": settings.get('company_name', 'BTP Devis Pro')
-            },
-            "payment": [
-                {
-                    "name": payment_method,
-                    "amount": montant_total
-                }
-            ]
-        }
-        
-        print(f"📤 Payload: {json.dumps(invoice_payload, indent=2)}")
-        
-        # 8. Appeler l'API e-MCF
-        from emcf import EMCFClient
-        emcf = EMCFClient()
-        
-        create_result = emcf.create_invoice(invoice_payload)
-        print(f"📥 Création: {json.dumps(create_result, indent=2)}")
-        
-        if not create_result or 'error' in create_result:
-            error_msg = create_result.get('error', 'Erreur inconnue')
-            return jsonify({'success': False, 'message': f'Erreur API: {error_msg}'}), 500
-        
-        uid = create_result.get('uid')
-        if not uid:
-            return jsonify({'success': False, 'message': 'UID non reçu'}), 500
-        
-        print(f"✅ UID reçu: {uid}")
-        
-        # 9. Confirmer la facture
-        confirm_result = emcf.confirm_invoice(uid)
-        print(f"📥 Confirmation: {json.dumps(confirm_result, indent=2)}")
-        
-        if not confirm_result or 'error' in confirm_result:
-            error_msg = confirm_result.get('error', 'Erreur inconnue')
-            return jsonify({'success': False, 'message': f'Erreur confirmation: {error_msg}'}), 500
-        
-        # 10. Enregistrer dans Supabase
-        update_data = {
-            "type_facture": "normalisee",
-            "statut_fiscal": "normalisee",
-            "num_facture_fiscale": confirm_result.get('nim', ''),
-            "code_securite": confirm_result.get('codeMECeFDGI', ''),
-            "qr_code": confirm_result.get('qrCode', ''),
-            "date_validation_fiscale": datetime.now().isoformat(),
-            "ifu_client": ifu_client,
-            "regime_tva": regime_tva,
-            "uid_facture": uid
-        }
-        
-        print(f"📝 Mise à jour Supabase: {update_data}")
-        
-        patch_response = requests.patch(
-            f"{supabase_url}/rest/v1/facture?id_facture=eq.{id_facture}",
-            headers=headers,
-            json=update_data
-        )
-        
-        print(f"📥 Update status: {patch_response.status_code}")
-        print(f"📥 Update response: {patch_response.text}")
-        
-        if patch_response.status_code not in [200, 204]:
-            return jsonify({'success': False, 'message': f'Erreur mise à jour: {patch_response.text}'}), 500
-        
-        return jsonify({
-            'success': True,
-            'message': 'Facture normalisée avec succès',
-            'num_fiscal': confirm_result.get('nim', ''),
-            'qr_code': confirm_result.get('qrCode', '')[:50] + '...' if confirm_result.get('qrCode') else '',
-            'code_mecf': confirm_result.get('codeMECeFDGI', '')
-        })
-        
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
 @app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])
 @jwt_required()
 def generate_pdf_normalise(id_facture):
@@ -3152,98 +2950,123 @@ def generate_pdf_normalise(id_facture):
             spaceBefore=5
         )
         
+        info_style = ParagraphStyle(
+            'InfoRight',
+            parent=styles['Normal'],
+            fontSize=7,
+            textColor=colors.HexColor('#4B5563'),
+            alignment=2,
+            leading=10
+        )
+        
         # ===== STORY =====
         story = []
         
         # ============================================================
-        # 1. EN-TÊTE PERSONNALISÉ (si importé)
+        # 1. EN-TÊTE : LOGO + INFOS (Mode 1) OU BANNIÈRE (Mode 2)
         # ============================================================
         
         custom_header = settings.get('custom_header')
         header_imported = False
         
+        # ──────────────────────────────────────────────────────────────
+        # MODE 2 : EN-TÊTE IMPORTÉ (BANNIÈRE)
+        # ──────────────────────────────────────────────────────────────
+        
         if custom_header:
             header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
             if os.path.exists(header_path):
                 try:
-                    # Charger l'image et garder ses proportions
+                    # Charger l'image
                     img = ImageReader(header_path)
                     img_width, img_height = img.getSize()
                     
+                    # Zone d'en-tête fixe : largeur 100%, hauteur max 110px
                     max_width = 17 * cm
-                    max_height = 3 * cm
+                    max_height = 110 * 0.75
                     
-                    # Calcul du ratio pour garder les proportions
+                    # Redimensionnement proportionnel
                     ratio = min(max_width / img_width, max_height / img_height)
                     new_width = img_width * ratio
                     new_height = img_height * ratio
                     
                     header_img = Image(header_path, width=new_width, height=new_height)
                     story.append(header_img)
-                    story.append(Spacer(1, 0.2*cm))
+                    story.append(Spacer(1, 0.15*cm))
+                    
+                    # Ligne de séparation sous l'en-tête
+                    story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
+                    story.append(Spacer(1, 0.15*cm))
+                    
                     header_imported = True
                     print(f"✅ En-tête importé: {new_width} x {new_height}")
                 except Exception as e:
                     print(f"⚠️ Erreur chargement en-tête: {e}")
                     header_imported = False
         
-        # ============================================================
-        # 1bis. EN-TÊTE STANDARD (si pas d'en-tête importé)
-        # ============================================================
+        # ──────────────────────────────────────────────────────────────
+        # MODE 1 : PERSONNALISATION (LOGO + TEXTE)
+        # ──────────────────────────────────────────────────────────────
         
         if not header_imported:
-            # Logo
+            # Récupérer le logo
             logo_img = None
             if settings.get('company_logo'):
                 logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
                 if os.path.exists(logo_path):
                     try:
-                        logo_img = Image(logo_path, width=40, height=40)
+                        logo_img = Image(logo_path, width=50, height=50)
                     except:
                         pass
             
-            # Titre avec logo
+            # Construction des infos entreprise (droite)
+            company_name = settings.get('company_name', 'BTP Devis Pro')
+            company_address = settings.get('company_address', '')
+            company_phone = settings.get('company_phone', '')
+            company_email = settings.get('company_email', '')
+            company_website = settings.get('website', '')
+            nif = settings.get('nif', '')
+            
+            # Texte des infos
+            info_lines = [f"<b>{company_name}</b>"]
+            if company_address:
+                info_lines.append(company_address)
+            if company_phone:
+                info_lines.append(f"📞 {company_phone}")
+            if company_email:
+                info_lines.append(f"✉ {company_email}")
+            if company_website:
+                info_lines.append(f"🌐 {company_website}")
+            if nif:
+                info_lines.append(f"NIF: {nif}")
+            
+            info_text = "<br/>".join(info_lines)
+            
+            # Création du tableau : Logo (gauche) | Infos (droite)
             if logo_img:
-                header_data = [[logo_img, Paragraph("FACTURE NORMALISÉE", title_style)]]
-                header_table = Table(header_data, colWidths=[2*cm, 14*cm])
+                header_data = [
+                    [logo_img, Paragraph(info_text, info_style)]
+                ]
+                header_table = Table(header_data, colWidths=[3*cm, 14*cm])
                 header_table.setStyle(TableStyle([
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-                    ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                    ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                 ]))
                 story.append(header_table)
             else:
-                story.append(Paragraph("FACTURE NORMALISÉE", title_style))
+                # Si pas de logo, juste les infos centrées
+                story.append(Paragraph(info_text, info_style))
             
-            # Nom de l'entreprise
-            company_name = settings.get('company_name', 'BTP Devis Pro')
-            story.append(Paragraph(company_name, subtitle_style))
+            story.append(Spacer(1, 0.1*cm))
             
-            # Slogan
-            slogan = settings.get('slogan', '')
-            if slogan:
-                story.append(Paragraph(slogan, subtitle_style))
-            
-            # Coordonnées
-            coords = []
-            if settings.get('company_address'):
-                coords.append(settings.get('company_address'))
-            if settings.get('company_phone'):
-                coords.append(f"📞 {settings.get('company_phone')}")
-            if settings.get('company_email'):
-                coords.append(f"✉ {settings.get('company_email')}")
-            if settings.get('website'):
-                coords.append(f"🌐 {settings.get('website')}")
-            
-            if coords:
-                story.append(Paragraph(" | ".join(coords), subtitle_style))
-            story.append(Paragraph(f"NIF: {settings.get('nif', 'N/A')}", subtitle_style))
-        
-        story.append(Spacer(1, 0.2*cm))
-        story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
-        story.append(Spacer(1, 0.2*cm))
+            # Ligne de séparation
+            story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
+            story.append(Spacer(1, 0.15*cm))
         
         # ============================================================
         # 2. INFORMATIONS (3 colonnes)
@@ -3386,8 +3209,6 @@ def generate_pdf_normalise(id_facture):
                 qr_img.save(qr_buffer, format='PNG')
                 qr_buffer.seek(0)
                 
-                # 🔥 CORRECTION : Utiliser directement le buffer avec Image
-                # Ne pas utiliser ImageReader, passer le buffer directement
                 qr_element = Image(qr_buffer, width=2.5*cm, height=2.5*cm)
                 print("✅ QR Code généré avec succès !")
                 
