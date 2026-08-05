@@ -2950,126 +2950,108 @@ def generate_pdf_normalise(id_facture):
             spaceBefore=5
         )
         
-        info_style = ParagraphStyle(
-            'InfoRight',
-            parent=styles['Normal'],
-            fontSize=7,
-            textColor=colors.HexColor('#4B5563'),
-            alignment=2,
-            leading=10
-        )
-        
         # ===== STORY =====
         story = []
         
         # ============================================================
-        # 1. EN-TÊTE : LOGO + INFOS (Mode 1) OU BANNIÈRE (Mode 2)
+        # 1. EN-TÊTE : LOGO À GAUCHE + INFOS À DROITE
         # ============================================================
         
-        custom_header = settings.get('custom_header')
-        header_imported = False
-        
-        # ──────────────────────────────────────────────────────────────
-        # MODE 2 : EN-TÊTE IMPORTÉ (BANNIÈRE)
-        # ──────────────────────────────────────────────────────────────
-        
-        if custom_header:
-            header_path = os.path.join(os.path.dirname(__file__), 'uploads', 'headers', custom_header)
-            if os.path.exists(header_path):
+        # Récupérer le logo
+        logo_img = None
+        if settings.get('company_logo'):
+            logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
+            if os.path.exists(logo_path):
                 try:
-                    # Charger l'image
-                    img = ImageReader(header_path)
-                    img_width, img_height = img.getSize()
-                    
-                    # Zone d'en-tête fixe : largeur 100%, hauteur max 110px
-                    max_width = 17 * cm
-                    max_height = 110 * 0.75
-                    
-                    # Redimensionnement proportionnel
-                    ratio = min(max_width / img_width, max_height / img_height)
-                    new_width = img_width * ratio
-                    new_height = img_height * ratio
-                    
-                    header_img = Image(header_path, width=new_width, height=new_height)
-                    story.append(header_img)
-                    story.append(Spacer(1, 0.15*cm))
-                    
-                    # Ligne de séparation sous l'en-tête
-                    story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
-                    story.append(Spacer(1, 0.15*cm))
-                    
-                    header_imported = True
-                    print(f"✅ En-tête importé: {new_width} x {new_height}")
-                except Exception as e:
-                    print(f"⚠️ Erreur chargement en-tête: {e}")
-                    header_imported = False
+                    logo_img = Image(logo_path, width=50, height=50)
+                except:
+                    pass
         
-        # ──────────────────────────────────────────────────────────────
-        # MODE 1 : PERSONNALISATION (LOGO + TEXTE)
-        # ──────────────────────────────────────────────────────────────
+        # Infos de l'entreprise
+        company_name = settings.get('company_name', 'BTP Devis Pro')
+        company_phone = settings.get('company_phone', '')
+        company_email = settings.get('company_email', '')
         
-        if not header_imported:
-            # Récupérer le logo
-            logo_img = None
-            if settings.get('company_logo'):
-                logo_path = os.path.join(os.path.dirname(__file__), 'uploads', settings['company_logo'])
-                if os.path.exists(logo_path):
-                    try:
-                        logo_img = Image(logo_path, width=50, height=50)
-                    except:
-                        pass
+        # Construction du texte des infos
+        if company_phone and company_email:
+            info_text = f"Tél: {company_phone} | Email: {company_email}"
+        elif company_phone:
+            info_text = f"Tél: {company_phone}"
+        elif company_email:
+            info_text = f"Email: {company_email}"
+        else:
+            info_text = ""
+        
+        # Création du tableau : Logo (gauche) | Infos (droite)
+        if logo_img:
+            # Style pour les infos
+            info_style = ParagraphStyle(
+                'InfoStyle',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.HexColor('#4B5563'),
+                alignment=0,  # GAUCHE
+                leading=12
+            )
             
-            # Construction des infos entreprise (droite)
-            company_name = settings.get('company_name', 'BTP Devis Pro')
-            company_address = settings.get('company_address', '')
-            company_phone = settings.get('company_phone', '')
-            company_email = settings.get('company_email', '')
-            company_website = settings.get('website', '')
-            nif = settings.get('nif', '')
+            # Créer le conteneur d'infos
+            info_html = f"""
+            <b>{company_name}</b><br/>
+            <font color='#6B7280' size='8'>{info_text}</font>
+            """
+            info_paragraph = Paragraph(info_html, info_style)
             
-            # Texte des infos
-            info_lines = [f"<b>{company_name}</b>"]
-            if company_address:
-                info_lines.append(company_address)
-            if company_phone:
-                info_lines.append(f"📞 {company_phone}")
-            if company_email:
-                info_lines.append(f"✉ {company_email}")
-            if company_website:
-                info_lines.append(f"🌐 {company_website}")
-            if nif:
-                info_lines.append(f"NIF: {nif}")
-            
-            info_text = "<br/>".join(info_lines)
-            
-            # Création du tableau : Logo (gauche) | Infos (droite)
-            if logo_img:
-                header_data = [
-                    [logo_img, Paragraph(info_text, info_style)]
-                ]
-                header_table = Table(header_data, colWidths=[3*cm, 14*cm])
-                header_table.setStyle(TableStyle([
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-                    ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 4),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 2),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-                ]))
-                story.append(header_table)
-            else:
-                # Si pas de logo, juste les infos centrées
-                story.append(Paragraph(info_text, info_style))
-            
-            story.append(Spacer(1, 0.1*cm))
-            
-            # Ligne de séparation
-            story.append(Paragraph(f"<hr color='{primary_color}' size='1.5'/>", styles['Normal']))
-            story.append(Spacer(1, 0.15*cm))
+            header_data = [
+                [logo_img, info_paragraph]
+            ]
+            header_table = Table(header_data, colWidths=[3*cm, 14*cm])
+            header_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+                ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ]))
+            story.append(header_table)
+        else:
+            # Si pas de logo, juste le nom et les coordonnées
+            name_style = ParagraphStyle(
+                'NameStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                fontName='Helvetica-Bold',
+                textColor=colors.HexColor('#1F2937'),
+                alignment=0
+            )
+            coord_style = ParagraphStyle(
+                'CoordStyle',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.HexColor('#6B7280'),
+                alignment=0,
+                leading=10
+            )
+            story.append(Paragraph(f"<b>{company_name}</b>", name_style))
+            if info_text:
+                story.append(Paragraph(info_text, coord_style))
+        
+        story.append(Spacer(1, 0.15*cm))
+        
+        # Ligne fine sous l'en-tête
+        story.append(Paragraph(f"<hr color='{primary_color}' size='1'/>", styles['Normal']))
+        story.append(Spacer(1, 0.2*cm))
         
         # ============================================================
-        # 2. INFORMATIONS (3 colonnes)
+        # 2. TITRE
+        # ============================================================
+        
+        story.append(Paragraph("FACTURE NORMALISÉE", title_style))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # ============================================================
+        # 3. INFORMATIONS (3 colonnes)
         # ============================================================
         
         # Vendeur
@@ -3113,7 +3095,7 @@ def generate_pdf_normalise(id_facture):
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # 3. TABLEAU DES ARTICLES
+        # 4. TABLEAU DES ARTICLES
         # ============================================================
         
         story.append(Paragraph("Détail des prestations", section_title))
@@ -3167,7 +3149,7 @@ def generate_pdf_normalise(id_facture):
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # 4. INFORMATIONS FISCALES + QR CODE
+        # 5. INFORMATIONS FISCALES + QR CODE
         # ============================================================
         
         # Récupérer le QR Code
@@ -3242,7 +3224,7 @@ def generate_pdf_normalise(id_facture):
         story.append(Spacer(1, 0.3*cm))
         
         # ============================================================
-        # 5. MENTION
+        # 6. MENTION
         # ============================================================
         
         mention_text = """
@@ -3260,7 +3242,7 @@ def generate_pdf_normalise(id_facture):
         story.append(Paragraph(mention_text, mention_style))
         
         # ============================================================
-        # 6. PIED DE PAGE
+        # 7. PIED DE PAGE
         # ============================================================
         
         story.append(Paragraph(f"<hr color='{primary_color}' size='0.5'/>", styles['Normal']))
