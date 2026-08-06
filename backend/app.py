@@ -17,8 +17,42 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from flask import send_from_directory
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_jwt_extended import create_access_token, set_access_cookies, unset_jwt_cookies
 import os
+import re
 
+
+
+# OU pour plusieurs origines
+CORS(app, origins=[
+    "https://btp-devis-pro-1.onrender.com",
+    "https://btpdevispro-info.netlify.app"
+], supports_credentials=True)
+
+# Configuration du rate limiter
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
+
+def sanitize_input(text):
+    """Nettoie les entrées utilisateur contre les XSS"""
+    if not text:
+        return text
+    
+    # Supprimer les balises HTML/JavaScript
+    text = re.sub(r'<[^>]*>', '', text)
+    
+    # Supprimer les caractères dangereux
+    dangerous = ['&', '<', '>', '"', "'", '/', ';']
+    for char in dangerous:
+        text = text.replace(char, '')
+    
+    return text.strip()
 # ==================== UTILITAIRE VÉRIFICATION ABONNEMENT ====================
 def verifier_abonnement(user_id):
     """Vérifie si l'utilisateur a un abonnement actif. Retourne (bool, message, headers, supabase_url)"""
@@ -71,6 +105,53 @@ def verifier_abonnement(user_id):
         return True, 'OK', headers, supabase_url
     else:
         return False, '❌ Aucun abonnement trouvé. Action bloquée.', headers, supabase_url
+def log_action(user_id, action, details=None):
+    """Enregistre une action dans les logs"""
+    try:
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        log_data = {
+            "id_user": user_id,
+            "action": action,
+            "details": details,
+            "ip": request.remote_addr,
+            "user_agent": request.headers.get('User-Agent')
+        }
+        
+        requests.post(
+            f"{supabase_url}/rest/v1/logs",
+            headers=headers,
+            json=log_data
+        )
+    except Exception as e:
+        print(f"⚠️ Erreur log: {e}")
+
+def valider_nif(ifu):
+    """
+    Valide un NIF/IFU béninois (13 caractères)
+    Format: 02 + 9 chiffres + 2 chiffres de contrôle
+    """
+    if not ifu or len(ifu) != 13:
+        return False
+    
+    if not ifu.isdigit():
+        return False
+    
+    # Vérification simple : tous les IFU commencent par 02
+    if not ifu.startswith('02'):
+        return False
+    
+    return True
 
 app = Flask(__name__)
 # Configuration SendGrid
@@ -110,6 +191,8 @@ def serve_static(path):
     frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
     return send_from_directory(frontend_path, path)
 # ==================== AUTHENTIFICATION ====================
+@limiter.limit("10 per minute")
+@limiter.limit("10 per minute")  # 🔥 Anti-brute force
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
@@ -118,9 +201,16 @@ def register():
         if existing:
             return jsonify({'success': False, 'message': 'Email déjà utilisé'}), 400
         
+        # 🔥 SANITIZE - Nettoyer les entrées
+        nom = sanitize_input(data.get('nom'))
+        email = sanitize_input(data.get('email'))
+        entreprise = sanitize_input(data.get('entreprise'))
+        telephone = sanitize_input(data.get('telephone'))
+        mot_de_passe = data.get('mot_de_passe')
+        
         result = utilisateur_model.create(
-            data['nom'], data['email'], data['mot_de_passe'],
-            data['entreprise'], data['telephone']
+            nom, email, mot_de_passe,
+            entreprise, telephone
         )
         
         if result:
@@ -129,7 +219,7 @@ def register():
             elif isinstance(result, dict):
                 user_id = result.get('id_user')
             else:
-                user = utilisateur_model.get_by_email(data['email'])
+                user = utilisateur_model.get_by_email(email)
                 user_id = user.get('id_user') if user else None
             
             if user_id:
@@ -161,6 +251,7 @@ def register():
                 )
                 
                 if response.status_code in [200, 201]:
+                    log_action(user_id, 'register', "Nouvel utilisateur inscrit")
                     return jsonify({'success': True, 'message': 'Inscription réussie ! Période d\'essai de 14 jours.'})
         
         return jsonify({'success': False, 'message': 'Erreur lors de l\'inscription'}), 500
@@ -171,6 +262,8 @@ def register():
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+    
+@limiter.limit("5 per minute")
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
@@ -196,12 +289,23 @@ def login():
                     'entreprise': user['entreprise']
                 }
             })
+        #Definis les cookies
+        set_access_cookies(response, token)
         return jsonify({'success': False, 'message': 'Identifiants incorrects'}), 401
     except Exception as e:
         print(f"❌ Erreur login: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    response = jsonify({'success': True, 'message': 'Déconnexion réussie'})
+    unset_jwt_cookies(response)
+    return response
+    
+    
 
 
 @app.route('/api/admin/abonnement/<int:id_user>/trial', methods=['POST'])
@@ -299,7 +403,8 @@ def get_clients():
     except Exception as e:
         print(f"❌ Erreur get_clients: {e}")
         return jsonify([]), 500
-
+    
+@limiter.limit("100 per hour")
 @app.route('/api/clients', methods=['POST'])
 @jwt_required()
 def create_client():
@@ -312,12 +417,13 @@ def create_client():
         if not ok:
             return jsonify({'success': False, 'message': message}), 403
         
+        # 🔥 SANITIZE - Nettoyer les entrées
         client_data = {
-            "nom": data.get('nom'),
-            "telephone": data.get('telephone'),
-            "email": data.get('email'),
-            "adresse": data.get('adresse'),
-            "ifu": data.get('ifu', ''),  # 🔥 AJOUT
+            "nom": sanitize_input(data.get('nom')),
+            "telephone": sanitize_input(data.get('telephone')),
+            "email": sanitize_input(data.get('email')),
+            "adresse": sanitize_input(data.get('adresse')),
+            "ifu": sanitize_input(data.get('ifu', '')),
             "id_user": user_id
         }
         
@@ -328,6 +434,7 @@ def create_client():
         )
         
         if response.status_code in [200, 201]:
+            log_action(user_id, 'create_client', f"Client {client_data['nom']} créé")
             return jsonify({'success': True, 'message': 'Client créé'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
@@ -335,7 +442,7 @@ def create_client():
     except Exception as e:
         print(f"❌ Erreur create_client: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
-
+@limiter.limit("100 per hour")
 @app.route('/api/clients/<int:id_client>', methods=['PUT'])
 @jwt_required()
 def update_client(id_client):
@@ -366,12 +473,13 @@ def update_client(id_client):
         if client.get('id_user') != user_id:
             return jsonify({'success': False, 'message': 'Non autorisé'}), 403
         
+        # 🔥 SANITIZE - Nettoyer les entrées
         update_data = {
-            "nom": data.get('nom'),
-            "telephone": data.get('telephone'),
-            "email": data.get('email'),
-            "adresse": data.get('adresse'),
-            "ifu": data.get('ifu', '')  # 🔥 AJOUT
+            "nom": sanitize_input(data.get('nom')),
+            "telephone": sanitize_input(data.get('telephone')),
+            "email": sanitize_input(data.get('email')),
+            "adresse": sanitize_input(data.get('adresse')),
+            "ifu": sanitize_input(data.get('ifu', ''))
         }
         
         response = requests.patch(
@@ -381,6 +489,7 @@ def update_client(id_client):
         )
         
         if response.status_code in [200, 204]:
+            log_action(user_id, 'update_client', f"Client {update_data['nom']} modifié")
             return jsonify({'success': True, 'message': 'Client modifié'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
@@ -467,6 +576,7 @@ def get_projets():
         print(f"❌ Erreur get_projets: {e}")
         return jsonify([]), 500
 
+@limiter.limit("100 per hour")
 @app.route('/api/projets', methods=['POST'])
 @jwt_required()
 def create_projet():
@@ -475,17 +585,16 @@ def create_projet():
         user_id = int(user_id)
         data = request.json
         
-        # 🔥 Vérifier l'abonnement
         ok, message, headers, supabase_url = verifier_abonnement(user_id)
         if not ok:
             return jsonify({'success': False, 'message': message}), 403
         
-        # Créer le projet avec les nouveaux champs
+        # 🔥 SANITIZE - Nettoyer les entrées
         projet_data = {
-            "nom_projet": data.get('nom_projet'),
-            "description": data.get('description'),
-            "localisation": data.get('localisation'),
-            "statut": data.get('statut', 'en_attente'),
+            "nom_projet": sanitize_input(data.get('nom_projet')),
+            "description": sanitize_input(data.get('description')),
+            "localisation": sanitize_input(data.get('localisation')),
+            "statut": sanitize_input(data.get('statut', 'en_attente')),
             "date_debut": data.get('date_debut'),
             "date_fin": data.get('date_fin'),
             "progression": data.get('progression', 0),
@@ -499,6 +608,7 @@ def create_projet():
         )
         
         if response.status_code in [200, 201]:
+            log_action(user_id, 'create_projet', f"Projet {projet_data['nom_projet']} créé")
             return jsonify({'success': True, 'message': 'Projet créé'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
@@ -509,6 +619,7 @@ def create_projet():
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@limiter.limit("100 per hour")
 @app.route('/api/projets/<int:id_projet>', methods=['PUT'])
 @jwt_required()
 def update_projet(id_projet):
@@ -527,7 +638,6 @@ def update_projet(id_projet):
             "Content-Type": "application/json"
         }
         
-        # Vérifier que le projet appartient à l'utilisateur
         check_response = requests.get(
             f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}&select=id_user",
             headers=headers
@@ -540,12 +650,12 @@ def update_projet(id_projet):
         if projet.get('id_user') != user_id:
             return jsonify({'success': False, 'message': 'Non autorisé'}), 403
         
-        # Mettre à jour le projet avec tous les champs
+        # 🔥 SANITIZE - Nettoyer les entrées
         update_data = {
-            "nom_projet": data.get('nom_projet'),
-            "description": data.get('description'),
-            "localisation": data.get('localisation'),
-            "statut": data.get('statut', 'en_attente'),
+            "nom_projet": sanitize_input(data.get('nom_projet')),
+            "description": sanitize_input(data.get('description')),
+            "localisation": sanitize_input(data.get('localisation')),
+            "statut": sanitize_input(data.get('statut', 'en_attente')),
             "date_debut": data.get('date_debut'),
             "date_fin": data.get('date_fin'),
             "progression": data.get('progression', 0)
@@ -558,6 +668,7 @@ def update_projet(id_projet):
         )
         
         if response.status_code in [200, 204]:
+            log_action(user_id, 'update_projet', f"Projet {update_data['nom_projet']} modifié")
             return jsonify({'success': True, 'message': 'Projet modifié'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
@@ -690,6 +801,7 @@ def get_devis():
         traceback.print_exc()
         return jsonify([]), 500
 
+@limiter.limit("100 per hour")
 @app.route('/api/devis', methods=['POST'])
 @jwt_required()
 def create_devis():
@@ -701,19 +813,17 @@ def create_devis():
         print(f"🔍 Création devis pour user_id: {user_id}")
         print(f"🔍 Données reçues: {data}")
         
-        # 🔥 Vérifier l'abonnement
         ok, message, headers, supabase_url = verifier_abonnement(user_id)
         if not ok:
             return jsonify({'success': False, 'message': message}), 403
         
         from datetime import datetime
         
-        # Calculer le total
         lignes = data.get('lignes', [])
         total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
         total = total_materiaux * 1.2
         
-        # Insérer le devis
+        # 🔥 SANITIZE - Nettoyer les entrées
         devis_data = {
             "date_creation": datetime.now().isoformat(),
             "total": total,
@@ -735,13 +845,11 @@ def create_devis():
         print(f"🔍 Réponse brute devis: {response.text}")
         
         if response.status_code in [200, 201]:
-            # 🔥 Récupérer l'ID du devis créé
             try:
                 result = response.json()
                 print(f"🔍 Résultat JSON: {result}")
             except Exception as e:
                 print(f"❌ Erreur parsing JSON: {e}")
-                # Si la réponse est vide, récupérer le dernier ID
                 get_response = requests.get(
                     f"{supabase_url}/rest/v1/devis?select=id_devis&order=id_devis.desc&limit=1",
                     headers=headers
@@ -761,11 +869,11 @@ def create_devis():
                     id_devis = None
             
             if id_devis:
-                # Insérer les lignes
                 for ligne in lignes:
                     total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
+                    # 🔥 SANITIZE - Nettoyer la désignation
                     ligne_data = {
-                        "designation": ligne.get('designation'),
+                        "designation": sanitize_input(ligne.get('designation')),
                         "quantite": ligne.get('quantite'),
                         "prix_unitaire": ligne.get('prix_unitaire'),
                         "total_ligne": total_ligne,
@@ -777,6 +885,7 @@ def create_devis():
                         json=ligne_data
                     )
                 
+                log_action(user_id, 'create_devis', f"Devis #{id_devis} créé")
                 return jsonify({'success': True, 'id_devis': id_devis})
             else:
                 return jsonify({'success': False, 'message': 'Devis créé mais ID non récupéré'}), 500
@@ -2277,6 +2386,7 @@ def create_facture(id_devis):
 
 
 
+@limiter.limit("50 per hour")
 @app.route('/api/settings', methods=['PUT'])
 @jwt_required()
 def update_settings():
@@ -2297,35 +2407,32 @@ def update_settings():
             "Prefer": "return=representation"
         }
         
-        # Vérifier si settings existe
         check_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
         )
         
-        # 🔥 RÉCUPÉRER TOUS LES CHAMPS (incluant nif)
+        # 🔥 SANITIZE - Nettoyer toutes les entrées
         update_data = {
-            "company_name": data.get('company_name', ''),
-            "company_email": data.get('company_email', ''),
-            "company_phone": data.get('company_phone', ''),
-            "company_address": data.get('company_address', ''),
-            "primary_color": data.get('primary_color', '#1E3A8A'),
-            "secondary_color": data.get('secondary_color', '#7C3AED'),
-            "accent_color": data.get('accent_color', '#06B6D4'),
+            "company_name": sanitize_input(data.get('company_name', '')),
+            "company_email": sanitize_input(data.get('company_email', '')),
+            "company_phone": sanitize_input(data.get('company_phone', '')),
+            "company_address": sanitize_input(data.get('company_address', '')),
+            "primary_color": sanitize_input(data.get('primary_color', '#1E3A8A')),
+            "secondary_color": sanitize_input(data.get('secondary_color', '#7C3AED')),
+            "accent_color": sanitize_input(data.get('accent_color', '#06B6D4')),
             "updated_at": datetime.now().isoformat(),
-            "slogan": data.get('slogan', ''),
-            "website": data.get('website', ''),
-            "footer_text": data.get('footer_text', ''),
-            # 🔥 CHAMPS FISCAUX - AJOUTER ICI
-            "nif": data.get('nif', ''),  # ← CE CHAMP ÉTAIT MANQUANT !
-            "regime_tva": data.get('regime_tva', 'non assujetti'),
-            "numero_contribuable": data.get('numero_contribuable', ''),
-            "adresse_fiscale": data.get('adresse_fiscale', '')
+            "slogan": sanitize_input(data.get('slogan', '')),
+            "website": sanitize_input(data.get('website', '')),
+            "footer_text": sanitize_input(data.get('footer_text', '')),
+            "nif": sanitize_input(data.get('nif', '')),
+            "regime_tva": sanitize_input(data.get('regime_tva', 'non assujetti')),
+            "numero_contribuable": sanitize_input(data.get('numero_contribuable', '')),
+            "adresse_fiscale": sanitize_input(data.get('adresse_fiscale', ''))
         }
         
         print(f"🔍 Mise à jour settings: {update_data}")
         
-        # Si settings existe, mettre à jour
         if check_response.status_code == 200 and check_response.json():
             response = requests.patch(
                 f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
@@ -2333,7 +2440,6 @@ def update_settings():
                 json=update_data
             )
         else:
-            # Créer si n'existe pas
             update_data["id_user"] = user_id
             update_data["created_at"] = datetime.now().isoformat()
             response = requests.post(
@@ -2343,6 +2449,7 @@ def update_settings():
             )
         
         if response.status_code in [200, 201, 204]:
+            log_action(user_id, 'update_settings', "Paramètres mis à jour")
             return jsonify({'success': True, 'message': 'Paramètres mis à jour'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
@@ -3275,6 +3382,17 @@ def generate_pdf_normalise(id_facture):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/facture/<int:id_facture>/normaliser', methods=['POST'])
+@jwt_required()
+def normaliser_facture(id_facture):
+    ifu_client = data.get('ifu_client', '').strip()
+    
+    if not valider_nif(ifu_client):
+        return jsonify({
+            'success': False, 
+            'message': 'IFU client invalide (13 chiffres, commence par 02)'
+        }), 400
+
 @app.route('/api/devis/<int:id_devis>/acompte', methods=['POST'])
 @jwt_required()
 def configurer_acompte(id_devis):
@@ -4014,6 +4132,7 @@ def generate_facture_pdf(id_facture):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
+@limiter.limit("100 per hour")
 @app.route('/api/devis/<int:id_devis>', methods=['PUT'])
 @jwt_required()
 def update_devis(id_devis):
@@ -4032,7 +4151,6 @@ def update_devis(id_devis):
             "Content-Type": "application/json"
         }
         
-        # Vérifier que le devis existe et appartient à l'utilisateur
         check_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user,statut",
             headers=headers
@@ -4048,18 +4166,15 @@ def update_devis(id_devis):
         if devis.get('statut') == 'validé':
             return jsonify({'success': False, 'message': 'Un devis validé ne peut pas être modifié'}), 400
         
-        # Supprimer les anciennes lignes
         requests.delete(
             f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
             headers=headers
         )
         
-        # Recalculer le total
         lignes = data.get('lignes', [])
         total_materiaux = sum(float(ligne['quantite']) * float(ligne['prix_unitaire']) for ligne in lignes)
         total = total_materiaux * 1.2
         
-        # Mettre à jour le devis
         from datetime import datetime
         update_data = {
             "id_client": data.get('id_client'),
@@ -4075,11 +4190,11 @@ def update_devis(id_devis):
         )
         
         if response.status_code in [200, 204]:
-            # Réinsérer les nouvelles lignes
             for ligne in lignes:
                 total_ligne = float(ligne['quantite']) * float(ligne['prix_unitaire'])
+                # 🔥 SANITIZE - Nettoyer la désignation
                 ligne_data = {
-                    "designation": ligne.get('designation'),
+                    "designation": sanitize_input(ligne.get('designation')),
                     "quantite": ligne.get('quantite'),
                     "prix_unitaire": ligne.get('prix_unitaire'),
                     "total_ligne": total_ligne,
@@ -4091,6 +4206,7 @@ def update_devis(id_devis):
                     json=ligne_data
                 )
             
+            log_action(user_id, 'update_devis', f"Devis #{id_devis} modifié")
             return jsonify({'success': True, 'message': 'Devis modifié avec succès'})
         else:
             return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500

@@ -15,26 +15,29 @@ if (!token) {
 
 
 // Fonction pour les requêtes API
+// 🔥 Remplacer localStorage par les cookies
 async function apiRequest(url, options = {}) {
     const headers = {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
     };
     
+    // 🔥 Le token est automatiquement envoyé via cookie
     const response = await fetch(`${API_URL}${url}`, {
         ...options,
-        headers: { ...headers, ...options.headers }
+        headers: { ...headers, ...options.headers },
+        credentials: 'include'  // 🔥 Important pour les cookies
     });
     
     if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
         window.location.href = 'login.html';
         throw new Error('Non authentifié');
     }
     
     return response;
 }
+
+// 🔥 Supprimer localStorage.getItem('token') partout
+// Le token est géré automatiquement par les cookies
 let app;
 
 // ==================== TOAST NOTIFICATIONS ====================
