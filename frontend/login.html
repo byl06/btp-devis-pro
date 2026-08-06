@@ -148,30 +148,28 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     
-    console.log("Tentative login avec API:", API_URL);
-    
     try {
         const response = await fetch(`${API_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',  // 🔥 AJOUTER CETTE LIGNE
             body: JSON.stringify({ email, mot_de_passe: password })
         });
         
         const data = await response.json();
         
         if (data.success) {
-            localStorage.setItem('token', data.token);
+            // 🔥 SUPPRIMER localStorage.setItem('token', data.token);
+            // Le token est dans le cookie
             localStorage.setItem('user', JSON.stringify(data.user));
             window.location.href = '/';
         } else {
             alert('Erreur: ' + data.message);
         }
     } catch (error) {
-        console.error('Erreur:', error);
         alert('Erreur de connexion au serveur');
     }
 });
-
 // ==================== MOT DE PASSE OUBLIÉ ====================
 function demanderReinitialisation() {
     const email = prompt("📧 Entrez votre adresse email :");

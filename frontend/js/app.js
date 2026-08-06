@@ -6,7 +6,7 @@ const WHATSAPP_NUMBER = "2290143733706";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 // Récupérer le token
-const token = localStorage.getItem('token');
+
 
 if (!token) {
     window.location.href = 'login.html';
@@ -21,14 +21,17 @@ async function apiRequest(url, options = {}) {
         'Content-Type': 'application/json'
     };
     
-    // 🔥 Le token est automatiquement envoyé via cookie
+    // 🔥 Supprimer Authorization: Bearer
+    // Le token est envoyé automatiquement via le cookie
+    
     const response = await fetch(`${API_URL}${url}`, {
         ...options,
         headers: { ...headers, ...options.headers },
-        credentials: 'include'  // 🔥 Important pour les cookies
+        credentials: 'include'  // 🔥 IMPORTANT
     });
     
     if (response.status === 401) {
+        localStorage.removeItem('user');
         window.location.href = 'login.html';
         throw new Error('Non authentifié');
     }
@@ -1576,10 +1579,15 @@ async exportDevisToExcel() {
     }
     
     logout() {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = 'login.html';
-    }
+    // 🔥 Appeler la route de déconnexion pour supprimer le cookie
+    fetch(`${API_URL}/api/logout`, {
+        method: 'POST',
+        credentials: 'include'
+    }).catch(() => {});
+    
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+}
 
 openCreateClientModal() {
     const modal = document.createElement('div');
@@ -2246,12 +2254,9 @@ async showAbonnementNotification() {
 
 async downloadPDF(id) {
     try {
-        const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/api/devis/${id}/pdf`, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'include'  // 🔥 Cookie automatique
         });
         
         if (response.status === 401) {
@@ -3148,18 +3153,14 @@ async importHeader() {
     formData.append('header_file', file);
     
     try {
-        const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/api/settings/import-header`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
+            credentials: 'include',  // 🔥 Cookie automatique
             body: formData
         });
         const result = await response.json();
         if (result.success) {
             Toast.success('✅ En-tête importé avec succès !');
-            // Réinitialiser le champ file
             document.getElementById('import-header-file').value = '';
             this.loadPage('parametres');
         } else {
@@ -3173,7 +3174,7 @@ async importHeader() {
 
 async previewImportedHeader() {
     try {
-        const token = localStorage.getItem('token');
+        
         if (!token) {
             Toast.error('❌ Vous devez être connecté');
             return;
@@ -3378,20 +3379,11 @@ async payerAcompte(id_devis) {
 
 async downloadFacturePDF(id_facture) {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            Toast.error('❌ Vous devez être connecté');
-            return;
-        }
-        
         Toast.info('📄 Téléchargement de la facture...');
         
         const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf`, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            credentials: 'include'  // 🔥 Cookie automatique
         });
         
         if (!response.ok) {
@@ -3411,7 +3403,6 @@ async downloadFacturePDF(id_facture) {
         window.URL.revokeObjectURL(url);
         
         Toast.success('✅ Facture PDF téléchargée');
-        
     } catch (error) {
         console.error('Erreur downloadFacturePDF:', error);
         Toast.error('❌ Erreur téléchargement');
@@ -3429,17 +3420,15 @@ async uploadLogo() {
     formData.append('logo', file);
     
     try {
-        const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/api/settings/logo`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+            credentials: 'include',  // 🔥 Cookie automatique
             body: formData
         });
         const result = await response.json();
         
         if (result.success) {
             Toast.success('✅ Logo téléchargé avec succès !');
-            // 🔥 Forcer le rechargement de la page des paramètres
             setTimeout(() => {
                 this.loadPage('parametres');
             }, 500);
@@ -3846,8 +3835,8 @@ async restoreData() {
                     const response = await fetch(`${API_URL}/api/restore`, {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                             credentials: 'include'  // 🔥 AJOUTER
                         },
                         body: JSON.stringify(data),
                         signal: controller.signal
@@ -5241,7 +5230,7 @@ async creerFactureNormalisee() {
 // Télécharger PDF facture normalisée
 async downloadPDFFacture(id_facture) {
     try {
-        const token = localStorage.getItem('token');
+        
         if (!token) {
             Toast.error('❌ Vous devez être connecté');
             return;
@@ -5352,21 +5341,11 @@ async payFacture(id_facture) {
 
 async previewHeader() {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            Toast.error('❌ Vous devez être connecté');
-            return;
-        }
-        
-        // 🔥 Utiliser fetch pour télécharger le PDF
         Toast.info('📄 Génération de l\'aperçu...');
         
         const response = await fetch(`${API_URL}/api/preview-header`, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            credentials: 'include'  // 🔥 Cookie automatique
         });
         
         if (!response.ok) {
@@ -5375,7 +5354,6 @@ async previewHeader() {
             return;
         }
         
-        // Récupérer le blob du PDF
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -5387,7 +5365,6 @@ async previewHeader() {
         window.URL.revokeObjectURL(url);
         
         Toast.success('✅ Aperçu PDF téléchargé');
-        
     } catch (error) {
         console.error('Erreur preview:', error);
         Toast.error('❌ Erreur génération aperçu');
@@ -5443,46 +5420,36 @@ async saveFiscalSettings() {
     // ==================== PDF NORMALISÉ ====================
     
     async downloadPDFNormalisee(id_facture) {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                alert('❌ Vous devez être connecté');
-                return;
-            }
-            
-            console.log(`📄 Téléchargement PDF normalisé pour facture ${id_facture}`);
-            
-            const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
-                return;
-            }
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `facture_normalisee_${id_facture}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            
-            console.log('✅ PDF normalisé téléchargé');
-            
-        } catch (error) {
-            console.error('Erreur downloadPDFNormalisee:', error);
-            alert('❌ Erreur lors du téléchargement');
+    try {
+        console.log(`📄 Téléchargement PDF normalisé pour facture ${id_facture}`);
+        
+        const response = await fetch(`${API_URL}/api/facture/${id_facture}/pdf-normalise`, {
+            method: 'GET',
+            credentials: 'include'  // 🔥 Cookie automatique
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
+            return;
         }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `facture_normalisee_${id_facture}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        console.log('✅ PDF normalisé téléchargé');
+    } catch (error) {
+        console.error('Erreur downloadPDFNormalisee:', error);
+        alert('❌ Erreur lors du téléchargement');
     }
+}
     
     viewFactureNormalisee(id_facture) {
         console.log(`👁️ Visualisation facture normalisée ${id_facture}`);
