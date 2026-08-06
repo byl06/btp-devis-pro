@@ -43,6 +43,7 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
+limiter.init_app(app)  # 🔥 Initier après la création
 
 def sanitize_input(text):
     """Nettoie les entrées utilisateur contre les XSS"""
