@@ -178,7 +178,13 @@ mail = Mail(app)
 app.config['JWT_SECRET_KEY'] = 'btp-devis-pro-super-secret-key-2024-32chars'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
+ #AJOUTER CES LIGNES
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # Forcer les cookies
+app.config['JWT_COOKIE_SECURE'] = False  # True en production avec HTTPS
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Désactiver CSRF pour test
+app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 jwt = JWTManager(app)
+
 
 
 
