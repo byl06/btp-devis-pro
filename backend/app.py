@@ -278,20 +278,14 @@ def register():
 def login():
     try:
         data = request.json
-        email = data.get('email')
-        mot_de_passe = data.get('mot_de_passe')
-        
-        print(f"🔐 Login reçu: {email}")
-        print(f"🔐 Mot de passe: {mot_de_passe}")
-        
-        user = utilisateur_model.authenticate(email, mot_de_passe)
+        user = utilisateur_model.authenticate(data['email'], data['mot_de_passe'])
         
         if user:
             user_id = str(user['id_user'])
             token = create_access_token(identity=user_id)
-            return jsonify({
+            
+            response = jsonify({
                 'success': True,
-                'token': token,
                 'user': {
                     'id': user['id_user'],
                     'nom': user['nom'],
@@ -299,13 +293,13 @@ def login():
                     'entreprise': user['entreprise']
                 }
             })
-        #Definis les cookies
-        set_access_cookies(response, token)
+            
+            # 🔥 AJOUTER CETTE LIGNE
+            set_access_cookies(response, token)
+            
+            return response
         return jsonify({'success': False, 'message': 'Identifiants incorrects'}), 401
     except Exception as e:
-        print(f"❌ Erreur login: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/logout', methods=['POST'])
