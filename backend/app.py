@@ -26,10 +26,7 @@ import re
 
 
 # OU pour plusieurs origines
-CORS(app, origins=[
-    "https://btp-devis-pro-1.onrender.com",
-    "https://btpdevispro-info.netlify.app"
-], supports_credentials=True)
+
 
 # Configuration du rate limiter
 limiter = Limiter(
@@ -171,6 +168,12 @@ app.config['JWT_SECRET_KEY'] = 'btp-devis-pro-super-secret-key-2024-32chars'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
 jwt = JWTManager(app)
+
+CORS(app, origins=[
+    "http://localhost:8000",
+    "https://btp-devis-pro-1.onrender.com",
+    "https://btpdevispro-info.netlify.app"
+], supports_credentials=True)
 
 # Initialisation des modèles
 utilisateur_model = Utilisateur()
