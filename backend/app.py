@@ -23,6 +23,14 @@ from flask_jwt_extended import create_access_token, set_access_cookies, unset_jw
 import os
 import re
 
+app = Flask(__name__)
+
+CORS(app, origins=[
+    "http://localhost:8000",
+    "https://btp-devis-pro-1.onrender.com",
+    "https://btpdevispro-info.netlify.app"
+], supports_credentials=True)
+
 
 
 # OU pour plusieurs origines
@@ -150,7 +158,7 @@ def valider_nif(ifu):
     
     return True
 
-app = Flask(__name__)
+
 # Configuration SendGrid
 app.config['MAIL_SERVER'] = 'smtp.sendgrid.net'
 app.config['MAIL_PORT'] = 587
@@ -162,18 +170,14 @@ app.config['MAIL_DEFAULT_SENDER'] = 'bylgaitb@gmail.com'  # Ton email
 mail = Mail(app)
 
 # Configuration CORS - Autorise toutes les origines (pour Render)
-CORS(app, origins=["http://localhost:8000", "https://btp-devis-pro-1.onrender.com"], supports_credentials=True)
+
 # Configuration JWT
 app.config['JWT_SECRET_KEY'] = 'btp-devis-pro-super-secret-key-2024-32chars'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
 jwt = JWTManager(app)
 
-CORS(app, origins=[
-    "http://localhost:8000",
-    "https://btp-devis-pro-1.onrender.com",
-    "https://btpdevispro-info.netlify.app"
-], supports_credentials=True)
+
 
 # Initialisation des modèles
 utilisateur_model = Utilisateur()
