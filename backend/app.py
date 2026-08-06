@@ -36,14 +36,16 @@ CORS(app, origins=[
 # OU pour plusieurs origines
 
 
-# Configuration du rate limiter
+# ============================================================
+# 5. CONFIGURATION RATE LIMITING
+# ============================================================
+
 limiter = Limiter(
-    app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
-limiter.init_app(app)  # 🔥 Initier après la création
+limiter.init_app(app)  # 🔥 IMPORTANT : init_app après la création
 
 def sanitize_input(text):
     """Nettoie les entrées utilisateur contre les XSS"""
