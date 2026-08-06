@@ -278,7 +278,10 @@ def register():
 def login():
     try:
         data = request.json
-        user = utilisateur_model.authenticate(data['email'], data['mot_de_passe'])
+        email = data.get('email')
+        mot_de_passe = data.get('mot_de_passe')
+        
+        user = utilisateur_model.authenticate(email, mot_de_passe)
         
         if user:
             user_id = str(user['id_user'])
@@ -294,7 +297,7 @@ def login():
                 }
             })
             
-            # 🔥 AJOUTER CETTE LIGNE
+            # 🔥 LA LIGNE MAGIQUE
             set_access_cookies(response, token)
             
             return response
