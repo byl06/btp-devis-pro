@@ -8,9 +8,6 @@ const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 // Récupérer le token
 
 
-if (!token) {
-    window.location.href = 'login.html';
-}
 
 
 
