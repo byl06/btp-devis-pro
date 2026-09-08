@@ -64,16 +64,33 @@
         
         <!-- Main Content -->
         <main class="main-content">
-            <header class="glass-header">
-                <h1 id="page-title">Dashboard</h1>
-                <div class="header-right">
-                    <!-- Langue supprimée -->
-                </div>
-            </header>
-            <div class="content-area" id="content-area">
-                <div class="loading">Chargement...</div>
-            </div>
-        </main>
+    <header class="glass-header">
+        <h1 id="page-title">Dashboard</h1>
+        <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
+            <!-- Bouton Devis rapide -->
+            <button onclick="app.openDevisRapide()" style="
+                background: linear-gradient(135deg, #F59E0B, #D97706);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: transform 0.2s;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fas fa-bolt"></i> Devis rapide
+            </button>
+        </div>
+    </header>
+    <div class="content-area" id="content-area">
+        <div class="loading">Chargement...</div>
+    </div>
+</main>
     </div>
 
     <!-- ============================================================ -->

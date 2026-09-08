@@ -439,6 +439,326 @@ async saveHeaderSettings() {
     };
 }
     
+// ============================================================
+// DEVIS RAPIDE
+// ============================================================
+
+async openDevisRapide() {
+    // Récupérer les clients et projets existants
+    const clients = await this.fetchClients();
+    const projets = await this.fetchProjets();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:650px; max-height:90vh; overflow-y:auto;">
+            <div class="modal-header">
+                <h2><i class="fas fa-bolt" style="color:#F59E0B;"></i> Devis rapide</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1.5rem;">
+                    Créez un devis en moins de 2 minutes. Remplissez les champs ci-dessous.
+                </p>
+                
+                <form id="devis-rapide-form">
+                    <!-- Client -->
+                    <div class="form-group">
+                        <label>Client *</label>
+                        <select id="rapide-client" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                            <option value="">Sélectionner un client existant</option>
+                            ${clients.map(c => `<option value="${c.id_client}">${c.nom}</option>`).join('')}
+                            <option value="new">+ Créer un nouveau client</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Nouveau client -->
+                    <div id="rapide-new-client" style="display:none; background:rgba(255,255,255,0.03); padding:1rem; border-radius:8px; margin-bottom:1rem;">
+                        <div class="form-group">
+                            <label>Nom du client *</label>
+                            <input type="text" id="rapide-client-nom" placeholder="Nom du client" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone</label>
+                            <input type="text" id="rapide-client-tel" placeholder="Téléphone" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="rapide-client-email" placeholder="Email" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                    </div>
+                    
+                    <!-- Projet -->
+                    <div class="form-group">
+                        <label>Projet *</label>
+                        <select id="rapide-projet" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                            <option value="">Sélectionner un projet existant</option>
+                            ${projets.map(p => `<option value="${p.id_projet}">${p.nom_projet}</option>`).join('')}
+                            <option value="new">+ Créer un nouveau projet</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Nouveau projet -->
+                    <div id="rapide-new-projet" style="display:none; background:rgba(255,255,255,0.03); padding:1rem; border-radius:8px; margin-bottom:1rem;">
+                        <div class="form-group">
+                            <label>Nom du projet *</label>
+                            <input type="text" id="rapide-projet-nom" placeholder="Nom du projet" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="rapide-projet-desc" placeholder="Description" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                    </div>
+                    
+                    <!-- Articles -->
+                    <div class="form-group">
+                        <label><i class="fas fa-tools"></i> Articles</label>
+                        <div id="rapide-articles-list">
+                            <div class="rapide-article" style="display:flex; gap:8px; margin-bottom:8px;">
+                                <input type="text" placeholder="Désignation" class="rapide-designation" style="flex:2; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                                <input type="number" placeholder="Qté" class="rapide-quantite" value="1" style="flex:0.8; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                                <input type="number" placeholder="Prix" class="rapide-prix" style="flex:1; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                                <button type="button" class="rapide-remove" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:6px 10px; cursor:pointer;">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" id="rapide-add-article" style="width:100%; padding:8px; background:rgba(255,255,255,0.05); border:1px dashed #334155; border-radius:6px; color:#94A3B8; cursor:pointer; margin-top:5px;">
+                            <i class="fas fa-plus"></i> Ajouter un article
+                        </button>
+                    </div>
+                    
+                    <!-- Récapitulatif -->
+                    <div style="background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.2); border-radius:8px; padding:12px; margin-top:10px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                            <span>Sous-total</span>
+                            <span id="rapide-sous-total">0 FCFA</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                            <span>Main d'œuvre (20%)</span>
+                            <span id="rapide-main-oeuvre">0 FCFA</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:1.1rem; font-weight:bold; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; margin-top:4px;">
+                            <span>TOTAL TTC</span>
+                            <span id="rapide-total" style="color:#06B6D4;">0 FCFA</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions" style="margin-top:1.5rem;">
+                        <button type="submit" class="btn-primary" style="width:100%; padding:12px;">
+                            <i class="fas fa-file-invoice"></i> Générer le devis
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // ============================================================
+    // GESTION DES ÉVÉNEMENTS
+    // ============================================================
+    
+    // Fermeture
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    
+    // Afficher/cacher nouveau client
+    const clientSelect = modal.querySelector('#rapide-client');
+    const newClientDiv = modal.querySelector('#rapide-new-client');
+    clientSelect.addEventListener('change', function() {
+        newClientDiv.style.display = this.value === 'new' ? 'block' : 'none';
+    });
+    
+    // Afficher/cacher nouveau projet
+    const projetSelect = modal.querySelector('#rapide-projet');
+    const newProjetDiv = modal.querySelector('#rapide-new-projet');
+    projetSelect.addEventListener('change', function() {
+        newProjetDiv.style.display = this.value === 'new' ? 'block' : 'none';
+    });
+    
+    // Ajouter un article
+    const addBtn = modal.querySelector('#rapide-add-article');
+    const articlesList = modal.querySelector('#rapide-articles-list');
+    addBtn.addEventListener('click', function() {
+        const articleDiv = document.createElement('div');
+        articleDiv.className = 'rapide-article';
+        articleDiv.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        articleDiv.innerHTML = `
+            <input type="text" placeholder="Désignation" class="rapide-designation" style="flex:2; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+            <input type="number" placeholder="Qté" class="rapide-quantite" value="1" style="flex:0.8; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+            <input type="number" placeholder="Prix" class="rapide-prix" style="flex:1; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+            <button type="button" class="rapide-remove" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:6px 10px; cursor:pointer;">✕</button>
+        `;
+        articlesList.appendChild(articleDiv);
+        
+        // Supprimer un article
+        articleDiv.querySelector('.rapide-remove').addEventListener('click', function() {
+            articleDiv.remove();
+            calculerTotalRapide();
+        });
+        
+        // Mettre à jour le total
+        articleDiv.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', calculerTotalRapide);
+        });
+    });
+    
+    // Supprimer les articles existants
+    modal.querySelectorAll('.rapide-remove').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('.rapide-article').remove();
+            calculerTotalRapide();
+        });
+    });
+    
+    // Mettre à jour le total
+    modal.querySelectorAll('#rapide-articles-list input').forEach(input => {
+        input.addEventListener('input', calculerTotalRapide);
+    });
+    
+    function calculerTotalRapide() {
+        const articles = modal.querySelectorAll('.rapide-article');
+        let totalMateriaux = 0;
+        
+        articles.forEach(article => {
+            const qte = parseFloat(article.querySelector('.rapide-quantite')?.value) || 0;
+            const prix = parseFloat(article.querySelector('.rapide-prix')?.value) || 0;
+            totalMateriaux += qte * prix;
+        });
+        
+        const mainOeuvre = totalMateriaux * 0.2;
+        const total = totalMateriaux + mainOeuvre;
+        
+        modal.querySelector('#rapide-sous-total').textContent = totalMateriaux.toLocaleString() + ' FCFA';
+        modal.querySelector('#rapide-main-oeuvre').textContent = mainOeuvre.toLocaleString() + ' FCFA';
+        modal.querySelector('#rapide-total').textContent = total.toLocaleString() + ' FCFA';
+    }
+    
+    // ============================================================
+    // SOUMISSION
+    // ============================================================
+    
+    const form = modal.querySelector('#devis-rapide-form');
+    let isSubmitting = false;
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (isSubmitting) return;
+        
+        // Récupérer les données
+        const id_client = modal.querySelector('#rapide-client').value;
+        const id_projet = modal.querySelector('#rapide-projet').value;
+        
+        let clientData = {};
+        let projetData = {};
+        
+        // Client
+        if (id_client === 'new') {
+            const nom = modal.querySelector('#rapide-client-nom').value.trim();
+            if (!nom) {
+                Toast.error('❌ Veuillez saisir le nom du client');
+                return;
+            }
+            clientData = {
+                nom: nom,
+                telephone: modal.querySelector('#rapide-client-tel').value,
+                email: modal.querySelector('#rapide-client-email').value
+            };
+        } else if (id_client) {
+            clientData = { id_client: parseInt(id_client) };
+        } else {
+            Toast.error('❌ Veuillez sélectionner ou créer un client');
+            return;
+        }
+        
+        // Projet
+        if (id_projet === 'new') {
+            const nom = modal.querySelector('#rapide-projet-nom').value.trim();
+            if (!nom) {
+                Toast.error('❌ Veuillez saisir le nom du projet');
+                return;
+            }
+            projetData = {
+                nom: nom,
+                description: modal.querySelector('#rapide-projet-desc').value
+            };
+        } else if (id_projet) {
+            projetData = { id_projet: parseInt(id_projet) };
+        } else {
+            Toast.error('❌ Veuillez sélectionner ou créer un projet');
+            return;
+        }
+        
+        // Articles
+        const lignes = [];
+        const articles = modal.querySelectorAll('.rapide-article');
+        let hasError = false;
+        
+        articles.forEach(article => {
+            const designation = article.querySelector('.rapide-designation').value.trim();
+            const quantite = parseInt(article.querySelector('.rapide-quantite').value) || 0;
+            const prix = parseFloat(article.querySelector('.rapide-prix').value) || 0;
+            
+            if (designation && quantite > 0 && prix > 0) {
+                lignes.push({ designation, quantite, prix_unitaire: prix });
+            } else if (designation) {
+                hasError = true;
+            }
+        });
+        
+        if (lignes.length === 0) {
+            Toast.error('❌ Ajoutez au moins un article valide');
+            return;
+        }
+        
+        if (hasError) {
+            Toast.warning('⚠️ Certains articles ont des informations incomplètes');
+        }
+        
+        // Construire le payload
+        const payload = {
+            lignes: lignes,
+            ...clientData,
+            ...projetData
+        };
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        isSubmitting = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await apiRequest('/api/devis/rapide', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                Toast.success(`✅ Devis #${result.id_devis} créé !`);
+                modal.remove();
+                // Ouvrir le devis créé
+                await this.viewDevis(result.id_devis);
+            } else {
+                Toast.error(result.message || '❌ Erreur');
+                isSubmitting = false;
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            Toast.error('❌ Erreur de connexion');
+            isSubmitting = false;
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+}
    async renderDashboard() {
     const stats = await this.getStats();
     const devisRaw = await this.fetchDevis();

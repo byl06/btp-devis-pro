@@ -2920,7 +2920,179 @@ def get_factures(id_user):
         return jsonify([]), 500
 
 
-
+@app.route('/api/devis/rapide', methods=['POST'])
+@jwt_required()
+def create_devis_rapide():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        print(f"🔍 Devis rapide pour user {user_id}")
+        print(f"🔍 Données reçues: {data}")
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Récupérer ou créer le client
+        id_client = data.get('id_client')
+        client_nom = data.get('client_nom', '').strip()
+        
+        if not id_client and not client_nom:
+            return jsonify({'success': False, 'message': 'Client requis'}), 400
+        
+        if not id_client and client_nom:
+            # Créer un nouveau client
+            client_data = {
+                "nom": client_nom,
+                "telephone": data.get('client_telephone', ''),
+                "email": data.get('client_email', ''),
+                "adresse": data.get('client_adresse', ''),
+                "id_user": user_id
+            }
+            
+            client_response = requests.post(
+                f"{supabase_url}/rest/v1/client",
+                headers=headers,
+                json=client_data
+            )
+            
+            if client_response.status_code in [200, 201]:
+                result = client_response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    id_client = result[0].get('id_client')
+                elif isinstance(result, dict):
+                    id_client = result.get('id_client')
+                else:
+                    # Récupérer le client créé
+                    get_response = requests.get(
+                        f"{supabase_url}/rest/v1/client?nom=eq.{client_nom}&id_user=eq.{user_id}&order=id_client.desc&limit=1",
+                        headers=headers
+                    )
+                    if get_response.status_code == 200 and get_response.json():
+                        id_client = get_response.json()[0].get('id_client')
+            else:
+                return jsonify({'success': False, 'message': f'Erreur création client: {client_response.text}'}), 500
+        
+        # 2. Récupérer ou créer le projet
+        id_projet = data.get('id_projet')
+        projet_nom = data.get('projet_nom', '').strip()
+        
+        if not id_projet and not projet_nom:
+            return jsonify({'success': False, 'message': 'Projet requis'}), 400
+        
+        if not id_projet and projet_nom:
+            projet_data = {
+                "nom_projet": projet_nom,
+                "description": data.get('projet_description', ''),
+                "localisation": data.get('projet_localisation', ''),
+                "id_user": user_id
+            }
+            
+            projet_response = requests.post(
+                f"{supabase_url}/rest/v1/projet",
+                headers=headers,
+                json=projet_data
+            )
+            
+            if projet_response.status_code in [200, 201]:
+                result = projet_response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    id_projet = result[0].get('id_projet')
+                elif isinstance(result, dict):
+                    id_projet = result.get('id_projet')
+                else:
+                    get_response = requests.get(
+                        f"{supabase_url}/rest/v1/projet?nom_projet=eq.{projet_nom}&id_user=eq.{user_id}&order=id_projet.desc&limit=1",
+                        headers=headers
+                    )
+                    if get_response.status_code == 200 and get_response.json():
+                        id_projet = get_response.json()[0].get('id_projet')
+            else:
+                return jsonify({'success': False, 'message': f'Erreur création projet: {projet_response.text}'}), 500
+        
+        # 3. Créer le devis
+        lignes = data.get('lignes', [])
+        if not lignes or len(lignes) == 0:
+            return jsonify({'success': False, 'message': 'Ajoutez au moins un article'}), 400
+        
+        total_materiaux = sum(float(ligne.get('quantite', 0)) * float(ligne.get('prix_unitaire', 0)) for ligne in lignes)
+        total = total_materiaux * 1.2  # +20% main d'œuvre
+        
+        devis_data = {
+            "date_creation": datetime.now().isoformat(),
+            "total": round(total, 2),
+            "statut": "brouillon",
+            "id_client": id_client,
+            "id_user": user_id,
+            "id_projet": id_projet
+        }
+        
+        devis_response = requests.post(
+            f"{supabase_url}/rest/v1/devis",
+            headers=headers,
+            json=devis_data
+        )
+        
+        if devis_response.status_code not in [200, 201]:
+            return jsonify({'success': False, 'message': f'Erreur création devis: {devis_response.text}'}), 500
+        
+        # Récupérer l'ID du devis
+        result = devis_response.json()
+        if isinstance(result, list) and len(result) > 0:
+            id_devis = result[0].get('id_devis')
+        elif isinstance(result, dict):
+            id_devis = result.get('id_devis')
+        else:
+            get_response = requests.get(
+                f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&order=id_devis.desc&limit=1",
+                headers=headers
+            )
+            if get_response.status_code == 200 and get_response.json():
+                id_devis = get_response.json()[0].get('id_devis')
+            else:
+                id_devis = None
+        
+        if not id_devis:
+            return jsonify({'success': False, 'message': 'Devis créé mais ID non récupéré'}), 500
+        
+        # 4. Ajouter les lignes
+        for ligne in lignes:
+            total_ligne = float(ligne.get('quantite', 0)) * float(ligne.get('prix_unitaire', 0))
+            ligne_data = {
+                "designation": ligne.get('designation', 'Article'),
+                "quantite": ligne.get('quantite', 1),
+                "prix_unitaire": ligne.get('prix_unitaire', 0),
+                "total_ligne": round(total_ligne, 2),
+                "id_devis": id_devis
+            }
+            requests.post(
+                f"{supabase_url}/rest/v1/ligne_devis",
+                headers=headers,
+                json=ligne_data
+            )
+        
+        return jsonify({
+            'success': True,
+            'id_devis': id_devis,
+            'message': 'Devis créé avec succès',
+            'total': round(total, 2)
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur create_devis_rapide: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
 # ==================== FACTURE NORMALISÉE ====================
 
 @app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])
