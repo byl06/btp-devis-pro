@@ -443,6 +443,10 @@ async saveHeaderSettings() {
 // DEVIS RAPIDE
 // ============================================================
 
+// ============================================================
+// DEVIS RAPIDE
+// ============================================================
+
 async openDevisRapide() {
     // Récupérer les clients et projets existants
     const clients = await this.fetchClients();
@@ -593,13 +597,11 @@ async openDevisRapide() {
         `;
         articlesList.appendChild(articleDiv);
         
-        // Supprimer un article
         articleDiv.querySelector('.rapide-remove').addEventListener('click', function() {
             articleDiv.remove();
             calculerTotalRapide();
         });
         
-        // Mettre à jour le total
         articleDiv.querySelectorAll('input').forEach(input => {
             input.addEventListener('input', calculerTotalRapide);
         });
@@ -652,48 +654,45 @@ async openDevisRapide() {
         const id_client = modal.querySelector('#rapide-client').value;
         const id_projet = modal.querySelector('#rapide-projet').value;
         
-        let clientData = {};
-        let projetData = {};
+        // Construire le payload
+        let payload = {
+            lignes: []
+        };
         
-        // Client
+        // 1. CLIENT
         if (id_client === 'new') {
             const nom = modal.querySelector('#rapide-client-nom').value.trim();
             if (!nom) {
                 Toast.error('❌ Veuillez saisir le nom du client');
                 return;
             }
-            clientData = {
-                nom: nom,
-                telephone: modal.querySelector('#rapide-client-tel').value,
-                email: modal.querySelector('#rapide-client-email').value
-            };
+            payload.client_nom = nom;
+            payload.client_telephone = modal.querySelector('#rapide-client-tel').value || '';
+            payload.client_email = modal.querySelector('#rapide-client-email').value || '';
         } else if (id_client) {
-            clientData = { id_client: parseInt(id_client) };
+            payload.id_client = parseInt(id_client);
         } else {
             Toast.error('❌ Veuillez sélectionner ou créer un client');
             return;
         }
         
-        // Projet
+        // 2. PROJET
         if (id_projet === 'new') {
             const nom = modal.querySelector('#rapide-projet-nom').value.trim();
             if (!nom) {
                 Toast.error('❌ Veuillez saisir le nom du projet');
                 return;
             }
-            projetData = {
-                nom: nom,
-                description: modal.querySelector('#rapide-projet-desc').value
-            };
+            payload.projet_nom = nom;
+            payload.projet_description = modal.querySelector('#rapide-projet-desc').value || '';
         } else if (id_projet) {
-            projetData = { id_projet: parseInt(id_projet) };
+            payload.id_projet = parseInt(id_projet);
         } else {
             Toast.error('❌ Veuillez sélectionner ou créer un projet');
             return;
         }
         
-        // Articles
-        const lignes = [];
+        // 3. ARTICLES
         const articles = modal.querySelectorAll('.rapide-article');
         let hasError = false;
         
@@ -703,13 +702,13 @@ async openDevisRapide() {
             const prix = parseFloat(article.querySelector('.rapide-prix').value) || 0;
             
             if (designation && quantite > 0 && prix > 0) {
-                lignes.push({ designation, quantite, prix_unitaire: prix });
+                payload.lignes.push({ designation, quantite, prix_unitaire: prix });
             } else if (designation) {
                 hasError = true;
             }
         });
         
-        if (lignes.length === 0) {
+        if (payload.lignes.length === 0) {
             Toast.error('❌ Ajoutez au moins un article valide');
             return;
         }
@@ -718,12 +717,7 @@ async openDevisRapide() {
             Toast.warning('⚠️ Certains articles ont des informations incomplètes');
         }
         
-        // Construire le payload
-        const payload = {
-            lignes: lignes,
-            ...clientData,
-            ...projetData
-        };
+        console.log('📤 Payload envoyé:', payload);
         
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
@@ -737,7 +731,21 @@ async openDevisRapide() {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            const result = await response.json();
+            
+            const text = await response.text();
+            console.log('📥 Réponse brute:', text);
+            
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON:', e);
+                Toast.error('❌ Erreur serveur');
+                isSubmitting = false;
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                return;
+            }
             
             if (result.success) {
                 Toast.success(`✅ Devis #${result.id_devis} créé !`);
@@ -751,7 +759,7 @@ async openDevisRapide() {
                 submitBtn.disabled = false;
             }
         } catch (error) {
-            console.error('Erreur:', error);
+            console.error('❌ Erreur:', error);
             Toast.error('❌ Erreur de connexion');
             isSubmitting = false;
             submitBtn.innerHTML = originalText;

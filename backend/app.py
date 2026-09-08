@@ -2926,10 +2926,13 @@ def create_devis_rapide():
     try:
         user_id = get_jwt_identity()
         user_id = int(user_id)
-        data = request.json
+        data = request.get_json()
         
         print(f"🔍 Devis rapide pour user {user_id}")
         print(f"🔍 Données reçues: {data}")
+        
+        if not data:
+            return jsonify({'success': False, 'message': 'Données JSON invalides'}), 400
         
         import requests
         from datetime import datetime
@@ -2940,17 +2943,30 @@ def create_devis_rapide():
         headers = {
             "Authorization": f"Bearer {supabase_key}",
             "apikey": supabase_key,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
         }
         
-        # 1. Récupérer ou créer le client
+        # ============================================================
+        # 1. GESTION DU CLIENT
+        # ============================================================
         id_client = data.get('id_client')
         client_nom = data.get('client_nom', '').strip()
+        
+        print(f"🔍 id_client: {id_client}, client_nom: '{client_nom}'")
         
         if not id_client and not client_nom:
             return jsonify({'success': False, 'message': 'Client requis'}), 400
         
-        if not id_client and client_nom:
+        if id_client:
+            # Client existant
+            check_response = requests.get(
+                f"{supabase_url}/rest/v1/client?id_client=eq.{id_client}&id_user=eq.{user_id}&select=id_client",
+                headers=headers
+            )
+            if check_response.status_code != 200 or not check_response.json():
+                return jsonify({'success': False, 'message': 'Client non trouvé'}), 404
+        else:
             # Créer un nouveau client
             client_data = {
                 "nom": client_nom,
@@ -2960,19 +2976,25 @@ def create_devis_rapide():
                 "id_user": user_id
             }
             
+            print(f"🔍 Création client: {client_data}")
+            
             client_response = requests.post(
                 f"{supabase_url}/rest/v1/client",
                 headers=headers,
                 json=client_data
             )
             
+            print(f"🔍 Status création client: {client_response.status_code}")
+            print(f"🔍 Réponse: {client_response.text}")
+            
             if client_response.status_code in [200, 201]:
-                result = client_response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    id_client = result[0].get('id_client')
-                elif isinstance(result, dict):
-                    id_client = result.get('id_client')
-                else:
+                try:
+                    result = client_response.json()
+                    if isinstance(result, list) and len(result) > 0:
+                        id_client = result[0].get('id_client')
+                    elif isinstance(result, dict):
+                        id_client = result.get('id_client')
+                except:
                     # Récupérer le client créé
                     get_response = requests.get(
                         f"{supabase_url}/rest/v1/client?nom=eq.{client_nom}&id_user=eq.{user_id}&order=id_client.desc&limit=1",
@@ -2983,14 +3005,30 @@ def create_devis_rapide():
             else:
                 return jsonify({'success': False, 'message': f'Erreur création client: {client_response.text}'}), 500
         
-        # 2. Récupérer ou créer le projet
+        if not id_client:
+            return jsonify({'success': False, 'message': 'ID client non récupéré'}), 500
+        
+        # ============================================================
+        # 2. GESTION DU PROJET
+        # ============================================================
         id_projet = data.get('id_projet')
         projet_nom = data.get('projet_nom', '').strip()
+        
+        print(f"🔍 id_projet: {id_projet}, projet_nom: '{projet_nom}'")
         
         if not id_projet and not projet_nom:
             return jsonify({'success': False, 'message': 'Projet requis'}), 400
         
-        if not id_projet and projet_nom:
+        if id_projet:
+            # Projet existant
+            check_response = requests.get(
+                f"{supabase_url}/rest/v1/projet?id_projet=eq.{id_projet}&id_user=eq.{user_id}&select=id_projet",
+                headers=headers
+            )
+            if check_response.status_code != 200 or not check_response.json():
+                return jsonify({'success': False, 'message': 'Projet non trouvé'}), 404
+        else:
+            # Créer un nouveau projet
             projet_data = {
                 "nom_projet": projet_nom,
                 "description": data.get('projet_description', ''),
@@ -2998,19 +3036,25 @@ def create_devis_rapide():
                 "id_user": user_id
             }
             
+            print(f"🔍 Création projet: {projet_data}")
+            
             projet_response = requests.post(
                 f"{supabase_url}/rest/v1/projet",
                 headers=headers,
                 json=projet_data
             )
             
+            print(f"🔍 Status création projet: {projet_response.status_code}")
+            print(f"🔍 Réponse: {projet_response.text}")
+            
             if projet_response.status_code in [200, 201]:
-                result = projet_response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    id_projet = result[0].get('id_projet')
-                elif isinstance(result, dict):
-                    id_projet = result.get('id_projet')
-                else:
+                try:
+                    result = projet_response.json()
+                    if isinstance(result, list) and len(result) > 0:
+                        id_projet = result[0].get('id_projet')
+                    elif isinstance(result, dict):
+                        id_projet = result.get('id_projet')
+                except:
                     get_response = requests.get(
                         f"{supabase_url}/rest/v1/projet?nom_projet=eq.{projet_nom}&id_user=eq.{user_id}&order=id_projet.desc&limit=1",
                         headers=headers
@@ -3020,13 +3064,18 @@ def create_devis_rapide():
             else:
                 return jsonify({'success': False, 'message': f'Erreur création projet: {projet_response.text}'}), 500
         
-        # 3. Créer le devis
+        if not id_projet:
+            return jsonify({'success': False, 'message': 'ID projet non récupéré'}), 500
+        
+        # ============================================================
+        # 3. CRÉATION DU DEVIS
+        # ============================================================
         lignes = data.get('lignes', [])
         if not lignes or len(lignes) == 0:
             return jsonify({'success': False, 'message': 'Ajoutez au moins un article'}), 400
         
         total_materiaux = sum(float(ligne.get('quantite', 0)) * float(ligne.get('prix_unitaire', 0)) for ligne in lignes)
-        total = total_materiaux * 1.2  # +20% main d'œuvre
+        total = total_materiaux * 1.2
         
         devis_data = {
             "date_creation": datetime.now().isoformat(),
@@ -3037,35 +3086,47 @@ def create_devis_rapide():
             "id_projet": id_projet
         }
         
+        print(f"🔍 Création devis: {devis_data}")
+        
         devis_response = requests.post(
             f"{supabase_url}/rest/v1/devis",
             headers=headers,
             json=devis_data
         )
         
+        print(f"🔍 Status création devis: {devis_response.status_code}")
+        print(f"🔍 Réponse: {devis_response.text}")
+        
         if devis_response.status_code not in [200, 201]:
             return jsonify({'success': False, 'message': f'Erreur création devis: {devis_response.text}'}), 500
         
         # Récupérer l'ID du devis
-        result = devis_response.json()
-        if isinstance(result, list) and len(result) > 0:
-            id_devis = result[0].get('id_devis')
-        elif isinstance(result, dict):
-            id_devis = result.get('id_devis')
-        else:
+        try:
+            result = devis_response.json()
+            if isinstance(result, list) and len(result) > 0:
+                id_devis = result[0].get('id_devis')
+            elif isinstance(result, dict):
+                id_devis = result.get('id_devis')
+            else:
+                id_devis = None
+        except:
+            id_devis = None
+        
+        if not id_devis:
+            # Récupérer le dernier devis créé
             get_response = requests.get(
                 f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&order=id_devis.desc&limit=1",
                 headers=headers
             )
             if get_response.status_code == 200 and get_response.json():
                 id_devis = get_response.json()[0].get('id_devis')
-            else:
-                id_devis = None
         
         if not id_devis:
             return jsonify({'success': False, 'message': 'Devis créé mais ID non récupéré'}), 500
         
-        # 4. Ajouter les lignes
+        # ============================================================
+        # 4. AJOUT DES LIGNES
+        # ============================================================
         for ligne in lignes:
             total_ligne = float(ligne.get('quantite', 0)) * float(ligne.get('prix_unitaire', 0))
             ligne_data = {
