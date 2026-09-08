@@ -82,6 +82,9 @@
 <!-- ============================================================ -->
 <!-- BANNIÈRE DE COOKIES - AFFICHÉE PAR DÉFAUT -->
 <div id="cookie-banner" style="
+    #cookie-banner {
+    display: none !important;
+}
     position: fixed;
     bottom: 0;
     left: 0;
@@ -90,7 +93,7 @@
     color: white;
     padding: 16px 24px;
     z-index: 9999;
-    display: none;
+    display: flex;  /* ← AFFICHÉ PAR DÉFAUT */
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
@@ -105,13 +108,47 @@
         </span>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-        <button onclick="accepterCookies()" style="background:#34D399; border:none; color:#0A1712; padding:8px 20px; border-radius:8px; font-weight:600; cursor:pointer;">Accepter</button>
-        <button onclick="refuserCookies()" style="background:transparent; border:1px solid #475569; color:#94A3B8; padding:8px 20px; border-radius:8px; cursor:pointer;">Refuser</button>
-        <a href="https://btpdevispro-info.netlify.app/politique-confidentialite.html" target="_blank" style="color:#34D399; text-decoration:none; font-size:0.85rem;">En savoir plus →</a>
+        <button onclick="accepterCookies()" style="
+            background: #34D399;
+            border: none;
+            color: #0A1712;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            Accepter
+        </button>
+        <button onclick="refuserCookies()" style="
+            background: transparent;
+            border: 1px solid #475569;
+            color: #94A3B8;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        " onmouseover="this.style.borderColor='#34D399'; this.style.color='#34D399'" onmouseout="this.style.borderColor='#475569'; this.style.color='#94A3B8'">
+            Refuser
+        </button>
+        <a href="https://btpdevispro-info.netlify.app/politique-confidentialite.html" target="_blank" style="
+            color: #34D399;
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        " onmouseover="this.style.background='rgba(52,211,153,0.1)'" onmouseout="this.style.background='transparent'">
+            En savoir plus →
+        </a>
     </div>
 </div>
 
 <script>
+// ============================================================
+// GESTION DES COOKIES
+// ============================================================
+
 function setCookie(name, value, days) {
     const expires = new Date(Date.now() + days * 86400000).toUTCString();
     document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Strict; Secure';
@@ -126,39 +163,43 @@ function accepterCookies() {
     setCookie('cookies_acceptes', 'true', 365);
     document.getElementById('cookie-banner').style.display = 'none';
     console.log('✅ Cookies acceptés');
+    
+    // 🔥 ICI tu peux activer les cookies analytiques plus tard
+    // activerAnalytics();
 }
 
 function refuserCookies() {
     setCookie('cookies_acceptes', 'false', 365);
     document.getElementById('cookie-banner').style.display = 'none';
     console.log('❌ Cookies refusés');
+    
+    // 🔥 ICI tu peux désactiver les cookies analytiques plus tard
+    // desactiverAnalytics();
 }
 
 // ============================================================
-// AFFICHER LA BANNIÈRE APRÈS LE CHARGEMENT COMPLET
+// VÉRIFICATION AU CHARGEMENT
 // ============================================================
 
-function afficherBanniereCookies() {
+document.addEventListener('DOMContentLoaded', function() {
     const consentement = getCookie('cookies_acceptes');
     
+    // 🔥 Si pas de consentement → afficher la bannière
     if (!consentement) {
-        setTimeout(function() {
-            const banner = document.getElementById('cookie-banner');
-            banner.style.display = 'flex';
-            banner.style.animation = 'fadeInUp 0.5s ease';
-            console.log('🍪 Bannière affichée après 1s');
-        }, 1000);
+        document.getElementById('cookie-banner').style.display = 'flex';
+        console.log('🍪 Bannière affichée (pas de consentement)');
     } else {
-        console.log('🍪 Consentement déjà donné: ' + consentement);
+        // 🔥 Si consentement déjà donné → cacher la bannière
+        document.getElementById('cookie-banner').style.display = 'none';
+        console.log('🍪 Bannière cachée (consentement déjà donné: ' + consentement + ')');
+        
+        // 🔥 Si consentement = 'true' → activer les analytiques
+        if (consentement === 'true') {
+            console.log('📊 Cookies analytiques activés');
+            // activerAnalytics();
+        }
     }
-}
-
-// Attendre le chargement complet de la page
-if (document.readyState === 'complete') {
-    afficherBanniereCookies();
-} else {
-    window.addEventListener('load', afficherBanniereCookies);
-}
+});
 </script>
 
     <script src="js/app.js"></script>
