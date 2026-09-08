@@ -81,7 +81,9 @@
 <!-- BANNIÈRE DE COOKIES - BTP DEVIS PRO                          -->
 <!-- ============================================================ -->
 <!-- BANNIÈRE DE COOKIES - AFFICHÉE PAR DÉFAUT -->
-<!-- BANNIÈRE DE COOKIES -->
+<!-- ============================================================ -->
+<!-- BANNIÈRE DE COOKIES                                           -->
+<!-- ============================================================ -->
 <div id="cookie-banner" style="
     position: fixed;
     bottom: 0;
@@ -91,7 +93,7 @@
     color: white;
     padding: 16px 24px;
     z-index: 9999;
-    display: flex;
+    display: none;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
@@ -126,17 +128,30 @@ function getCookie(name) {
 function accepterCookies() {
     setCookie('cookies_acceptes', 'true', 365);
     document.getElementById('cookie-banner').style.display = 'none';
+    console.log('✅ Cookies acceptés');
 }
 
 function refuserCookies() {
     setCookie('cookies_acceptes', 'false', 365);
     document.getElementById('cookie-banner').style.display = 'none';
+    console.log('❌ Cookies refusés');
 }
 
-// Vérification immédiate
+// ============================================================
+// VÉRIFICATION IMMÉDIATE (pas de flash)
+// ============================================================
+
 (function() {
-    if (getCookie('cookies_acceptes')) {
+    const consentement = getCookie('cookies_acceptes');
+    
+    if (consentement) {
+        // Cookie présent → bannière cachée
         document.getElementById('cookie-banner').style.display = 'none';
+        console.log('🍪 Bannière cachée (consentement: ' + consentement + ')');
+    } else {
+        // Pas de cookie → afficher la bannière
+        document.getElementById('cookie-banner').style.display = 'flex';
+        console.log('🍪 Bannière affichée (pas de consentement)');
     }
 })();
 </script>
