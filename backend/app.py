@@ -2920,6 +2920,7 @@ def get_factures(id_user):
         return jsonify([]), 500
 
 
+
 # ==================== FACTURE NORMALISÉE ====================
 
 @app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])

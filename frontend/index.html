@@ -76,11 +76,7 @@
         </main>
     </div>
 
-    <!-- Bannière Cookies -->
-<!-- ============================================================ -->
-<!-- BANNIÈRE DE COOKIES - BTP DEVIS PRO                          -->
-<!-- ============================================================ -->
-<!-- ============================================================ -->
+    <!-- ============================================================ -->
 <!-- BANNIÈRE DE COOKIES                                           -->
 <!-- ============================================================ -->
 <div id="cookie-banner" style="
@@ -107,15 +103,45 @@
         </span>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-        <button onclick="accepterCookies()" style="background:#34D399; border:none; color:#0A1712; padding:8px 20px; border-radius:8px; font-weight:600; cursor:pointer;">Accepter</button>
-        <button onclick="refuserCookies()" style="background:transparent; border:1px solid #475569; color:#94A3B8; padding:8px 20px; border-radius:8px; cursor:pointer;">Refuser</button>
-        <a href="https://btpdevispro-info.netlify.app/politique-confidentialite.html" target="_blank" style="color:#34D399; text-decoration:none; font-size:0.85rem;">En savoir plus →</a>
+        <button onclick="accepterCookies()" style="
+            background: #34D399;
+            border: none;
+            color: #0A1712;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            Accepter
+        </button>
+        <button onclick="refuserCookies()" style="
+            background: transparent;
+            border: 1px solid #475569;
+            color: #94A3B8;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        " onmouseover="this.style.borderColor='#34D399'; this.style.color='#34D399'" onmouseout="this.style.borderColor='#475569'; this.style.color='#94A3B8'">
+            Refuser
+        </button>
+        <a href="https://btpdevispro-info.netlify.app/politique-confidentialite.html" target="_blank" style="
+            color: #34D399;
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        " onmouseover="this.style.background='rgba(52,211,153,0.1)'" onmouseout="this.style.background='transparent'">
+            En savoir plus →
+        </a>
     </div>
 </div>
 
 <script>
 // ============================================================
-// GESTION DES COOKIES - VERSION SIMPLIFIÉE ET RAPIDE
+// GESTION DES COOKIES — VERSION AVEC RELOAD
 // ============================================================
 
 function setCookie(name, value, days) {
@@ -136,21 +162,32 @@ function getCookie(name) {
 function accepterCookies() {
     setCookie('cookies_acceptes', 'true', 365);
     document.getElementById('cookie-banner').style.display = 'none';
+    // Recharger la page pour enlever la bannière proprement
+    location.reload();
 }
 
 function refuserCookies() {
     setCookie('cookies_acceptes', 'false', 365);
     document.getElementById('cookie-banner').style.display = 'none';
+    // Recharger la page pour enlever la bannière proprement
+    location.reload();
 }
 
 // ============================================================
-// EXÉCUTION IMMÉDIATE (pas d'attente)
+// EXÉCUTION IMMÉDIATE — VÉRIFICATION DU COOKIE
 // ============================================================
 
 (function() {
     var consentement = getCookie('cookies_acceptes');
+    
     if (!consentement) {
+        // Pas de consentement → afficher la bannière
         document.getElementById('cookie-banner').style.display = 'flex';
+        console.log('🍪 Bannière affichée (pas de consentement)');
+    } else {
+        // Consentement déjà donné → bannière cachée
+        document.getElementById('cookie-banner').style.display = 'none';
+        console.log('🍪 Bannière cachée (consentement: ' + consentement + ')');
     }
 })();
 </script>
