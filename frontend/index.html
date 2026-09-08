@@ -81,9 +81,6 @@
 <!-- BANNIÈRE DE COOKIES - BTP DEVIS PRO                          -->
 <!-- ============================================================ -->
 <!-- BANNIÈRE DE COOKIES - AFFICHÉE PAR DÉFAUT -->
-<!-- ============================================================ -->
-<!-- BANNIÈRE DE COOKIES                                           -->
-<!-- ============================================================ -->
 <div id="cookie-banner" style="
     position: fixed;
     bottom: 0;
@@ -138,22 +135,30 @@ function refuserCookies() {
 }
 
 // ============================================================
-// VÉRIFICATION IMMÉDIATE (pas de flash)
+// AFFICHER LA BANNIÈRE APRÈS LE CHARGEMENT COMPLET
 // ============================================================
 
-(function() {
+function afficherBanniereCookies() {
     const consentement = getCookie('cookies_acceptes');
     
-    if (consentement) {
-        // Cookie présent → bannière cachée
-        document.getElementById('cookie-banner').style.display = 'none';
-        console.log('🍪 Bannière cachée (consentement: ' + consentement + ')');
+    if (!consentement) {
+        setTimeout(function() {
+            const banner = document.getElementById('cookie-banner');
+            banner.style.display = 'flex';
+            banner.style.animation = 'fadeInUp 0.5s ease';
+            console.log('🍪 Bannière affichée après 1s');
+        }, 1000);
     } else {
-        // Pas de cookie → afficher la bannière
-        document.getElementById('cookie-banner').style.display = 'flex';
-        console.log('🍪 Bannière affichée (pas de consentement)');
+        console.log('🍪 Consentement déjà donné: ' + consentement);
     }
-})();
+}
+
+// Attendre le chargement complet de la page
+if (document.readyState === 'complete') {
+    afficherBanniereCookies();
+} else {
+    window.addEventListener('load', afficherBanniereCookies);
+}
 </script>
 
     <script src="js/app.js"></script>
