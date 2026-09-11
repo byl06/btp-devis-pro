@@ -65,28 +65,68 @@
         <!-- Main Content -->
         <main class="main-content">
     <header class="glass-header">
-        <h1 id="page-title">Dashboard</h1>
-        <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
-            <!-- Bouton Devis rapide -->
-            <button onclick="app.openDevisRapide()" style="
-                background: linear-gradient(135deg, #F59E0B, #D97706);
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 8px;
-                font-weight: 600;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                transition: transform 0.2s;
-                font-size: 0.85rem;
-                white-space: nowrap;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-bolt"></i> Devis rapide
-            </button>
+    <h1 id="page-title">Dashboard</h1>
+    <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
+        <!-- 🔍 Barre de recherche globale -->
+        <div style="position: relative;">
+            <input type="text" 
+                   id="search-globale" 
+                   placeholder="🔍 Rechercher..." 
+                   autocomplete="off"
+                   style="
+                       width: 250px;
+                       padding: 8px 12px 8px 35px;
+                       border-radius: 8px;
+                       background: rgba(255,255,255,0.08);
+                       border: 1px solid rgba(255,255,255,0.15);
+                       color: white;
+                       font-size: 0.85rem;
+                       outline: none;
+                       transition: all 0.3s;
+                   "
+                   onfocus="this.style.borderColor='#06B6D4'; this.style.background='rgba(255,255,255,0.12)'"
+                   onblur="setTimeout(() => { document.getElementById('search-results').style.display='none'; }, 200)"
+                   oninput="app.rechercheGlobale(this.value)">
+            <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 0.85rem;"></i>
+            
+            <!-- Résultats de recherche -->
+            <div id="search-results" style="
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                margin-top: 8px;
+                background: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                max-height: 400px;
+                overflow-y: auto;
+                z-index: 1000;
+            "></div>
         </div>
-    </header>
+        
+        <!-- Bouton Devis rapide -->
+        <button onclick="app.openDevisRapide()" style="
+            background: linear-gradient(135deg, #F59E0B, #D97706);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.2s;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            <i class="fas fa-bolt"></i> Devis rapide
+        </button>
+    </div>
+</header>
     <div class="content-area" id="content-area">
         <div class="loading">Chargement...</div>
     </div>

@@ -764,6 +764,134 @@ async openDevisRapide() {
         }
     });
 }
+
+// ============================================================
+// RECHERCHE GLOBALE
+// ============================================================
+
+async rechercheGlobale(query) {
+    const resultsDiv = document.getElementById('search-results');
+    
+    if (!query || query.length < 2) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await apiRequest(`/api/recherche?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (!data.success || !data.results || data.results.length === 0) {
+            resultsDiv.innerHTML = `
+                <div style="padding: 16px; text-align: center; color: #94A3B8; font-size: 0.85rem;">
+                    <i class="fas fa-search" style="font-size: 20px; opacity: 0.5; margin-bottom: 8px; display: block;"></i>
+                    Aucun résultat pour "<strong>${query}</strong>"
+                </div>
+            `;
+            resultsDiv.style.display = 'block';
+            return;
+        }
+        
+        let html = `
+            <div style="padding: 8px 12px; border-bottom: 1px solid #334155; font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">
+                ${data.count} résultat${data.count > 1 ? 's' : ''}
+            </div>
+        `;
+        
+        data.results.forEach(result => {
+            html += `
+                <div onclick="app.ouvrirResultat('${result.type}', ${result.id})" 
+                     style="
+                         display: flex;
+                         align-items: center;
+                         gap: 12px;
+                         padding: 10px 16px;
+                         cursor: pointer;
+                         transition: background 0.2s;
+                         border-bottom: 1px solid rgba(255,255,255,0.05);
+                     "
+                     onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                     onmouseout="this.style.background='transparent'">
+                    <div style="
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 8px;
+                        background: ${result.couleur}22;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: ${result.couleur};
+                        flex-shrink: 0;
+                    ">
+                        <i class="fas ${result.icone}"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.85rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${result.titre}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${result.sous_titre}
+                        </div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: ${result.couleur}; background: ${result.couleur}15; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; font-weight: 600;">
+                        ${result.type}
+                    </div>
+                </div>
+            `;
+        });
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('❌ Erreur recherche:', error);
+        resultsDiv.innerHTML = `
+            <div style="padding: 16px; text-align: center; color: #EF4444; font-size: 0.85rem;">
+                ❌ Erreur de recherche
+            </div>
+        `;
+        resultsDiv.style.display = 'block';
+    }
+}
+
+// ============================================================
+// OUVRIR UN RÉSULTAT
+// ============================================================
+
+ouvrirResultat(type, id) {
+    // Cacher les résultats
+    const resultsDiv = document.getElementById('search-results');
+    if (resultsDiv) resultsDiv.style.display = 'none';
+    
+    // Vider la recherche
+    const searchInput = document.getElementById('search-globale');
+    if (searchInput) searchInput.value = '';
+    
+    // Rediriger selon le type
+    switch(type) {
+        case 'client':
+            this.loadPage('clients');
+            // Optionnel : ouvrir le client après chargement
+            setTimeout(() => {
+                if (this.editClient) this.editClient(id);
+            }, 500);
+            break;
+        case 'projet':
+            this.loadPage('projets');
+            setTimeout(() => {
+                if (this.editProjet) this.editProjet(id);
+            }, 500);
+            break;
+        case 'devis':
+            this.viewDevis(id);
+            break;
+        case 'facture':
+            this.loadPage('factures');
+            break;
+        default:
+            this.loadPage('dashboard');
+    }
+}
    async renderDashboard() {
     const stats = await this.getStats();
     const devisRaw = await this.fetchDevis();

@@ -3154,6 +3154,178 @@ def create_devis_rapide():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/recherche', methods=['GET'])
+@jwt_required()
+def recherche_globale():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        query = request.args.get('q', '').strip().lower()
+        
+        if not query or len(query) < 2:
+            return jsonify({'success': True, 'results': []})
+        
+        print(f"🔍 Recherche globale: '{query}' pour user {user_id}")
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        results = []
+        
+        # ============================================================
+        # 1. RECHERCHE DANS LES CLIENTS
+        # ============================================================
+        try:
+            clients_response = requests.get(
+                f"{supabase_url}/rest/v1/client?id_user=eq.{user_id}&select=*",
+                headers=headers
+            )
+            
+            if clients_response.status_code == 200:
+                clients = clients_response.json()
+                for client in clients:
+                    nom = (client.get('nom') or '').lower()
+                    email = (client.get('email') or '').lower()
+                    tel = (client.get('telephone') or '').lower()
+                    
+                    if query in nom or query in email or query in tel:
+                        results.append({
+                            'type': 'client',
+                            'id': client.get('id_client'),
+                            'titre': client.get('nom', 'Client'),
+                            'sous_titre': client.get('telephone', '') or client.get('email', ''),
+                            'icone': 'fa-user',
+                            'couleur': '#06B6D4',
+                            'page': 'clients'
+                        })
+        except Exception as e:
+            print(f"⚠️ Erreur recherche clients: {e}")
+        
+        # ============================================================
+        # 2. RECHERCHE DANS LES PROJETS
+        # ============================================================
+        try:
+            projets_response = requests.get(
+                f"{supabase_url}/rest/v1/projet?id_user=eq.{user_id}&select=*",
+                headers=headers
+            )
+            
+            if projets_response.status_code == 200:
+                projets = projets_response.json()
+                for projet in projets:
+                    nom = (projet.get('nom_projet') or '').lower()
+                    desc = (projet.get('description') or '').lower()
+                    loc = (projet.get('localisation') or '').lower()
+                    
+                    if query in nom or query in desc or query in loc:
+                        results.append({
+                            'type': 'projet',
+                            'id': projet.get('id_projet'),
+                            'titre': projet.get('nom_projet', 'Projet'),
+                            'sous_titre': projet.get('localisation', '') or projet.get('description', ''),
+                            'icone': 'fa-hard-hat',
+                            'couleur': '#8B5CF6',
+                            'page': 'projets'
+                        })
+        except Exception as e:
+            print(f"⚠️ Erreur recherche projets: {e}")
+        
+        # ============================================================
+        # 3. RECHERCHE DANS LES DEVIS
+        # ============================================================
+        try:
+            devis_response = requests.get(
+                f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&select=*&order=id_devis.desc&limit=50",
+                headers=headers
+            )
+            
+            if devis_response.status_code == 200:
+                devis_list = devis_response.json()
+                for devis in devis_list:
+                    ref = f"devis-{devis.get('id_devis', 0):06d}".lower()
+                    ref2 = str(devis.get('id_devis', '')).lower()
+                    statut = (devis.get('statut') or '').lower()
+                    total = str(devis.get('total', '')).lower()
+                    
+                    if query in ref or query in ref2 or query in statut or query in total:
+                        results.append({
+                            'type': 'devis',
+                            'id': devis.get('id_devis'),
+                            'titre': f"Devis #{devis.get('id_devis')}",
+                            'sous_titre': f"{(devis.get('total') or 0):,.0f} FCFA · {devis.get('statut', 'brouillon')}",
+                            'icone': 'fa-file-invoice',
+                            'couleur': '#F59E0B',
+                            'page': 'devis'
+                        })
+        except Exception as e:
+            print(f"⚠️ Erreur recherche devis: {e}")
+        
+        # ============================================================
+        # 4. RECHERCHE DANS LES FACTURES
+        # ============================================================
+        try:
+            factures_response = requests.get(
+                f"{supabase_url}/rest/v1/facture?select=*&order=id_facture.desc&limit=50",
+                headers=headers
+            )
+            
+            if factures_response.status_code == 200:
+                factures = factures_response.json()
+                for facture in factures:
+                    # Vérifier que la facture appartient à l'utilisateur via le devis
+                    id_devis = facture.get('id_devis')
+                    if id_devis:
+                        devis_check = requests.get(
+                            f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}&select=id_user",
+                            headers=headers
+                        )
+                        if devis_check.status_code == 200 and devis_check.json():
+                            if devis_check.json()[0].get('id_user') != user_id:
+                                continue
+                    
+                    ref = f"facture-{facture.get('id_facture', 0):06d}".lower()
+                    ref2 = str(facture.get('id_facture', '')).lower()
+                    statut = (facture.get('statut') or '').lower()
+                    montant = str(facture.get('montant', '')).lower()
+                    
+                    if query in ref or query in ref2 or query in statut or query in montant:
+                        results.append({
+                            'type': 'facture',
+                            'id': facture.get('id_facture'),
+                            'titre': f"Facture #{facture.get('id_facture')}",
+                            'sous_titre': f"{(facture.get('montant') or 0):,.0f} FCFA · {facture.get('statut', 'non payée')}",
+                            'icone': 'fa-receipt',
+                            'couleur': '#10B981',
+                            'page': 'factures'
+                        })
+        except Exception as e:
+            print(f"⚠️ Erreur recherche factures: {e}")
+        
+        # Limiter à 10 résultats
+        results = results[:10]
+        
+        print(f"✅ {len(results)} résultats trouvés")
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'count': len(results)
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur recherche_globale: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'results': [], 'message': str(e)}), 500
 # ==================== FACTURE NORMALISÉE ====================
 
 @app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])
