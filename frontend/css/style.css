@@ -1430,6 +1430,29 @@ body {
     }
 }
 
+/* Assurer que la recherche est toujours au-dessus */
+#search-results {
+    z-index: 99999 !important;
+}
+
+/* Conteneur de la recherche */
+.header-right {
+    position: relative;
+    z-index: 1000;
+}
+
+/* Le header entier doit être au-dessus */
+.glass-header {
+    position: relative;
+    z-index: 1000;
+}
+
+/* Les cartes en dessous */
+.cards-grid {
+    position: relative;
+    z-index: 1;
+}
+
 /* ===== ONGLETS FACTURES ===== */
 .tab-facture {
     transition: all 0.3s ease;
