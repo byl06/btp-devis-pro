@@ -713,7 +713,7 @@ async openDevisRapide() {
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
         submitBtn.disabled = true;
         
-        try {
+                try {
             const response = await apiRequest('/api/devis/rapide', {
                 method: 'POST',
                 body: JSON.stringify(payload)
@@ -735,21 +735,25 @@ async openDevisRapide() {
             }
             
             if (result.success) {
+                // ✅ SUCCÈS
                 Toast.success(`✅ Devis #${result.id_devis} créé !`);
                 modal.remove();
                 
-                // 🔥 Ouvrir le devis dans un try séparé
+                // 🔥 Recharger la page sans bloquer
                 try {
-                    await this.viewDevis(result.id_devis);
-                } catch (viewError) {
-                    console.error('⚠️ Erreur affichage devis:', viewError);
-                    this.loadPage('devis');
+                    await this.loadPage('devis');
+                } catch (e) {
+                    console.error('⚠️ Erreur rechargement:', e);
                 }
+                
+                // 🔥 Sortir du try principal — plus rien après
+                return;
             } else {
                 Toast.error(result.message || '❌ Erreur');
                 isSubmitting = false;
                 submitBtn.innerHTML = originalText;
                 submitBtn.disabled = false;
+                return;
             }
         } catch (error) {
             console.error('❌ Erreur création devis:', error);
