@@ -448,7 +448,6 @@ async saveHeaderSettings() {
 // ============================================================
 
 async openDevisRapide() {
-    // Récupérer les clients et projets existants
     const clients = await this.fetchClients();
     const projets = await this.fetchProjets();
     
@@ -563,26 +562,22 @@ async openDevisRapide() {
     // GESTION DES ÉVÉNEMENTS
     // ============================================================
     
-    // Fermeture
     const closeBtns = modal.querySelectorAll('.close-modal');
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     
-    // Afficher/cacher nouveau client
     const clientSelect = modal.querySelector('#rapide-client');
     const newClientDiv = modal.querySelector('#rapide-new-client');
     clientSelect.addEventListener('change', function() {
         newClientDiv.style.display = this.value === 'new' ? 'block' : 'none';
     });
     
-    // Afficher/cacher nouveau projet
     const projetSelect = modal.querySelector('#rapide-projet');
     const newProjetDiv = modal.querySelector('#rapide-new-projet');
     projetSelect.addEventListener('change', function() {
         newProjetDiv.style.display = this.value === 'new' ? 'block' : 'none';
     });
     
-    // Ajouter un article
     const addBtn = modal.querySelector('#rapide-add-article');
     const articlesList = modal.querySelector('#rapide-articles-list');
     addBtn.addEventListener('click', function() {
@@ -607,7 +602,6 @@ async openDevisRapide() {
         });
     });
     
-    // Supprimer les articles existants
     modal.querySelectorAll('.rapide-remove').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('.rapide-article').remove();
@@ -615,7 +609,6 @@ async openDevisRapide() {
         });
     });
     
-    // Mettre à jour le total
     modal.querySelectorAll('#rapide-articles-list input').forEach(input => {
         input.addEventListener('input', calculerTotalRapide);
     });
@@ -638,10 +631,6 @@ async openDevisRapide() {
         modal.querySelector('#rapide-total').textContent = total.toLocaleString() + ' FCFA';
     }
     
-    // ============================================================
-    // SOUMISSION
-    // ============================================================
-    
     const form = modal.querySelector('#devis-rapide-form');
     let isSubmitting = false;
     
@@ -650,16 +639,14 @@ async openDevisRapide() {
         
         if (isSubmitting) return;
         
-        // Récupérer les données
         const id_client = modal.querySelector('#rapide-client').value;
         const id_projet = modal.querySelector('#rapide-projet').value;
         
-        // Construire le payload
         let payload = {
             lignes: []
         };
         
-        // 1. CLIENT
+        // Client
         if (id_client === 'new') {
             const nom = modal.querySelector('#rapide-client-nom').value.trim();
             if (!nom) {
@@ -676,7 +663,7 @@ async openDevisRapide() {
             return;
         }
         
-        // 2. PROJET
+        // Projet
         if (id_projet === 'new') {
             const nom = modal.querySelector('#rapide-projet-nom').value.trim();
             if (!nom) {
@@ -692,7 +679,7 @@ async openDevisRapide() {
             return;
         }
         
-        // 3. ARTICLES
+        // Articles
         const articles = modal.querySelectorAll('.rapide-article');
         let hasError = false;
         
@@ -750,8 +737,14 @@ async openDevisRapide() {
             if (result.success) {
                 Toast.success(`✅ Devis #${result.id_devis} créé !`);
                 modal.remove();
-                // Ouvrir le devis créé
-                await this.viewDevis(result.id_devis);
+                
+                // 🔥 Ouvrir le devis dans un try séparé
+                try {
+                    await this.viewDevis(result.id_devis);
+                } catch (viewError) {
+                    console.error('⚠️ Erreur affichage devis:', viewError);
+                    this.loadPage('devis');
+                }
             } else {
                 Toast.error(result.message || '❌ Erreur');
                 isSubmitting = false;
@@ -759,7 +752,7 @@ async openDevisRapide() {
                 submitBtn.disabled = false;
             }
         } catch (error) {
-            console.error('❌ Erreur:', error);
+            console.error('❌ Erreur création devis:', error);
             Toast.error('❌ Erreur de connexion');
             isSubmitting = false;
             submitBtn.innerHTML = originalText;
