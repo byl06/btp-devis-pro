@@ -326,6 +326,10 @@ async saveHeaderSettings() {
                     pageTitle.textContent = 'Devis';
                     contentArea.innerHTML = await this.renderDevisList();
                     break;
+                    case 'catalogue':
+    pageTitle.textContent = 'Catalogue';
+    contentArea.innerHTML = await this.renderCatalogue();
+    break;
                 case 'clients':
                     pageTitle.textContent = 'Clients';
                     contentArea.innerHTML = await this.renderClients();
@@ -890,6 +894,344 @@ ouvrirResultat(type, id) {
             break;
         default:
             this.loadPage('dashboard');
+    }
+}
+
+// ============================================================
+// CATALOGUE DE PRODUITS
+// ============================================================
+
+async renderCatalogue() {
+    try {
+        const response = await apiRequest('/api/catalogue');
+        const produits = this.safeArray(await response.json());
+        
+        const totalValeur = produits.reduce((sum, p) => sum + (parseFloat(p.prix_unitaire) || 0), 0);
+        
+        if (produits.length === 0) {
+            return `
+                <div class="glass-card" style="text-align:center; padding:60px;">
+                    <i class="fas fa-box-open" style="font-size:48px; opacity:0.3; margin-bottom:1rem; display:block;"></i>
+                    <h3>Aucun produit dans votre catalogue</h3>
+                    <p style="color:#94A3B8; margin:1rem 0;">Ajoutez vos produits pour gagner du temps sur vos devis.</p>
+                    <button class="btn-primary" onclick="app.openCreateProduitModal()" style="background:linear-gradient(135deg, #8B5CF6, #6D28D9);">
+                        <i class="fas fa-plus"></i> Ajouter mon premier produit
+                    </button>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="page-content">
+                <!-- En-tête -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                    <div>
+                        <h3 style="font-weight:600;"><i class="fas fa-box" style="color:#8B5CF6;"></i> Mon catalogue</h3>
+                        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
+                            ${produits.length} produit${produits.length > 1 ? 's' : ''} · Valeur totale : ${totalValeur.toLocaleString()} FCFA
+                        </p>
+                    </div>
+                    <button class="btn-primary" onclick="app.openCreateProduitModal()" style="background:linear-gradient(135deg, #8B5CF6, #6D28D9);">
+                        <i class="fas fa-plus"></i> Ajouter un produit
+                    </button>
+                </div>
+                
+                <!-- Recherche -->
+                <div style="margin-bottom:1rem;">
+                    <div style="position:relative;">
+                        <input type="text" id="search-catalogue" placeholder="🔍 Rechercher un produit..." 
+                               oninput="app.filterCatalogue()"
+                               style="width:100%; padding:10px 12px 10px 36px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid #334155; color:white; font-size:0.9rem;">
+                        <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#94A3B8;"></i>
+                    </div>
+                </div>
+                
+                <!-- Tableau des produits -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Désignation</th>
+                                <th>Catégorie</th>
+                                <th>Unité</th>
+                                <th>Prix unitaire</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catalogue-tbody">
+                            ${produits.map(p => `
+                                <tr class="catalogue-row" data-designation="${(p.designation || '').toLowerCase()}" data-categorie="${(p.categorie || '').toLowerCase()}">
+                                    <td><strong>${this.escapeHtml(p.designation)}</strong></td>
+                                    <td>
+                                        <span style="background:rgba(139,92,246,0.15); color:#A78BFA; padding:3px 10px; border-radius:20px; font-size:0.75rem;">
+                                            ${this.escapeHtml(p.categorie || 'Général')}
+                                        </span>
+                                    </td>
+                                    <td>${this.escapeHtml(p.unite || 'unité')}</td>
+                                    <td><strong style="color:#10B981;">${(parseFloat(p.prix_unitaire) || 0).toLocaleString()} FCFA</strong></td>
+                                    <td>
+                                        <button class="btn-icon" onclick="app.editProduit(${p.id_produit})" title="Modifier" style="background:#F59E0B;color:white;">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon" onclick="app.deleteProduit(${p.id_produit})" title="Supprimer" style="background:#EF4444;color:white;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('❌ Erreur renderCatalogue:', error);
+        return '<div class="glass-card">❌ Erreur chargement du catalogue</div>';
+    }
+}
+
+// ============================================================
+// FILTRER LE CATALOGUE
+// ============================================================
+
+filterCatalogue() {
+    const query = (document.getElementById('search-catalogue')?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.catalogue-row');
+    
+    rows.forEach(row => {
+        const designation = row.getAttribute('data-designation') || '';
+        const categorie = row.getAttribute('data-categorie') || '';
+        
+        if (!query || designation.includes(query) || categorie.includes(query)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// ============================================================
+// AJOUTER UN PRODUIT
+// ============================================================
+
+openCreateProduitModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-box" style="color:#8B5CF6;"></i> Nouveau produit</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="produit-form">
+                    <div class="form-group">
+                        <label>Désignation *</label>
+                        <input type="text" id="produit-designation" required placeholder="Ex: Ciment (50 kg)" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                    </div>
+                    <div class="form-group">
+                        <label>Prix unitaire (FCFA) *</label>
+                        <input type="number" id="produit-prix" required placeholder="Ex: 5000" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                    </div>
+                    <div class="form-group">
+                        <label>Unité</label>
+                        <select id="produit-unite" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                            <option value="unité">Unité</option>
+                            <option value="sac">Sac</option>
+                            <option value="barre">Barre</option>
+                            <option value="kg">Kilogramme (kg)</option>
+                            <option value="m³">Mètre cube (m³)</option>
+                            <option value="m²">Mètre carré (m²)</option>
+                            <option value="m">Mètre (m)</option>
+                            <option value="litre">Litre</option>
+                            <option value="carton">Carton</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Catégorie</label>
+                        <select id="produit-categorie" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                            <option value="Matériaux">Matériaux</option>
+                            <option value="Quincaillerie">Quincaillerie</option>
+                            <option value="Bois">Bois</option>
+                            <option value="Peinture">Peinture</option>
+                            <option value="Plomberie">Plomberie</option>
+                            <option value="Électricité">Électricité</option>
+                            <option value="Main d'œuvre">Main d'œuvre</option>
+                            <option value="Général">Général</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #8B5CF6, #6D28D9);">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    
+    const form = modal.querySelector('#produit-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const data = {
+            designation: document.getElementById('produit-designation').value.trim(),
+            prix_unitaire: parseFloat(document.getElementById('produit-prix').value) || 0,
+            unite: document.getElementById('produit-unite').value,
+            categorie: document.getElementById('produit-categorie').value
+        };
+        
+        try {
+            const response = await apiRequest('/api/catalogue', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                Toast.success('✅ Produit ajouté !');
+                modal.remove();
+                this.loadPage('catalogue');
+            } else {
+                Toast.error(result.message || '❌ Erreur');
+            }
+        } catch (error) {
+            Toast.error('❌ Erreur de connexion');
+        }
+    });
+}
+
+// ============================================================
+// MODIFIER UN PRODUIT
+// ============================================================
+
+async editProduit(id) {
+    try {
+        const response = await apiRequest('/api/catalogue');
+        const produits = await response.json();
+        const produit = produits.find(p => p.id_produit === id);
+        
+        if (!produit) {
+            Toast.error('❌ Produit non trouvé');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:500px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-edit" style="color:#F59E0B;"></i> Modifier le produit</h2>
+                    <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-produit-form">
+                        <div class="form-group">
+                            <label>Désignation *</label>
+                            <input type="text" id="edit-produit-designation" value="${produit.designation}" required style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Prix unitaire (FCFA) *</label>
+                            <input type="number" id="edit-produit-prix" value="${produit.prix_unitaire}" required style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Unité</label>
+                            <select id="edit-produit-unite" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                                ${['unité', 'sac', 'barre', 'kg', 'm³', 'm²', 'm', 'litre', 'carton'].map(u => 
+                                    `<option value="${u}" ${produit.unite === u ? 'selected' : ''}>${u}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Catégorie</label>
+                            <select id="edit-produit-categorie" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                                ${['Matériaux', 'Quincaillerie', 'Bois', 'Peinture', 'Plomberie', 'Électricité', "Main d'œuvre", 'Général'].map(c => 
+                                    `<option value="${c}" ${produit.categorie === c ? 'selected' : ''}>${c}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #F59E0B, #D97706);">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                            <button type="button" class="btn-secondary close-modal">Annuler</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const closeBtns = modal.querySelectorAll('.close-modal');
+        closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        
+        const form = modal.querySelector('#edit-produit-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                designation: document.getElementById('edit-produit-designation').value.trim(),
+                prix_unitaire: parseFloat(document.getElementById('edit-produit-prix').value) || 0,
+                unite: document.getElementById('edit-produit-unite').value,
+                categorie: document.getElementById('edit-produit-categorie').value
+            };
+            
+            try {
+                const response = await apiRequest(`/api/catalogue/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    Toast.success('✅ Produit modifié !');
+                    modal.remove();
+                    this.loadPage('catalogue');
+                } else {
+                    Toast.error(result.message || '❌ Erreur');
+                }
+            } catch (error) {
+                Toast.error('❌ Erreur de connexion');
+            }
+        });
+        
+    } catch (error) {
+        Toast.error('❌ Erreur');
+    }
+}
+
+// ============================================================
+// SUPPRIMER UN PRODUIT
+// ============================================================
+
+async deleteProduit(id) {
+    if (!confirm('🗑️ Supprimer ce produit du catalogue ?')) return;
+    
+    try {
+        const response = await apiRequest(`/api/catalogue/${id}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Produit supprimé !');
+            this.loadPage('catalogue');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
     }
 }
    async renderDashboard() {

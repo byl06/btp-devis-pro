@@ -3326,6 +3326,187 @@ def recherche_globale():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'results': [], 'message': str(e)}), 500
+
+
+
+# ============================================================
+# CATALOGUE DE PRODUITS
+# ============================================================
+
+@app.route('/api/catalogue', methods=['GET'])
+@jwt_required()
+def get_catalogue():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/catalogue?id_user=eq.{user_id}&order=designation.asc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([]), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur get_catalogue: {e}")
+        return jsonify([]), 500
+
+
+@app.route('/api/catalogue', methods=['POST'])
+@jwt_required()
+def create_produit():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        produit_data = {
+            "designation": data.get('designation', '').strip(),
+            "prix_unitaire": float(data.get('prix_unitaire', 0)),
+            "unite": data.get('unite', 'unité'),
+            "categorie": data.get('categorie', 'Général'),
+            "id_user": user_id,
+            "date_creation": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        if not produit_data['designation']:
+            return jsonify({'success': False, 'message': 'Désignation requise'}), 400
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/catalogue",
+            headers=headers,
+            json=produit_data
+        )
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Produit ajouté'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur create_produit: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/catalogue/<int:id_produit>', methods=['PUT'])
+@jwt_required()
+def update_produit(id_produit):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le produit appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/catalogue?id_produit=eq.{id_produit}&id_user=eq.{user_id}&select=id_produit",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Produit non trouvé'}), 404
+        
+        update_data = {
+            "designation": data.get('designation', '').strip(),
+            "prix_unitaire": float(data.get('prix_unitaire', 0)),
+            "unite": data.get('unite', 'unité'),
+            "categorie": data.get('categorie', 'Général'),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/catalogue?id_produit=eq.{id_produit}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Produit modifié'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur update_produit: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/catalogue/<int:id_produit>', methods=['DELETE'])
+@jwt_required()
+def delete_produit(id_produit):
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier que le produit appartient à l'utilisateur
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/catalogue?id_produit=eq.{id_produit}&id_user=eq.{user_id}&select=id_produit",
+            headers=headers
+        )
+        
+        if check_response.status_code != 200 or not check_response.json():
+            return jsonify({'success': False, 'message': 'Produit non trouvé'}), 404
+        
+        response = requests.delete(
+            f"{supabase_url}/rest/v1/catalogue?id_produit=eq.{id_produit}",
+            headers=headers
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Produit supprimé'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur delete_produit: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 # ==================== FACTURE NORMALISÉE ====================
 
 @app.route('/api/facture/<int:id_facture>/pdf-normalise', methods=['GET'])
