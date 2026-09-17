@@ -629,14 +629,13 @@ async openDevisRapide() {
                 return;
             }
             
+            // 🔥 Construire le HTML des suggestions
             suggestionsDiv.innerHTML = matches.map(p => `
-                <div onclick="app.selectionnerProduit(this)" 
+                <div class="rapide-suggestion-item" 
                      data-designation="${self.escapeHtml(p.designation)}"
                      data-prix="${p.prix_unitaire}"
                      data-unite="${p.unite}"
-                     style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;"
-                     onmouseover="this.style.background='rgba(139,92,246,0.15)'"
-                     onmouseout="this.style.background='transparent'">
+                     style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <div style="font-size:0.8rem; font-weight:600; color:white;">${self.escapeHtml(p.designation)}</div>
@@ -647,6 +646,20 @@ async openDevisRapide() {
                 </div>
             `).join('');
             
+            // 🔥 Attacher les événements APRÈS l'injection
+            suggestionsDiv.querySelectorAll('.rapide-suggestion-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    self.selectionnerProduit(this);
+                });
+                item.addEventListener('mouseover', function() {
+                    this.style.background = 'rgba(139,92,246,0.15)';
+                });
+                item.addEventListener('mouseout', function() {
+                    this.style.background = 'transparent';
+                });
+            });
+            
             suggestionsDiv.style.display = 'block';
         });
         
@@ -654,7 +667,7 @@ async openDevisRapide() {
         designationInput.addEventListener('blur', function() {
             setTimeout(() => {
                 suggestionsDiv.style.display = 'none';
-            }, 200);
+            }, 250);
         });
     }
     
@@ -856,21 +869,28 @@ async openDevisRapide() {
 // SÉLECTIONNER UN PRODUIT DANS L'AUTO-COMPLÉTION
 // ============================================================
 
+// ============================================================
+// SÉLECTIONNER UN PRODUIT DANS L'AUTO-COMPLÉTION
+// ============================================================
+
 selectionnerProduit(el) {
     console.log('🖱️ Clic sur produit:', el);
     
+    // 🔥 Trouver le parent .rapide-article
     const articleDiv = el.closest('.rapide-article');
     if (!articleDiv) {
         console.error('❌ Parent .rapide-article non trouvé');
         return;
     }
     
-    const designation = el.getAttribute('data-designation');
-    const prix = el.getAttribute('data-prix');
-    const unite = el.getAttribute('data-unite');
+    // 🔥 Récupérer les données
+    const designation = el.getAttribute('data-designation') || el.dataset.designation;
+    const prix = el.getAttribute('data-prix') || el.dataset.prix;
+    const unite = el.getAttribute('data-unite') || el.dataset.unite;
     
     console.log('📦 Données:', { designation, prix, unite });
     
+    // 🔥 Trouver les champs
     const designationInput = articleDiv.querySelector('.rapide-designation');
     const prixInput = articleDiv.querySelector('.rapide-prix');
     const quantiteInput = articleDiv.querySelector('.rapide-quantite');
@@ -881,18 +901,27 @@ selectionnerProduit(el) {
         return;
     }
     
+    // 🔥 Remplir les champs
     designationInput.value = designation;
     prixInput.value = prix;
     if (quantiteInput) quantiteInput.value = 1;
     
+    console.log('✅ Champs remplis:', {
+        designation: designationInput.value,
+        prix: prixInput.value,
+        quantite: quantiteInput?.value
+    });
+    
+    // 🔥 Cacher les suggestions
     if (suggestionsDiv) suggestionsDiv.style.display = 'none';
     
+    // 🔥 Focus sur la quantité
     if (quantiteInput) {
         quantiteInput.focus();
         quantiteInput.select();
     }
     
-    // Recalculer le total
+    // 🔥 Recalculer le total
     const modal = articleDiv.closest('.modal');
     if (modal) {
         const articles = modal.querySelectorAll('.rapide-article');
@@ -912,6 +941,8 @@ selectionnerProduit(el) {
         if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
         if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
         if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
+        
+        console.log('💰 Total mis à jour:', total);
     }
 }
 
