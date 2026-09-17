@@ -455,6 +455,15 @@ async openDevisRapide() {
     const clients = await this.fetchClients();
     const projets = await this.fetchProjets();
     
+    // 🔥 Récupérer le catalogue
+    let catalogue = [];
+    try {
+        const catResponse = await apiRequest('/api/catalogue');
+        catalogue = await catResponse.json();
+    } catch (e) {
+        console.log("⚠️ Catalogue non disponible:", e);
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.style.display = 'flex';
@@ -466,7 +475,7 @@ async openDevisRapide() {
             </div>
             <div class="modal-body">
                 <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1.5rem;">
-                    Créez un devis en moins de 2 minutes. Remplissez les champs ci-dessous.
+                    Créez un devis en moins de 2 minutes. Tapez les premières lettres d'un produit pour l'auto-compléter.
                 </p>
                 
                 <form id="devis-rapide-form">
@@ -522,8 +531,11 @@ async openDevisRapide() {
                     <div class="form-group">
                         <label><i class="fas fa-tools"></i> Articles</label>
                         <div id="rapide-articles-list">
-                            <div class="rapide-article" style="display:flex; gap:8px; margin-bottom:8px;">
-                                <input type="text" placeholder="Désignation" class="rapide-designation" style="flex:2; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                            <div class="rapide-article" style="display:flex; gap:8px; margin-bottom:8px; position:relative;">
+                                <div style="flex:2; position:relative;">
+                                    <input type="text" placeholder="Désignation" class="rapide-designation" autocomplete="off" style="width:100%; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                                    <div class="rapide-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1E293B; border:1px solid #334155; border-radius:6px; max-height:150px; overflow-y:auto; z-index:100; margin-top:2px;"></div>
+                                </div>
                                 <input type="number" placeholder="Qté" class="rapide-quantite" value="1" style="flex:0.8; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
                                 <input type="number" placeholder="Prix" class="rapide-prix" style="flex:1; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
                                 <button type="button" class="rapide-remove" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:6px 10px; cursor:pointer;">✕</button>
@@ -570,31 +582,104 @@ async openDevisRapide() {
     closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     
+    // Afficher/cacher nouveau client
     const clientSelect = modal.querySelector('#rapide-client');
     const newClientDiv = modal.querySelector('#rapide-new-client');
     clientSelect.addEventListener('change', function() {
         newClientDiv.style.display = this.value === 'new' ? 'block' : 'none';
     });
     
+    // Afficher/cacher nouveau projet
     const projetSelect = modal.querySelector('#rapide-projet');
     const newProjetDiv = modal.querySelector('#rapide-new-projet');
     projetSelect.addEventListener('change', function() {
         newProjetDiv.style.display = this.value === 'new' ? 'block' : 'none';
     });
     
+    // ============================================================
+    // AUTO-COMPLÉTION DEPUIS LE CATALOGUE
+    // ============================================================
+    
+    function attacherAutoCompletion(articleDiv) {
+        const designationInput = articleDiv.querySelector('.rapide-designation');
+        const suggestionsDiv = articleDiv.querySelector('.rapide-suggestions');
+        const prixInput = articleDiv.querySelector('.rapide-prix');
+        const uniteInput = articleDiv.querySelector('.rapide-quantite');
+        
+        if (!designationInput || !suggestionsDiv) return;
+        
+        designationInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length < 2 || catalogue.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Filtrer le catalogue
+            const matches = catalogue.filter(p => 
+                (p.designation || '').toLowerCase().includes(query) ||
+                (p.categorie || '').toLowerCase().includes(query)
+            ).slice(0, 8);
+            
+            if (matches.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = matches.map(p => `
+                <div onclick="app.selectionnerProduit(this)" 
+                     data-designation="${this.escapeHtml(p.designation)}"
+                     data-prix="${p.prix_unitaire}"
+                     data-unite="${p.unite}"
+                     style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;"
+                     onmouseover="this.style.background='rgba(139,92,246,0.15)'"
+                     onmouseout="this.style.background='transparent'">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:0.8rem; font-weight:600; color:white;">${this.escapeHtml(p.designation)}</div>
+                            <div style="font-size:0.7rem; color:#94A3B8;">${this.escapeHtml(p.categorie || 'Général')} · ${this.escapeHtml(p.unite || 'unité')}</div>
+                        </div>
+                        <div style="font-size:0.8rem; font-weight:600; color:#10B981;">${(parseFloat(p.prix_unitaire) || 0).toLocaleString()} F</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            suggestionsDiv.style.display = 'block';
+        });
+        
+        // Cacher les suggestions au clic ailleurs
+        designationInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                suggestionsDiv.style.display = 'none';
+            }, 200);
+        });
+    }
+    
+    // Attacher l'auto-complétion aux articles existants
+    modal.querySelectorAll('.rapide-article').forEach(article => {
+        attacherAutoCompletion(article);
+    });
+    
+    // Ajouter un article
     const addBtn = modal.querySelector('#rapide-add-article');
     const articlesList = modal.querySelector('#rapide-articles-list');
     addBtn.addEventListener('click', function() {
         const articleDiv = document.createElement('div');
         articleDiv.className = 'rapide-article';
-        articleDiv.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        articleDiv.style.cssText = 'display:flex; gap:8px; margin-bottom:8px; position:relative;';
         articleDiv.innerHTML = `
-            <input type="text" placeholder="Désignation" class="rapide-designation" style="flex:2; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+            <div style="flex:2; position:relative;">
+                <input type="text" placeholder="Désignation" class="rapide-designation" autocomplete="off" style="width:100%; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
+                <div class="rapide-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1E293B; border:1px solid #334155; border-radius:6px; max-height:150px; overflow-y:auto; z-index:100; margin-top:2px;"></div>
+            </div>
             <input type="number" placeholder="Qté" class="rapide-quantite" value="1" style="flex:0.8; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
             <input type="number" placeholder="Prix" class="rapide-prix" style="flex:1; padding:6px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white; font-size:0.85rem;">
             <button type="button" class="rapide-remove" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:6px 10px; cursor:pointer;">✕</button>
         `;
         articlesList.appendChild(articleDiv);
+        
+        attacherAutoCompletion(articleDiv);
         
         articleDiv.querySelector('.rapide-remove').addEventListener('click', function() {
             articleDiv.remove();
@@ -606,6 +691,7 @@ async openDevisRapide() {
         });
     });
     
+    // Supprimer les articles existants
     modal.querySelectorAll('.rapide-remove').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('.rapide-article').remove();
@@ -635,6 +721,10 @@ async openDevisRapide() {
         modal.querySelector('#rapide-total').textContent = total.toLocaleString() + ' FCFA';
     }
     
+    // ============================================================
+    // SOUMISSION
+    // ============================================================
+    
     const form = modal.querySelector('#devis-rapide-form');
     let isSubmitting = false;
     
@@ -646,9 +736,7 @@ async openDevisRapide() {
         const id_client = modal.querySelector('#rapide-client').value;
         const id_projet = modal.querySelector('#rapide-projet').value;
         
-        let payload = {
-            lignes: []
-        };
+        let payload = { lignes: [] };
         
         // Client
         if (id_client === 'new') {
@@ -708,8 +796,6 @@ async openDevisRapide() {
             Toast.warning('⚠️ Certains articles ont des informations incomplètes');
         }
         
-        console.log('📤 Payload envoyé:', payload);
-        
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
         
@@ -717,20 +803,17 @@ async openDevisRapide() {
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
         submitBtn.disabled = true;
         
-                try {
+        try {
             const response = await apiRequest('/api/devis/rapide', {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
             
             const text = await response.text();
-            console.log('📥 Réponse brute:', text);
-            
             let result;
             try {
                 result = JSON.parse(text);
             } catch (e) {
-                console.error('❌ Erreur parsing JSON:', e);
                 Toast.error('❌ Erreur serveur');
                 isSubmitting = false;
                 submitBtn.innerHTML = originalText;
@@ -739,18 +822,13 @@ async openDevisRapide() {
             }
             
             if (result.success) {
-                // ✅ SUCCÈS
                 Toast.success(`✅ Devis #${result.id_devis} créé !`);
                 modal.remove();
-                
-                // 🔥 Recharger la page sans bloquer
                 try {
                     await this.loadPage('devis');
                 } catch (e) {
                     console.error('⚠️ Erreur rechargement:', e);
                 }
-                
-                // 🔥 Sortir du try principal — plus rien après
                 return;
             } else {
                 Toast.error(result.message || '❌ Erreur');
@@ -760,13 +838,57 @@ async openDevisRapide() {
                 return;
             }
         } catch (error) {
-            console.error('❌ Erreur création devis:', error);
+            console.error('❌ Erreur:', error);
             Toast.error('❌ Erreur de connexion');
             isSubmitting = false;
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         }
     });
+}
+// ============================================================
+// SÉLECTIONNER UN PRODUIT DANS L'AUTO-COMPLÉTION
+// ============================================================
+
+selectionnerProduit(el) {
+    const articleDiv = el.closest('.rapide-article');
+    if (!articleDiv) return;
+    
+    const designation = el.getAttribute('data-designation');
+    const prix = el.getAttribute('data-prix');
+    const unite = el.getAttribute('data-unite');
+    
+    // Remplir les champs
+    articleDiv.querySelector('.rapide-designation').value = designation;
+    articleDiv.querySelector('.rapide-prix').value = prix;
+    articleDiv.querySelector('.rapide-quantite').value = 1;
+    articleDiv.querySelector('.rapide-quantite').focus();
+    
+    // Cacher les suggestions
+    const suggestionsDiv = articleDiv.querySelector('.rapide-suggestions');
+    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+    
+    // Recalculer le total
+    const modal = articleDiv.closest('.modal');
+    if (modal) {
+        const articles = modal.querySelectorAll('.rapide-article');
+        let totalMateriaux = 0;
+        articles.forEach(a => {
+            const q = parseFloat(a.querySelector('.rapide-quantite')?.value) || 0;
+            const p = parseFloat(a.querySelector('.rapide-prix')?.value) || 0;
+            totalMateriaux += q * p;
+        });
+        const mainOeuvre = totalMateriaux * 0.2;
+        const total = totalMateriaux + mainOeuvre;
+        
+        const sousTotalEl = modal.querySelector('#rapide-sous-total');
+        const mainOeuvreEl = modal.querySelector('#rapide-main-oeuvre');
+        const totalEl = modal.querySelector('#rapide-total');
+        
+        if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
+        if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
+        if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
+    }
 }
 
 // ============================================================
