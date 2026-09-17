@@ -452,6 +452,9 @@ async saveHeaderSettings() {
 // ============================================================
 
 async openDevisRapide() {
+    // 🔥 Capturer le contexte de l'app
+    const self = this;
+    
     const clients = await this.fetchClients();
     const projets = await this.fetchProjets();
     
@@ -460,6 +463,7 @@ async openDevisRapide() {
     try {
         const catResponse = await apiRequest('/api/catalogue');
         catalogue = await catResponse.json();
+        console.log('📦 Catalogue chargé:', catalogue.length, 'produits');
     } catch (e) {
         console.log("⚠️ Catalogue non disponible:", e);
     }
@@ -603,8 +607,6 @@ async openDevisRapide() {
     function attacherAutoCompletion(articleDiv) {
         const designationInput = articleDiv.querySelector('.rapide-designation');
         const suggestionsDiv = articleDiv.querySelector('.rapide-suggestions');
-        const prixInput = articleDiv.querySelector('.rapide-prix');
-        const uniteInput = articleDiv.querySelector('.rapide-quantite');
         
         if (!designationInput || !suggestionsDiv) return;
         
@@ -629,7 +631,7 @@ async openDevisRapide() {
             
             suggestionsDiv.innerHTML = matches.map(p => `
                 <div onclick="app.selectionnerProduit(this)" 
-                     data-designation="${this.escapeHtml(p.designation)}"
+                     data-designation="${self.escapeHtml(p.designation)}"
                      data-prix="${p.prix_unitaire}"
                      data-unite="${p.unite}"
                      style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;"
@@ -637,8 +639,8 @@ async openDevisRapide() {
                      onmouseout="this.style.background='transparent'">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <div style="font-size:0.8rem; font-weight:600; color:white;">${this.escapeHtml(p.designation)}</div>
-                            <div style="font-size:0.7rem; color:#94A3B8;">${this.escapeHtml(p.categorie || 'Général')} · ${this.escapeHtml(p.unite || 'unité')}</div>
+                            <div style="font-size:0.8rem; font-weight:600; color:white;">${self.escapeHtml(p.designation)}</div>
+                            <div style="font-size:0.7rem; color:#94A3B8;">${self.escapeHtml(p.categorie || 'Général')} · ${self.escapeHtml(p.unite || 'unité')}</div>
                         </div>
                         <div style="font-size:0.8rem; font-weight:600; color:#10B981;">${(parseFloat(p.prix_unitaire) || 0).toLocaleString()} F</div>
                     </div>
@@ -716,9 +718,13 @@ async openDevisRapide() {
         const mainOeuvre = totalMateriaux * 0.2;
         const total = totalMateriaux + mainOeuvre;
         
-        modal.querySelector('#rapide-sous-total').textContent = totalMateriaux.toLocaleString() + ' FCFA';
-        modal.querySelector('#rapide-main-oeuvre').textContent = mainOeuvre.toLocaleString() + ' FCFA';
-        modal.querySelector('#rapide-total').textContent = total.toLocaleString() + ' FCFA';
+        const sousTotalEl = modal.querySelector('#rapide-sous-total');
+        const mainOeuvreEl = modal.querySelector('#rapide-main-oeuvre');
+        const totalEl = modal.querySelector('#rapide-total');
+        
+        if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
+        if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
+        if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
     }
     
     // ============================================================
@@ -825,7 +831,7 @@ async openDevisRapide() {
                 Toast.success(`✅ Devis #${result.id_devis} créé !`);
                 modal.remove();
                 try {
-                    await this.loadPage('devis');
+                    await self.loadPage('devis');
                 } catch (e) {
                     console.error('⚠️ Erreur rechargement:', e);
                 }
@@ -845,50 +851,6 @@ async openDevisRapide() {
             submitBtn.disabled = false;
         }
     });
-}
-// ============================================================
-// SÉLECTIONNER UN PRODUIT DANS L'AUTO-COMPLÉTION
-// ============================================================
-
-selectionnerProduit(el) {
-    const articleDiv = el.closest('.rapide-article');
-    if (!articleDiv) return;
-    
-    const designation = el.getAttribute('data-designation');
-    const prix = el.getAttribute('data-prix');
-    const unite = el.getAttribute('data-unite');
-    
-    // Remplir les champs
-    articleDiv.querySelector('.rapide-designation').value = designation;
-    articleDiv.querySelector('.rapide-prix').value = prix;
-    articleDiv.querySelector('.rapide-quantite').value = 1;
-    articleDiv.querySelector('.rapide-quantite').focus();
-    
-    // Cacher les suggestions
-    const suggestionsDiv = articleDiv.querySelector('.rapide-suggestions');
-    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
-    
-    // Recalculer le total
-    const modal = articleDiv.closest('.modal');
-    if (modal) {
-        const articles = modal.querySelectorAll('.rapide-article');
-        let totalMateriaux = 0;
-        articles.forEach(a => {
-            const q = parseFloat(a.querySelector('.rapide-quantite')?.value) || 0;
-            const p = parseFloat(a.querySelector('.rapide-prix')?.value) || 0;
-            totalMateriaux += q * p;
-        });
-        const mainOeuvre = totalMateriaux * 0.2;
-        const total = totalMateriaux + mainOeuvre;
-        
-        const sousTotalEl = modal.querySelector('#rapide-sous-total');
-        const mainOeuvreEl = modal.querySelector('#rapide-main-oeuvre');
-        const totalEl = modal.querySelector('#rapide-total');
-        
-        if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
-        if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
-        if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
-    }
 }
 
 // ============================================================
