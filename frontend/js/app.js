@@ -852,6 +852,68 @@ async openDevisRapide() {
         }
     });
 }
+// ============================================================
+// SÉLECTIONNER UN PRODUIT DANS L'AUTO-COMPLÉTION
+// ============================================================
+
+selectionnerProduit(el) {
+    console.log('🖱️ Clic sur produit:', el);
+    
+    const articleDiv = el.closest('.rapide-article');
+    if (!articleDiv) {
+        console.error('❌ Parent .rapide-article non trouvé');
+        return;
+    }
+    
+    const designation = el.getAttribute('data-designation');
+    const prix = el.getAttribute('data-prix');
+    const unite = el.getAttribute('data-unite');
+    
+    console.log('📦 Données:', { designation, prix, unite });
+    
+    const designationInput = articleDiv.querySelector('.rapide-designation');
+    const prixInput = articleDiv.querySelector('.rapide-prix');
+    const quantiteInput = articleDiv.querySelector('.rapide-quantite');
+    const suggestionsDiv = articleDiv.querySelector('.rapide-suggestions');
+    
+    if (!designationInput || !prixInput) {
+        console.error('❌ Champs non trouvés');
+        return;
+    }
+    
+    designationInput.value = designation;
+    prixInput.value = prix;
+    if (quantiteInput) quantiteInput.value = 1;
+    
+    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+    
+    if (quantiteInput) {
+        quantiteInput.focus();
+        quantiteInput.select();
+    }
+    
+    // Recalculer le total
+    const modal = articleDiv.closest('.modal');
+    if (modal) {
+        const articles = modal.querySelectorAll('.rapide-article');
+        let totalMateriaux = 0;
+        articles.forEach(a => {
+            const q = parseFloat(a.querySelector('.rapide-quantite')?.value) || 0;
+            const p = parseFloat(a.querySelector('.rapide-prix')?.value) || 0;
+            totalMateriaux += q * p;
+        });
+        const mainOeuvre = totalMateriaux * 0.2;
+        const total = totalMateriaux + mainOeuvre;
+        
+        const sousTotalEl = modal.querySelector('#rapide-sous-total');
+        const mainOeuvreEl = modal.querySelector('#rapide-main-oeuvre');
+        const totalEl = modal.querySelector('#rapide-total');
+        
+        if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
+        if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
+        if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
+    }
+}
 
 // ============================================================
 // RECHERCHE GLOBALE
