@@ -6372,7 +6372,19 @@ async saveFiscalSettings() {
         this.downloadPDFNormalisee(id_facture);
     }
 // Traduire les textes statiques
+// ============================================================
+// ÉCHAPPER LE HTML (pour éviter les injections)
+// ============================================================
 
+escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 }
 // Fonction de formatage des nombres
 function formatMoney(amount) {
