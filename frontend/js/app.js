@@ -947,6 +947,77 @@ selectionnerProduit(el) {
 }
 
 // ============================================================
+// SÉLECTIONNER UN PRODUIT DANS LE DEVIS CLASSIQUE
+// ============================================================
+
+selectionnerProduitClassique(el) {
+    console.log('🖱️ Clic sur produit (classique):', el);
+    
+    // Trouver le parent .materiaux-item
+    const itemDiv = el.closest('.materiaux-item');
+    if (!itemDiv) {
+        console.error('❌ Parent .materiaux-item non trouvé');
+        return;
+    }
+    
+    const designation = el.getAttribute('data-designation') || el.dataset.designation;
+    const prix = el.getAttribute('data-prix') || el.dataset.prix;
+    const unite = el.getAttribute('data-unite') || el.dataset.unite;
+    
+    console.log('📦 Données:', { designation, prix, unite });
+    
+    const designationInput = itemDiv.querySelector('.designation');
+    const prixInput = itemDiv.querySelector('.prix');
+    const quantiteInput = itemDiv.querySelector('.quantite');
+    const suggestionsDiv = itemDiv.querySelector('.classique-suggestions');
+    
+    if (!designationInput || !prixInput) {
+        console.error('❌ Champs non trouvés');
+        return;
+    }
+    
+    // Remplir les champs
+    designationInput.value = designation;
+    prixInput.value = prix;
+    if (quantiteInput) quantiteInput.value = 1;
+    
+    console.log('✅ Champs remplis:', {
+        designation: designationInput.value,
+        prix: prixInput.value,
+        quantite: quantiteInput?.value
+    });
+    
+    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+    
+    if (quantiteInput) {
+        quantiteInput.focus();
+        quantiteInput.select();
+    }
+    
+    // Recalculer le total
+    const modal = itemDiv.closest('.modal');
+    if (modal) {
+        const items = modal.querySelectorAll('.materiaux-item');
+        let totalMateriaux = 0;
+        items.forEach(item => {
+            const q = parseFloat(item.querySelector('.quantite')?.value) || 0;
+            const p = parseFloat(item.querySelector('.prix')?.value) || 0;
+            totalMateriaux += q * p;
+        });
+        const mainOeuvre = totalMateriaux * 0.2;
+        const total = totalMateriaux + mainOeuvre;
+        
+        const sousTotalEl = modal.querySelector('#sous-total-materiaux');
+        const mainOeuvreEl = modal.querySelector('#main-oeuvre');
+        const totalEl = modal.querySelector('#total-estime');
+        
+        if (sousTotalEl) sousTotalEl.textContent = totalMateriaux.toLocaleString() + ' FCFA';
+        if (mainOeuvreEl) mainOeuvreEl.textContent = mainOeuvre.toLocaleString() + ' FCFA';
+        if (totalEl) totalEl.textContent = total.toLocaleString() + ' FCFA';
+    }
+}
+
+// ============================================================
 // RECHERCHE GLOBALE
 // ============================================================
 
@@ -2786,7 +2857,21 @@ openCreateProjetModal() {
 }
 
 openCreateDevisModal() {
-    Promise.all([this.fetchClients(), this.fetchProjets()]).then(([clients, projets]) => {
+    // 🔥 Capturer le contexte
+    const self = this;
+    
+    Promise.all([this.fetchClients(), this.fetchProjets()]).then(async ([clients, projets]) => {
+        
+        // 🔥 Récupérer le catalogue
+        let catalogue = [];
+        try {
+            const catResponse = await apiRequest('/api/catalogue');
+            catalogue = await catResponse.json();
+            console.log('📦 Catalogue chargé:', catalogue.length, 'produits');
+        } catch (e) {
+            console.log("⚠️ Catalogue non disponible:", e);
+        }
+        
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -2816,10 +2901,13 @@ openCreateDevisModal() {
                         <div class="form-group">
                             <label><i class="fas fa-tools"></i> Matériaux et travaux</label>
                             <div id="materiaux-list">
-                                <div class="materiaux-item">
-                                    <input type="text" placeholder="Désignation" class="designation" style="flex:2">
-                                    <input type="number" placeholder="Quantité" class="quantite" value="1" style="flex:1">
-                                    <input type="number" placeholder="Prix unitaire" class="prix" style="flex:1">
+                                <div class="materiaux-item" style="position:relative;">
+                                    <div style="flex:2; position:relative;">
+                                        <input type="text" placeholder="Désignation" class="designation" autocomplete="off" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                                        <div class="classique-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1E293B; border:1px solid #334155; border-radius:6px; max-height:150px; overflow-y:auto; z-index:100; margin-top:2px;"></div>
+                                    </div>
+                                    <input type="number" placeholder="Quantité" class="quantite" value="1" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                                    <input type="number" placeholder="Prix unitaire" class="prix" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
                                     <button type="button" class="remove-item" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:8px; cursor:pointer;">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -2861,7 +2949,9 @@ openCreateDevisModal() {
         
         document.body.appendChild(modal);
         
-        // Fonction de calcul
+        // ============================================================
+        // FONCTION DE CALCUL
+        // ============================================================
         const calculateTotal = () => {
             const items = modal.querySelectorAll('.materiaux-item');
             let totalMateriaux = 0;
@@ -2879,140 +2969,214 @@ openCreateDevisModal() {
             return { totalMateriaux, mainOeuvre, total };
         };
         
-        // Ajouter un matériau
-        const addBtn = modal.querySelector('#add-materiaux');
-        addBtn.addEventListener('click', () => {
-            const container = modal.querySelector('#materiaux-list');
-            const newItem = document.createElement('div');
-            newItem.className = 'materiaux-item';
-            newItem.style.display = 'flex';
-            newItem.style.gap = '10px';
-            newItem.style.marginBottom = '10px';
-            newItem.innerHTML = `
-                <input type="text" placeholder="Désignation" class="designation" style="flex:2; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
-                <input type="number" placeholder="Quantité" class="quantite" value="1" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
-                <input type="number" placeholder="Prix unitaire" class="prix" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
-                <button type="button" class="remove-item" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:8px; cursor:pointer;">
-                    <i class="fas fa-trash"></i>
-                </button>
-            `;
-            newItem.querySelector('.remove-item').addEventListener('click', () => {
-                newItem.remove();
-                calculateTotal();
+        // ============================================================
+        // AUTO-COMPLÉTION DEPUIS LE CATALOGUE
+        // ============================================================
+        
+        function attacherAutoCompletionClassique(itemDiv) {
+            const designationInput = itemDiv.querySelector('.designation');
+            const suggestionsDiv = itemDiv.querySelector('.classique-suggestions');
+            
+            if (!designationInput || !suggestionsDiv) return;
+            
+            designationInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                
+                if (query.length < 2 || catalogue.length === 0) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                const matches = catalogue.filter(p => 
+                    (p.designation || '').toLowerCase().includes(query) ||
+                    (p.categorie || '').toLowerCase().includes(query)
+                ).slice(0, 8);
+                
+                if (matches.length === 0) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                suggestionsDiv.innerHTML = matches.map(p => `
+                    <div class="classique-suggestion-item" 
+                         data-designation="${self.escapeHtml(p.designation)}"
+                         data-prix="${p.prix_unitaire}"
+                         data-unite="${p.unite}"
+                         style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-size:0.8rem; font-weight:600; color:white;">${self.escapeHtml(p.designation)}</div>
+                                <div style="font-size:0.7rem; color:#94A3B8;">${self.escapeHtml(p.categorie || 'Général')} · ${self.escapeHtml(p.unite || 'unité')}</div>
+                            </div>
+                            <div style="font-size:0.8rem; font-weight:600; color:#10B981;">${(parseFloat(p.prix_unitaire) || 0).toLocaleString()} F</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Attacher les événements
+                suggestionsDiv.querySelectorAll('.classique-suggestion-item').forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        self.selectionnerProduitClassique(this);
+                    });
+                    item.addEventListener('mouseover', function() {
+                        this.style.background = 'rgba(139,92,246,0.15)';
+                    });
+                    item.addEventListener('mouseout', function() {
+                        this.style.background = 'transparent';
+                    });
+                });
+                
+                suggestionsDiv.style.display = 'block';
             });
-            newItem.querySelectorAll('input').forEach(input => {
+            
+            // Cacher les suggestions
+            designationInput.addEventListener('blur', function() {
+                setTimeout(() => {
+                    suggestionsDiv.style.display = 'none';
+                }, 250);
+            });
+        }
+        
+        // Attacher l'auto-complétion aux items existants
+        modal.querySelectorAll('.materiaux-item').forEach(item => {
+            attacherAutoCompletionClassique(item);
+            item.querySelectorAll('input').forEach(input => {
                 input.addEventListener('input', () => calculateTotal());
             });
-            container.appendChild(newItem);
-            calculateTotal();
         });
         
-        // Événements existants
+        // Supprimer un item
         modal.querySelectorAll('.remove-item').forEach(btn => {
             btn.addEventListener('click', () => {
                 btn.closest('.materiaux-item').remove();
                 calculateTotal();
             });
         });
-        modal.querySelectorAll('#materiaux-list input').forEach(input => {
-            input.addEventListener('input', () => calculateTotal());
+        
+        // Ajouter un matériau
+        const addBtn = modal.querySelector('#add-materiaux');
+        addBtn.addEventListener('click', () => {
+            const container = modal.querySelector('#materiaux-list');
+            const newItem = document.createElement('div');
+            newItem.className = 'materiaux-item';
+            newItem.style.cssText = 'display:flex; gap:10px; margin-bottom:10px; position:relative;';
+            newItem.innerHTML = `
+                <div style="flex:2; position:relative;">
+                    <input type="text" placeholder="Désignation" class="designation" autocomplete="off" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                    <div class="classique-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1E293B; border:1px solid #334155; border-radius:6px; max-height:150px; overflow-y:auto; z-index:100; margin-top:2px;"></div>
+                </div>
+                <input type="number" placeholder="Quantité" class="quantite" value="1" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                <input type="number" placeholder="Prix unitaire" class="prix" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+                <button type="button" class="remove-item" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:8px; cursor:pointer;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            
+            attacherAutoCompletionClassique(newItem);
+            
+            newItem.querySelector('.remove-item').addEventListener('click', () => {
+                newItem.remove();
+                calculateTotal();
+            });
+            
+            newItem.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', () => calculateTotal());
+            });
+            
+            container.appendChild(newItem);
+            calculateTotal();
         });
         
         // Fermeture
         const closeBtns = modal.querySelectorAll('.close-modal');
         closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
         
-        // Soumission avec verrou anti-doublon
-const form = modal.querySelector('#devis-form');
-let isSubmitting = false; // Verrou
-
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Empêcher les doubles clics
-    if (isSubmitting) {
-        console.log("⏳ Déjà en cours, veuillez patienter...");
-        return;
-    }
-    
-    const limitesOk = await this.checkLimites('devis');
-    if (!limitesOk) return;
-    
-    const id_client = modal.querySelector('#devis-client').value;
-    const id_projet = modal.querySelector('#devis-projet').value;
-    
-    if (!id_client || !id_projet) {
-        alert('Veuillez sélectionner un client et un projet');
-        return;
-    }
-    
-    const lignes = [];
-    const items = modal.querySelectorAll('.materiaux-item');
-    items.forEach(item => {
-        const designation = item.querySelector('.designation')?.value;
-        const quantite = parseFloat(item.querySelector('.quantite')?.value);
-        const prix_unitaire = parseFloat(item.querySelector('.prix')?.value);
-        if (designation && quantite > 0 && prix_unitaire > 0) {
-            lignes.push({ designation, quantite, prix_unitaire });
-        }
-    });
-    
-    if (lignes.length === 0) {
-        alert('Veuillez ajouter au moins un matériau');
-        return;
-    }
-    
-    const devisData = {
-        id_client: parseInt(id_client),
-        id_user: this.currentUser.id,
-        id_projet: parseInt(id_projet),
-        lignes: lignes
-    };
-    
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    
-    // Verrouiller et désactiver le bouton
-    isSubmitting = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
-    submitBtn.disabled = true;
-    
-    try {
-        const response = await apiRequest('/api/devis', { method: 'POST', body: JSON.stringify(devisData) });
+        // ============================================================
+        // SOUMISSION
+        // ============================================================
+        const form = modal.querySelector('#devis-form');
+        let isSubmitting = false;
         
-        console.log('Status HTTP:', response.status);
-        
-        const result = await response.json();
-        console.log('Résultat complet:', result);
-        
-        // Vérification
-        if (result.success == true || result.success === "true" || result.id_devis) {
-            alert('✅ Devis créé avec succès !');
-            modal.remove();
-            setTimeout(() => {
-                this.loadPage('devis');
-            }, 500);
-        } else {
-            if (result.message) {
-                alert('❌ ' + result.message);
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (isSubmitting) {
+                console.log("⏳ Déjà en cours...");
+                return;
             }
-            // Déverrouiller en cas d'erreur
-            isSubmitting = false;
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
-    } catch (error) {
-        console.error('Erreur détaillée:', error);
-        alert('❌ Erreur de connexion: ' + error.message);
-        isSubmitting = false;
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-    // Pas de finally ici car on ne veut pas déverrouiller en cas de succès
-    // (la modale est fermée donc pas besoin)
-});
-
-calculateTotal();
+            
+            const limitesOk = await self.checkLimites('devis');
+            if (!limitesOk) return;
+            
+            const id_client = modal.querySelector('#devis-client').value;
+            const id_projet = modal.querySelector('#devis-projet').value;
+            
+            if (!id_client || !id_projet) {
+                alert('Veuillez sélectionner un client et un projet');
+                return;
+            }
+            
+            const lignes = [];
+            const items = modal.querySelectorAll('.materiaux-item');
+            items.forEach(item => {
+                const designation = item.querySelector('.designation')?.value;
+                const quantite = parseFloat(item.querySelector('.quantite')?.value);
+                const prix_unitaire = parseFloat(item.querySelector('.prix')?.value);
+                if (designation && quantite > 0 && prix_unitaire > 0) {
+                    lignes.push({ designation, quantite, prix_unitaire });
+                }
+            });
+            
+            if (lignes.length === 0) {
+                alert('Veuillez ajouter au moins un matériau');
+                return;
+            }
+            
+            const devisData = {
+                id_client: parseInt(id_client),
+                id_user: self.currentUser.id,
+                id_projet: parseInt(id_projet),
+                lignes: lignes
+            };
+            
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            isSubmitting = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await apiRequest('/api/devis', { 
+                    method: 'POST', 
+                    body: JSON.stringify(devisData) 
+                });
+                
+                const result = await response.json();
+                
+                if (result.success == true || result.success === "true" || result.id_devis) {
+                    Toast.success('✅ Devis créé avec succès !');
+                    modal.remove();
+                    setTimeout(() => {
+                        self.loadPage('devis');
+                    }, 500);
+                } else {
+                    Toast.error(result.message || '❌ Erreur');
+                    isSubmitting = false;
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                Toast.error('❌ Erreur de connexion');
+                isSubmitting = false;
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+        
+        calculateTotal();
     });
 }
 
@@ -3570,15 +3734,18 @@ async editDevis(id) {
                             <label><i class="fas fa-tools"></i> Matériaux et travaux</label>
                             <div id="edit-materiaux-list">
                                 ${devis.lignes.map((ligne, index) => `
-                                    <div class="materiaux-item" data-index="${index}">
-                                        <input type="text" placeholder="Désignation" class="designation" value="${ligne.designation}" style="flex:2">
-                                        <input type="number" placeholder="Quantité" class="quantite" value="${ligne.quantite}" style="flex:1">
-                                        <input type="number" placeholder="Prix unitaire" class="prix" value="${ligne.prix_unitaire}" style="flex:1">
-                                        <button type="button" class="remove-item" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:8px; cursor:pointer;">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                `).join('')}
+    <div class="materiaux-item" data-index="${index}" style="position:relative;">
+        <div style="flex:2; position:relative;">
+            <input type="text" placeholder="Désignation" class="designation" value="${ligne.designation}" autocomplete="off" style="width:100%; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+            <div class="classique-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1E293B; border:1px solid #334155; border-radius:6px; max-height:150px; overflow-y:auto; z-index:100; margin-top:2px;"></div>
+        </div>
+        <input type="number" placeholder="Quantité" class="quantite" value="${ligne.quantite}" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+        <input type="number" placeholder="Prix unitaire" class="prix" value="${ligne.prix_unitaire}" style="flex:1; padding:8px; border-radius:6px; background:#0F172A; border:1px solid #334155; color:white;">
+        <button type="button" class="remove-item" style="background:#EF4444; color:white; border:none; border-radius:6px; padding:8px; cursor:pointer;">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+`).join('')}
                             </div>
                             <button type="button" id="edit-add-materiaux" class="btn-secondary" style="margin-top:10px; width:100%;">
                                 <i class="fas fa-plus"></i> Ajouter un matériau
@@ -3615,7 +3782,89 @@ async editDevis(id) {
         `;
         
         document.body.appendChild(modal);
+        // 🔥 Charger le catalogue pour l'auto-complétion
+let catalogue = [];
+try {
+    const catResponse = await apiRequest('/api/catalogue');
+    catalogue = await catResponse.json();
+} catch (e) {
+    console.log("⚠️ Catalogue non disponible:", e);
+}
+
+// Fonction d'auto-complétion
+function attacherAutoCompletionEdit(itemDiv) {
+    const designationInput = itemDiv.querySelector('.designation');
+    const suggestionsDiv = itemDiv.querySelector('.classique-suggestions');
+    
+    if (!designationInput || !suggestionsDiv) return;
+    
+    designationInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
         
+        if (query.length < 2 || catalogue.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        const matches = catalogue.filter(p => 
+            (p.designation || '').toLowerCase().includes(query) ||
+            (p.categorie || '').toLowerCase().includes(query)
+        ).slice(0, 8);
+        
+        if (matches.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        suggestionsDiv.innerHTML = matches.map(p => `
+            <div class="edit-suggestion-item" 
+                 data-designation="${self.escapeHtml(p.designation)}"
+                 data-prix="${p.prix_unitaire}"
+                 data-unite="${p.unite}"
+                 style="padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.8rem; font-weight:600; color:white;">${self.escapeHtml(p.designation)}</div>
+                        <div style="font-size:0.7rem; color:#94A3B8;">${self.escapeHtml(p.categorie || 'Général')} · ${self.escapeHtml(p.unite || 'unité')}</div>
+                    </div>
+                    <div style="font-size:0.8rem; font-weight:600; color:#10B981;">${(parseFloat(p.prix_unitaire) || 0).toLocaleString()} F</div>
+                </div>
+            </div>
+        `).join('');
+        
+        suggestionsDiv.querySelectorAll('.edit-suggestion-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const designation = this.getAttribute('data-designation');
+                const prix = this.getAttribute('data-prix');
+                designationInput.value = designation;
+                itemDiv.querySelector('.prix').value = prix;
+                itemDiv.querySelector('.quantite').value = 1;
+                suggestionsDiv.style.display = 'none';
+                itemDiv.querySelector('.quantite').focus();
+            });
+            item.addEventListener('mouseover', function() {
+                this.style.background = 'rgba(139,92,246,0.15)';
+            });
+            item.addEventListener('mouseout', function() {
+                this.style.background = 'transparent';
+            });
+        });
+        
+        suggestionsDiv.style.display = 'block';
+    });
+    
+    designationInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            suggestionsDiv.style.display = 'none';
+        }, 250);
+    });
+}
+
+// Attacher à tous les items existants
+modal.querySelectorAll('.materiaux-item').forEach(item => {
+    attacherAutoCompletionEdit(item);
+});
         // Fonction de calcul
         const calculateTotal = () => {
             const items = modal.querySelectorAll('#edit-materiaux-list .materiaux-item');
