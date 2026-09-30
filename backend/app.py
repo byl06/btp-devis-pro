@@ -848,7 +848,8 @@ def create_devis():
             "statut": "brouillon",
             "id_client": data.get('id_client'),
             "id_user": user_id,
-            "id_projet": data.get('id_projet')
+            "id_projet": data.get('id_projet'),
+            "show_signature": show_signature 
         }
         
         print(f"🔍 Données devis à insérer: {devis_data}")
@@ -1667,9 +1668,21 @@ def generate_pdf(id_devis):
         total_ht = sum(l['total_ligne'] for l in lignes)
         
         # Signature : valeur du devis > valeur des settings (par défaut True)
-        show_signature = devis.get('show_signature')
-        if show_signature is None:
+                # Signature : valeur du devis > valeur des settings (par défaut True)
+        # 🔥 show_signature dans le devis peut être :
+        #    - True  → afficher
+        #    - False → ne pas afficher
+        #    - None  → utiliser la valeur des settings
+        devis_show_signature = devis.get('show_signature')
+        
+        if devis_show_signature is None:
+            # Pas de valeur dans le devis → utiliser les settings
             show_signature = settings.get('show_signature', True)
+        else:
+            # Valeur définie dans le devis → l'utiliser
+            show_signature = devis_show_signature
+        
+        print(f"🔍 show_signature - devis: {devis_show_signature}, settings: {settings.get('show_signature')}, final: {show_signature}")
         
         # ============================================================
         # CRÉATION DU PDF
@@ -4850,7 +4863,8 @@ def update_devis(id_devis):
             "id_client": data.get('id_client'),
             "id_projet": data.get('id_projet'),
             "total": total,
-            "date_creation": datetime.now().isoformat()
+            "date_creation": datetime.now().isoformat(),
+            "show_signature": data.get('show_signature')
         }
         
         response = requests.patch(

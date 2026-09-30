@@ -2941,6 +2941,17 @@ openCreateDevisModal() {
                             </div>
                         </div>
                         
+                                                <!-- 🔥 NOUVEAU : Option zone de signature -->
+                        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:1rem; padding:0.75rem; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
+                            <input type="checkbox" 
+                                   id="devis-show-signature" 
+                                   ${this.currentSettings?.show_signature !== false ? 'checked' : ''} 
+                                   style="width:18px; height:18px; cursor:pointer; accent-color:#10B981;">
+                            <label for="devis-show-signature" style="cursor:pointer; margin:0; font-size:0.9rem; color:white;">
+                                Ajouter une zone de signature
+                            </label>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">Créer le devis</button>
                             <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -3140,7 +3151,8 @@ openCreateDevisModal() {
                 id_client: parseInt(id_client),
                 id_user: self.currentUser.id,
                 id_projet: parseInt(id_projet),
-                lignes: lignes
+                lignes: lignes,
+                show_signature: modal.querySelector('#devis-show-signature').checked
             };
             
             const submitBtn = form.querySelector('button[type="submit"]');
@@ -3775,6 +3787,17 @@ async editDevis(id) {
                             </div>
                         </div>
                         
+                                                <!-- 🔥 NOUVEAU : Option zone de signature -->
+                        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:1rem; padding:0.75rem; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
+                            <input type="checkbox" 
+                                   id="edit-devis-show-signature" 
+                                   ${devis.show_signature !== false ? 'checked' : ''} 
+                                   style="width:18px; height:18px; cursor:pointer; accent-color:#10B981;">
+                            <label for="edit-devis-show-signature" style="cursor:pointer; margin:0; font-size:0.9rem; color:white;">
+                                Ajouter une zone de signature
+                            </label>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">Enregistrer les modifications</button>
                             <button type="button" class="btn-secondary close-modal">Annuler</button>
@@ -3960,7 +3983,8 @@ modal.querySelectorAll('.materiaux-item').forEach(item => {
             const devisData = {
                 id_client: parseInt(id_client),
                 id_projet: parseInt(id_projet),
-                lignes: lignes
+                lignes: lignes,
+                show_signature: modal.querySelector('#edit-devis-show-signature').checked
             };
             
             const submitBtn = form.querySelector('button[type="submit"]');
