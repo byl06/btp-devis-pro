@@ -1560,7 +1560,7 @@ def generate_pdf(id_devis):
         from reportlab.lib.pagesizes import A4
         from reportlab.platypus import (
             SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, 
-            Image, PageBreak
+            Image, PageBreak, KeepTogether
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import mm
@@ -1576,6 +1576,7 @@ def generate_pdf(id_devis):
         BLANC = colors.HexColor('#FFFFFF')
         GRIS_FONCE = colors.HexColor('#303030')
         GRIS_MOYEN = colors.HexColor('#5F665F')
+        GRIS_BORDURE = colors.HexColor('#D4E0D7')
         
         # Configuration Supabase
         supabase_url = os.environ.get('SUPABASE_URL', '')
@@ -1676,6 +1677,12 @@ def generate_pdf(id_devis):
         num_devis = f"{devis.get('id_devis', 0):06d}"
         validite = "30 jours"
         
+        # Conversion des types pour les lignes
+        for ligne in lignes:
+            ligne['prix_unitaire'] = float(ligne['prix_unitaire']) if ligne.get('prix_unitaire') else 0
+            ligne['quantite'] = int(ligne['quantite']) if ligne.get('quantite') else 0
+            ligne['total_ligne'] = float(ligne['total_ligne']) if ligne.get('total_ligne') else 0
+        
         # ============================================================
         # CRÉATION DU PDF
         # ============================================================
@@ -1702,7 +1709,7 @@ def generate_pdf(id_devis):
         
         styles = getSampleStyleSheet()
         
-                # Titre "Devis" (grand, blanc)
+        # Titre "Devis"
         style_titre_devis = ParagraphStyle(
             'TitreDevis',
             parent=styles['Normal'],
@@ -1713,24 +1720,24 @@ def generate_pdf(id_devis):
             spaceAfter=0
         )
         
-        # Numéro devis (blanc atténué)
+        # Numéro devis
         style_num_devis = ParagraphStyle(
             'NumDevis',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=11,
-            textColor=colors.HexColor('#D4E8DC'),  # Blanc plus visible
+            textColor=colors.HexColor('#D4E8DC'),
             leading=14
         )
         
-        # Date/validité dans le header (blanc)
+        # Date/validité dans le header
         style_header_info = ParagraphStyle(
             'HeaderInfo',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=10,
             textColor=BLANC,
-            alignment=2,  # Droite
+            alignment=2,
             leading=14
         )
         
@@ -1745,16 +1752,6 @@ def generate_pdf(id_devis):
             spaceAfter=4
         )
         
-        # Style nom client
-        style_client_nom = ParagraphStyle(
-            'ClientNom',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=10,
-            textColor=GRIS_FONCE,
-            leading=14
-        )
-        
         # Style infos client
         style_client_info = ParagraphStyle(
             'ClientInfo',
@@ -1765,15 +1762,49 @@ def generate_pdf(id_devis):
             leading=13
         )
         
-        # Style ID client (droite)
+        # Style ID client
         style_id_client = ParagraphStyle(
             'IdClient',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=9,
             textColor=GRIS_MOYEN,
-            alignment=2,  # Droite
+            alignment=2,
             leading=13
+        )
+        
+        # Style en-têtes du tableau
+        style_th = ParagraphStyle(
+            'TH',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            textColor=BLANC,
+            leading=12
+        )
+        
+        # Style cellules
+        style_td = ParagraphStyle(
+            'TD',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8.5,
+            textColor=GRIS_FONCE,
+            leading=11
+        )
+        
+        # Style cellules centrées
+        style_td_center = ParagraphStyle(
+            'TDCenter',
+            parent=style_td,
+            alignment=1
+        )
+        
+        # Style cellules droite
+        style_td_right = ParagraphStyle(
+            'TDRight',
+            parent=style_td,
+            alignment=2
         )
         
         # ============================================================
@@ -1786,65 +1817,49 @@ def generate_pdf(id_devis):
         # 1. HEADER VERT (43mm de hauteur)
         # ------------------------------------------------------------
         
-                # ------------------------------------------------------------
-        # 1. HEADER VERT (43mm de hauteur)
-        # ------------------------------------------------------------
-        
-        # 🔥 Header avec fond vert qui remplit TOUTE la largeur
-        # Structure :
-        # | Colonne gauche (Titre + Numéro) | Colonne droite (Date + Validité) |
-        
-        # Construction du contenu gauche
         gauche_content = [
             Paragraph("Devis", style_titre_devis),
             Spacer(1, 2),
             Paragraph(f"N° {num_devis}", style_num_devis)
         ]
         
-        # Construction du contenu droite
         droite_content = [
             Paragraph(f"<b>Date :</b> {date_formatee}", style_header_info),
             Paragraph(f"<b>Validité :</b> {validite}", style_header_info)
         ]
         
-        # 🔥 Tableau interne (invisible, juste pour positionner)
         inner_header = Table(
             [[gauche_content, droite_content]],
             colWidths=[largeur_utile * 0.6, largeur_utile * 0.4]
         )
         inner_header.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (0, 0), 'TOP'),      # Titre en haut
-            ('VALIGN', (1, 0), (1, 0), 'TOP'),      # Date en haut
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         
-        # 🔥 Tableau principal du header (fond vert, remplit tout)
         header_table = Table(
             [[inner_header]],
             colWidths=[largeur_utile],
-            rowHeights=[43*mm]  # Hauteur fixe de 43mm
+            rowHeights=[43*mm]
         )
         header_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), VERT_PROFOND),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 15),   # Padding à gauche
-            ('RIGHTPADDING', (0, 0), (-1, -1), 15),  # Padding à droite
-            ('TOPPADDING', (0, 0), (-1, -1), 12),    # Padding en haut
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12), # Padding en bas
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
         ]))
         
         story.append(header_table)
-        story.append(Spacer(1, 43*mm - 15*mm))  # Ajustement pour atteindre ~43mm
         
         # ------------------------------------------------------------
-        # 2. INFOS CLIENT (Zone blanche)
+        # 2. INFOS CLIENT
         # ------------------------------------------------------------
         
-        # Colonne gauche : "Pour :" + infos client
-        # On construit un Paragraph multi-lignes
         client_lines = [f"<b>{client_nom}</b>"]
         if client_telephone:
             client_lines.append(client_telephone)
@@ -1860,7 +1875,6 @@ def generate_pdf(id_devis):
             Paragraph(client_text, style_client_info)
         ]
         
-        # Colonne droite : ID client
         droite_client = [
             Paragraph(f"ID client : {client_id}", style_id_client)
         ]
@@ -1877,22 +1891,82 @@ def generate_pdf(id_devis):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         
-        story.append(Spacer(1, 10*mm))  # Espace après le header
+        story.append(Spacer(1, 10*mm))
         story.append(client_table)
         
         # ------------------------------------------------------------
-        # 3. ZONE RÉSERVÉE POUR LE TABLEAU (Étape 2)
+        # 3. TABLEAU DES PRESTATIONS (ÉTAPE 2)
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 18*mm))  # Espace avant le tableau
+        story.append(Spacer(1, 18*mm))
         
-        # 🔥 ICI on ajoutera le tableau à l'Étape 2
-        placeholder_tableau = Paragraph(
-            "<i>(Tableau des prestations — Étape 2)</i>",
-            ParagraphStyle('Placeholder', parent=styles['Normal'], 
-                          fontSize=9, textColor=GRIS_MOYEN, alignment=1)
-        )
-        story.append(placeholder_tableau)
+        # En-têtes du tableau
+        table_header = [
+            Paragraph("<b>Détail</b>", style_th),
+            Paragraph("<b>Quantité</b>", style_th),
+            Paragraph("<b>Prix HT</b>", style_th),
+            Paragraph("<b>Total HT</b>", style_th)
+        ]
+        
+        # Données du tableau
+        table_data = [table_header]
+        
+        total_ht = 0
+        
+        for ligne in lignes:
+            designation = ligne.get('designation', '')
+            quantite = ligne.get('quantite', 0)
+            prix_unitaire = ligne.get('prix_unitaire', 0)
+            total_ligne = ligne.get('total_ligne', 0)
+            
+            total_ht += total_ligne
+            
+            table_data.append([
+                Paragraph(designation, style_td),
+                Paragraph(str(quantite), style_td_center),
+                Paragraph(f"{prix_unitaire:,.0f}".replace(',', ' '), style_td_center),
+                Paragraph(f"{total_ligne:,.0f}".replace(',', ' '), style_td_right)
+            ])
+        
+        # 🔥 Proportions : 52%, 16%, 16%, 16%
+        col_widths = [
+            largeur_utile * 0.52,
+            largeur_utile * 0.16,
+            largeur_utile * 0.16,
+            largeur_utile * 0.16
+        ]
+        
+        # Création du tableau
+        tableau = Table(table_data, colWidths=col_widths, repeatRows=1)
+        
+        tableau_style = [
+            # En-têtes
+            ('BACKGROUND', (0, 0), (-1, 0), VERT_CLAIR),
+            ('TEXTCOLOR', (0, 0), (-1, 0), BLANC),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            
+            # Corps
+            ('BACKGROUND', (0, 1), (-1, -1), BLANC),
+            ('TEXTCOLOR', (0, 1), (-1, -1), GRIS_FONCE),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8.5),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            
+            # Bordures
+            ('GRID', (0, 0), (-1, -1), 0.5, GRIS_BORDURE),
+            ('LINEBELOW', (0, 0), (-1, 0), 1, VERT_PROFOND),
+        ]
+        
+        tableau.setStyle(TableStyle(tableau_style))
+        
+        story.append(tableau)
         
         # ------------------------------------------------------------
         # 4. ZONE RÉSERVÉE POUR LES TOTAUX (Étape 3)
@@ -1901,7 +1975,7 @@ def generate_pdf(id_devis):
         story.append(Spacer(1, 15*mm))
         
         placeholder_totaux = Paragraph(
-            "<i>(Zone des totaux — Étape 3)</i>",
+            f"<i>(Total HT calculé : {total_ht:,.0f} FCFA — Étape 3 pour les totaux complets)</i>".replace(',', ' '),
             ParagraphStyle('Placeholder2', parent=styles['Normal'],
                           fontSize=9, textColor=GRIS_MOYEN, alignment=2)
         )
@@ -1938,7 +2012,7 @@ def generate_pdf(id_devis):
         story.append(Paragraph("Merci pour votre confiance !", style_merci))
         
         # ============================================================
-        # CONSTRUCTION AVEC HEADER/FOOTER SUR CHAQUE PAGE
+        # CONSTRUCTION
         # ============================================================
         
         doc.build(story)
