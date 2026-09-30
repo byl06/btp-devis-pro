@@ -4055,12 +4055,128 @@ def generate_pdf_normalise(id_facture):
         # PLACEHOLDER POUR ÉTAPES 2+ (Zone fiscale, QR Code, etc.)
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 10*mm))
-        story.append(Paragraph(
-            "<i>(Zone fiscale + QR Code — Étape 2)</i>",
-            ParagraphStyle('PH', parent=styles['Normal'], fontSize=9,
-                          textColor=GRIS_MOYEN, alignment=1)
-        ))
+                # ------------------------------------------------------------
+        # 4. ZONE FISCALE + QR CODE
+        # ------------------------------------------------------------
+        
+        story.append(Spacer(1, 8*mm))
+        
+        # Style pour les infos fiscales
+        style_fiscal_titre = ParagraphStyle(
+            'FiscalTitre', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=10,
+            textColor=VERT_PROFOND, leading=13, spaceAfter=6
+        )
+        
+        style_fiscal_info = ParagraphStyle(
+            'FiscalInfo', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=8.5,
+            textColor=GRIS_FONCE, leading=13
+        )
+        
+        style_fiscal_mention = ParagraphStyle(
+            'FiscalMention', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=8.5,
+            textColor=VERT_PROFOND, leading=12, alignment=1
+        )
+        
+        style_fiscal_sous_mention = ParagraphStyle(
+            'FiscalSousMention', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=7.5,
+            textColor=GRIS_MOYEN, leading=10, alignment=1
+        )
+        
+        # Titre de la zone fiscale
+        story.append(Paragraph("<b>Informations fiscales</b>", style_fiscal_titre))
+        
+        # Construction des infos fiscales (texte à droite du QR Code)
+        fiscal_info_lines = []
+        if nim:
+            fiscal_info_lines.append(f"<b>NIM :</b> {nim}")
+        if code_mecf:
+            fiscal_info_lines.append(f"<b>Code MECeF :</b> {code_mecf}")
+        if date_heure_complete:
+            fiscal_info_lines.append(f"<b>Date/Heure :</b> {date_heure_complete}")
+        fiscal_info_lines.append("<b>Type :</b> Facture de vente (FV)")
+        
+        fiscal_info_text = "<br/>".join(fiscal_info_lines)
+        fiscal_info_paragraph = Paragraph(fiscal_info_text, style_fiscal_info)
+        
+        # ============================================================
+        # GÉNÉRATION DU QR CODE
+        # ============================================================
+        
+        qr_element = None
+        
+        try:
+            import qrcode
+            from io import BytesIO
+            
+            if qr_code_data and len(qr_code_data) > 10:
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=4,
+                    border=1,
+                )
+                qr.add_data(str(qr_code_data))
+                qr.make(fit=True)
+                
+                qr_img = qr.make_image(fill_color="black", back_color="white")
+                qr_buffer = BytesIO()
+                qr_img.save(qr_buffer, format='PNG')
+                qr_buffer.seek(0)
+                
+                from reportlab.platypus import Image as RLImage
+                qr_element = RLImage(qr_buffer, width=30*mm, height=30*mm)
+                print("✅ QR Code généré")
+            else:
+                qr_element = Paragraph("⚠️ QR Code non disponible", style_fiscal_info)
+        except Exception as e:
+            print(f"⚠️ Erreur QR Code: {e}")
+            qr_element = Paragraph("⚠️ Erreur QR Code", style_fiscal_info)
+        
+        # ============================================================
+        # TABLEAU ZONE FISCALE (QR Code | Infos)
+        # ============================================================
+        
+        fiscal_data = [[qr_element, fiscal_info_paragraph]]
+        
+        fiscal_table = Table(
+            fiscal_data,
+            colWidths=[35*mm, largeur_utile - 35*mm]
+        )
+        
+        fiscal_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (0, 0), 0),
+            ('RIGHTPADDING', (0, 0), (0, 0), 5*mm),
+            ('LEFTPADDING', (1, 0), (1, 0), 5*mm),
+            ('RIGHTPADDING', (1, 0), (1, 0), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        story.append(fiscal_table)
+        
+        # ============================================================
+        # MENTION DGI (conformité)
+        # ============================================================
+        
+        story.append(Spacer(1, 4*mm))
+        
+        mention_conformite = Paragraph(
+            "✔ Facture normalisée conforme à la réglementation fiscale en vigueur",
+            style_fiscal_mention
+        )
+        story.append(mention_conformite)
+        
+        mention_dgi = Paragraph(
+            "Émise via le système e-MCF de la DGI",
+            style_fiscal_sous_mention
+        )
+        story.append(mention_dgi)
         
         # ============================================================
         # CONSTRUCTION
