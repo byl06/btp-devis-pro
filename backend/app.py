@@ -1879,11 +1879,69 @@ def generate_pdf(id_devis):
         # 3. PLACEHOLDER TOTAUX (Étape 3)
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 15*mm))
-        story.append(Paragraph(
-            f"<i>(Total HT : {total_ht:,.0f} FCFA — Étape 3)</i>".replace(',', ' '),
-            ParagraphStyle('PH2', parent=styles['Normal'], fontSize=9, textColor=GRIS_MOYEN, alignment=2)
-        ))
+                # ------------------------------------------------------------
+        # 3. ZONE DES TOTAUX
+        # ------------------------------------------------------------
+        
+        story.append(Spacer(1, 10*mm))
+        
+        # Calculs
+        total_devis = float(devis.get('total', 0)) if devis.get('total') else total_ht
+        
+        # ⚠️ Logique métier actuelle :
+        # - Total HT = somme des lignes
+        # - TVA = 0 pour l'instant (à définir plus tard)
+        # - Total = total du devis
+        
+        tva_montant = 0  # À définir plus tard
+        total_final = total_devis
+        
+        # Construction des données
+        totaux_data = [
+            ["Total HT", f"{total_ht:,.0f} FCFA".replace(',', ' ')],
+        ]
+        
+        if tva_montant > 0:
+            totaux_data.append(["TVA", f"{tva_montant:,.0f} FCFA".replace(',', ' ')])
+        
+        totaux_data.append(["Total", f"{total_final:,.0f} FCFA".replace(',', ' ')])
+        
+        # Tableau des totaux
+        totaux_table = Table(
+            totaux_data,
+            colWidths=[largeur_utile * 0.25, largeur_utile * 0.20]
+        )
+        
+        totaux_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -2), GRIS_MOYEN),
+            ('TEXTCOLOR', (0, -1), (-1, -1), VERT_PROFOND),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -1), (-1, -1), 11),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LINEBELOW', (0, 0), (-1, -2), 0.5, GRIS_BORDURE),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, VERT_PROFOND),
+        ]))
+        
+        # Conteneur pour aligner à droite
+        totaux_container = Table(
+            [["", totaux_table]],
+            colWidths=[largeur_utile * 0.55, largeur_utile * 0.45]
+        )
+        totaux_container.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        story.append(totaux_container)
         
         # ------------------------------------------------------------
         # 4. PLACEHOLDER SIGNATURE (Étape 4)
