@@ -2114,7 +2114,7 @@ def generate_pdf(id_devis):
         return jsonify({'error': str(e)}), 500
 
 
-        
+
 # ==================== ABONNEMENT ====================
 @app.route('/api/abonnement/statut', methods=['GET'])
 @jwt_required()
@@ -2507,7 +2507,8 @@ def update_settings():
             "nif": sanitize_input(data.get('nif', '')),
             "regime_tva": sanitize_input(data.get('regime_tva', 'non assujetti')),
             "numero_contribuable": sanitize_input(data.get('numero_contribuable', '')),
-            "adresse_fiscale": sanitize_input(data.get('adresse_fiscale', ''))
+            "adresse_fiscale": sanitize_input(data.get('adresse_fiscale', '')),
+            "show_signature": data.get('show_signature', True)
         }
         
         print(f"🔍 Mise à jour settings: {update_data}")

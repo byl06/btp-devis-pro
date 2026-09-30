@@ -209,7 +209,7 @@ setupEventListeners() {
         });
     });
 
-    // ===== FORMULAIRES =====
+        // ===== FORMULAIRES =====
     document.addEventListener('submit', async (e) => {
         const target = e.target;
         
@@ -237,6 +237,11 @@ setupEventListeners() {
             e.preventDefault();
             await this.saveHeaderSettings();
         }
+        // 🔥 NOUVEAU : Formulaire Paramètres Devis
+        else if (target.id === 'devis-settings-form') {
+            e.preventDefault();
+            await this.saveDevisSettings();
+        }
     });
     
     // ===== FILTRES POUR LA PAGE DEVIS =====
@@ -246,36 +251,6 @@ setupEventListeners() {
             this.filterDevis();
         }
     });
-
-    // ===== FORMULAIRES =====
-document.addEventListener('submit', async (e) => {
-    const target = e.target;
-    
-    if (target.id === 'company-form') {
-        e.preventDefault();
-        await this.saveCompanySettings();
-    }
-    else if (target.id === 'colors-form') {
-        e.preventDefault();
-        await this.saveColorSettings();
-    }
-    else if (target.id === 'logo-form') {
-        e.preventDefault();
-        await this.uploadLogo();
-    }
-    else if (target.id === 'change-password-form') {
-        e.preventDefault();
-        await this.changePassword();
-    }
-    else if (target.id === 'fiscal-form') {
-        e.preventDefault();
-        await this.saveFiscalSettings();
-    }
-    else if (target.id === 'import-header-form') {  // 🔥 AJOUT ICI
-        e.preventDefault();
-        await this.importHeader();
-    }
-});
     
     document.addEventListener('change', (e) => {
         if (e.target.id === 'filter-status' || e.target.id === 'filter-date') {
@@ -283,6 +258,34 @@ document.addEventListener('submit', async (e) => {
             this.filterDevis();
         }
     });
+}
+
+async saveDevisSettings() {
+    const showSignature = document.getElementById('show-signature').checked;
+    
+    const data = {
+        show_signature: showSignature
+    };
+    
+    try {
+        const response = await apiRequest('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Paramètres des devis enregistrés');
+            // Mettre à jour les settings en cache
+            if (this.currentSettings) {
+                this.currentSettings.show_signature = showSignature;
+            }
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
 }
 
 async saveHeaderSettings() {
@@ -4018,6 +4021,12 @@ async renderParametres() {
                          style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'entreprise' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'entreprise' ? 'white' : '#94A3B8'}; transition:all 0.3s;">
                         <i class="fas fa-building"></i> Entreprise
                     </div>
+                    <!-- 🔥 NOUVEL ONGLET DEVIS -->
+                    <div class="tab-parametre ${activeTab === 'devis' ? 'active' : ''}" 
+                         onclick="app.switchParametreTab('devis')" 
+                         style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'devis' ? '#10B981' : 'transparent'}; color:${activeTab === 'devis' ? '#10B981' : '#94A3B8'}; transition:all 0.3s;">
+                        <i class="fas fa-file-invoice"></i> Devis
+                    </div>
                     <div class="tab-parametre ${activeTab === 'fiscal' ? 'active' : ''}" 
                          onclick="app.switchParametreTab('fiscal')" 
                          style="padding:10px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'fiscal' ? '#F59E0B' : 'transparent'}; color:${activeTab === 'fiscal' ? '#F59E0B' : '#94A3B8'}; transition:all 0.3s;">
@@ -4141,6 +4150,39 @@ renderParametreContent(tab, settings) {
                         <input type="color" id="accent-color" value="${settings.accent_color || '#06B6D4'}" style="width:100%; height:40px;">
                     </div>
                     <button type="submit" class="btn-primary"><i class="fas fa-palette"></i> Appliquer</button>
+                </form>
+            </div>
+        `,
+        devis: `
+            <div class="glass-card" style="border:1px solid rgba(16,185,129,0.3);">
+                <h3><i class="fas fa-file-invoice" style="color:#10B981;"></i> Paramètres des devis</h3>
+                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1.5rem;">
+                    Configurez l'apparence de vos devis PDF.
+                </p>
+                
+                <form id="devis-settings-form">
+                    <!-- Zone de signature -->
+                    <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:1rem; margin-bottom:1rem;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <input type="checkbox" 
+                                   id="show-signature" 
+                                   ${settings.show_signature !== false ? 'checked' : ''} 
+                                   style="width:20px; height:20px; cursor:pointer; accent-color:#10B981;">
+                            <div style="flex:1;">
+                                <label for="show-signature" style="cursor:pointer; font-weight:600; color:white; display:block;">
+                                    Ajouter une zone de signature sur les devis
+                                </label>
+                                <p style="font-size:0.75rem; color:#64748B; margin-top:4px;">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Affiche "Bon pour accord" + zone de signature manuscrite sur vos devis PDF
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #10B981, #059669);">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
                 </form>
             </div>
         `,
@@ -4272,12 +4314,13 @@ switchParametreTab(tab) {
     const tabs = document.querySelectorAll('.tab-parametre');
     const colors = {
         entreprise: '#06B6D4',
+        devis: '#10B981',
         fiscal: '#F59E0B',
         securite: '#EF4444',
         abonnement: '#8B5CF6',
         backup: '#10B981'
     };
-    const tabNames = ['entreprise', 'fiscal', 'securite', 'abonnement', 'backup'];
+    const tabNames = ['entreprise', 'devis', 'fiscal', 'securite', 'abonnement', 'backup'];
     
     tabs.forEach((t, i) => {
         t.style.borderBottom = '3px solid transparent';
