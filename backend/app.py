@@ -1702,7 +1702,7 @@ def generate_pdf(id_devis):
         
         styles = getSampleStyleSheet()
         
-        # Titre "Devis" (grand, blanc)
+                # Titre "Devis" (grand, blanc)
         style_titre_devis = ParagraphStyle(
             'TitreDevis',
             parent=styles['Normal'],
@@ -1710,7 +1710,7 @@ def generate_pdf(id_devis):
             fontSize=38,
             textColor=BLANC,
             leading=42,
-            spaceAfter=2
+            spaceAfter=0
         )
         
         # Numéro devis (blanc atténué)
@@ -1719,7 +1719,7 @@ def generate_pdf(id_devis):
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=11,
-            textColor=colors.HexColor('#E8F0EA'),
+            textColor=colors.HexColor('#D4E8DC'),  # Blanc plus visible
             leading=14
         )
         
@@ -1786,47 +1786,57 @@ def generate_pdf(id_devis):
         # 1. HEADER VERT (43mm de hauteur)
         # ------------------------------------------------------------
         
-        # Contenu du header
-        # Colonne gauche : Titre + Numéro
-        header_gauche = [
+                # ------------------------------------------------------------
+        # 1. HEADER VERT (43mm de hauteur)
+        # ------------------------------------------------------------
+        
+        # 🔥 Header avec fond vert qui remplit TOUTE la largeur
+        # Structure :
+        # | Colonne gauche (Titre + Numéro) | Colonne droite (Date + Validité) |
+        
+        # Construction du contenu gauche
+        gauche_content = [
             Paragraph("Devis", style_titre_devis),
+            Spacer(1, 2),
             Paragraph(f"N° {num_devis}", style_num_devis)
         ]
         
-        # Colonne droite : Date + Validité
-        header_droite = [
+        # Construction du contenu droite
+        droite_content = [
             Paragraph(f"<b>Date :</b> {date_formatee}", style_header_info),
             Paragraph(f"<b>Validité :</b> {validite}", style_header_info)
         ]
         
-        # Tableau du header
-        header_table = Table(
-            [[header_gauche, header_droite]],
+        # 🔥 Tableau interne (invisible, juste pour positionner)
+        inner_header = Table(
+            [[gauche_content, droite_content]],
             colWidths=[largeur_utile * 0.6, largeur_utile * 0.4]
         )
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (0, 0), 0),
-            ('RIGHTPADDING', (1, 0), (1, 0), 0),
+        inner_header.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (0, 0), 'TOP'),      # Titre en haut
+            ('VALIGN', (1, 0), (1, 0), 'TOP'),      # Date en haut
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         
-        # Fond vert pour tout le header
-        header_container = Table(
-            [[header_table]],
-            colWidths=[largeur_utile]
+        # 🔥 Tableau principal du header (fond vert, remplit tout)
+        header_table = Table(
+            [[inner_header]],
+            colWidths=[largeur_utile],
+            rowHeights=[43*mm]  # Hauteur fixe de 43mm
         )
-        header_container.setStyle(TableStyle([
+        header_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), VERT_PROFOND),
-            ('LEFTPADDING', (0, 0), (-1, -1), 15),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-            ('TOPPADDING', (0, 0), (-1, -1), 15),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),   # Padding à gauche
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),  # Padding à droite
+            ('TOPPADDING', (0, 0), (-1, -1), 12),    # Padding en haut
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12), # Padding en bas
         ]))
         
-        # 🔥 Ajouter le header avec une hauteur fixe de 43mm
-        story.append(header_container)
+        story.append(header_table)
         story.append(Spacer(1, 43*mm - 15*mm))  # Ajustement pour atteindre ~43mm
         
         # ------------------------------------------------------------
