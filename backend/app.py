@@ -1560,7 +1560,7 @@ def generate_pdf(id_devis):
         from reportlab.lib.pagesizes import A4
         from reportlab.platypus import (
             SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, 
-            Image, PageBreak, KeepTogether
+            Image
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import mm
@@ -1570,7 +1570,6 @@ def generate_pdf(id_devis):
         # CONFIGURATION
         # ============================================================
         
-        # Couleurs du template
         VERT_PROFOND = colors.HexColor('#438A5C')
         VERT_CLAIR = colors.HexColor('#7FAF91')
         BLANC = colors.HexColor('#FFFFFF')
@@ -1578,7 +1577,6 @@ def generate_pdf(id_devis):
         GRIS_MOYEN = colors.HexColor('#5F665F')
         GRIS_BORDURE = colors.HexColor('#D4E0D7')
         
-        # Configuration Supabase
         supabase_url = os.environ.get('SUPABASE_URL', '')
         supabase_key = os.environ.get('SUPABASE_KEY', '')
         
@@ -1592,70 +1590,48 @@ def generate_pdf(id_devis):
         # RÉCUPÉRATION DES DONNÉES
         # ============================================================
         
-        # 1. Récupérer le devis
         devis_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_devis=eq.{id_devis}",
             headers=headers
         )
-        
         if devis_response.status_code != 200 or not devis_response.json():
             return jsonify({'error': 'Devis non trouvé'}), 404
-        
         devis = devis_response.json()[0]
         
-        # 2. Récupérer le client
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
             headers=headers
         )
         client = client_response.json()[0] if client_response.status_code == 200 and client_response.json() else {}
         
-        # 3. Récupérer le projet
         projet_response = requests.get(
             f"{supabase_url}/rest/v1/projet?id_projet=eq.{devis.get('id_projet')}",
             headers=headers
         )
         projet = projet_response.json()[0] if projet_response.status_code == 200 and projet_response.json() else {}
         
-        # 4. Récupérer les lignes
         lignes_response = requests.get(
             f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
             headers=headers
         )
         lignes = lignes_response.json() if lignes_response.status_code == 200 else []
         
-        # 5. Récupérer les settings
         settings_response = requests.get(
             f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
             headers=headers
         )
-        
-        if settings_response.status_code == 200 and settings_response.json():
-            settings = settings_response.json()[0]
-        else:
-            settings = {
-                'company_name': '',
-                'company_email': '',
-                'company_phone': '',
-                'company_address': '',
-                'company_logo': None,
-                'website': '',
-                'nif': '',
-                'slogan': ''
-            }
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else {}
         
         # ============================================================
         # PRÉPARATION DES DONNÉES
         # ============================================================
         
-        # Infos client
         client_nom = client.get('nom', 'Non renseigné')
         client_telephone = client.get('telephone', '')
         client_email = client.get('email', '')
         client_adresse = client.get('adresse', '')
         client_id = devis.get('id_client', '')
         
-        # Infos entreprise
         company_name = settings.get('company_name', 'Mon Entreprise')
         company_email = settings.get('company_email', '')
         company_phone = settings.get('company_phone', '')
@@ -1663,7 +1639,6 @@ def generate_pdf(id_devis):
         company_website = settings.get('website', '')
         company_logo = settings.get('company_logo')
         
-        # Infos devis
         date_creation = devis.get('date_creation', '')
         if date_creation:
             try:
@@ -1677,31 +1652,33 @@ def generate_pdf(id_devis):
         num_devis = f"{devis.get('id_devis', 0):06d}"
         validite = "30 jours"
         
-        # Conversion des types pour les lignes
         for ligne in lignes:
             ligne['prix_unitaire'] = float(ligne['prix_unitaire']) if ligne.get('prix_unitaire') else 0
             ligne['quantite'] = int(ligne['quantite']) if ligne.get('quantite') else 0
             ligne['total_ligne'] = float(ligne['total_ligne']) if ligne.get('total_ligne') else 0
         
+        total_ht = sum(l['total_ligne'] for l in lignes)
+        
         # ============================================================
-        # CRÉATION DU PDF
+        # CRÉATION DU PDF AVEC CANVAS PERSONNALISÉ
         # ============================================================
         
         buffer = io.BytesIO()
+        page_width, page_height = A4
+        header_height = 43 * mm
+        footer_height = 55 * mm
         
-        # Marges : 20mm partout
+        # 🔥 MARGES : on réserve de l'espace pour header et footer
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
             rightMargin=20*mm,
             leftMargin=20*mm,
-            topMargin=0,
-            bottomMargin=0
+            topMargin=header_height + 5*mm,   # Header + espace
+            bottomMargin=footer_height + 5*mm  # Footer + espace
         )
         
-        # Largeur utile
-        page_width, page_height = A4
-        largeur_utile = page_width - 40*mm  # 210mm - 40mm = 170mm
+        largeur_utile = page_width - 40*mm
         
         # ============================================================
         # STYLES
@@ -1709,103 +1686,99 @@ def generate_pdf(id_devis):
         
         styles = getSampleStyleSheet()
         
-        # Titre "Devis"
-        style_titre_devis = ParagraphStyle(
-            'TitreDevis',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=38,
-            textColor=BLANC,
-            leading=42,
-            spaceAfter=0
-        )
-        
-        # Numéro devis
-        style_num_devis = ParagraphStyle(
-            'NumDevis',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=11,
-            textColor=colors.HexColor('#D4E8DC'),
-            leading=14
-        )
-        
-        # Date/validité dans le header
-        style_header_info = ParagraphStyle(
-            'HeaderInfo',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=10,
-            textColor=BLANC,
-            alignment=2,
-            leading=14
-        )
-        
-        # Style "Pour :"
         style_pour = ParagraphStyle(
-            'Pour',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=11,
-            textColor=VERT_PROFOND,
-            leading=14,
-            spaceAfter=4
+            'Pour', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=11,
+            textColor=VERT_PROFOND, leading=14, spaceAfter=4
         )
         
-        # Style infos client
         style_client_info = ParagraphStyle(
-            'ClientInfo',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=9,
-            textColor=GRIS_MOYEN,
-            leading=13
+            'ClientInfo', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=9,
+            textColor=GRIS_MOYEN, leading=13
         )
         
-        # Style ID client
         style_id_client = ParagraphStyle(
-            'IdClient',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=9,
-            textColor=GRIS_MOYEN,
-            alignment=2,
-            leading=13
+            'IdClient', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=9,
+            textColor=GRIS_MOYEN, alignment=2, leading=13
         )
         
-        # Style en-têtes du tableau
         style_th = ParagraphStyle(
-            'TH',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=9,
-            textColor=BLANC,
-            leading=12
+            'TH', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=9,
+            textColor=BLANC, leading=12
         )
         
-        # Style cellules
         style_td = ParagraphStyle(
-            'TD',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=8.5,
-            textColor=GRIS_FONCE,
-            leading=11
+            'TD', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=8.5,
+            textColor=GRIS_FONCE, leading=11
         )
         
-        # Style cellules centrées
-        style_td_center = ParagraphStyle(
-            'TDCenter',
-            parent=style_td,
-            alignment=1
+        style_td_center = ParagraphStyle('TDCenter', parent=style_td, alignment=1)
+        style_td_right = ParagraphStyle('TDRight', parent=style_td, alignment=2)
+        
+        style_merci = ParagraphStyle(
+            'Merci', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=12,
+            textColor=VERT_PROFOND, alignment=1
         )
         
-        # Style cellules droite
-        style_td_right = ParagraphStyle(
-            'TDRight',
-            parent=style_td,
-            alignment=2
-        )
+        # ============================================================
+        # FONCTION POUR DESSINER LE HEADER SUR CHAQUE PAGE
+        # ============================================================
+        
+        def draw_header_footer(canvas, doc):
+            canvas.saveState()
+            
+            # 🔥 HEADER VERT (toute la largeur, du haut de la page)
+            canvas.setFillColor(VERT_PROFOND)
+            canvas.rect(0, page_height - header_height, page_width, header_height, fill=1, stroke=0)
+            
+            # 🔥 Titre "Devis" (blanc, grand)
+            canvas.setFillColor(BLANC)
+            canvas.setFont('Helvetica', 38)
+            canvas.drawString(20*mm, page_height - 25*mm, "Devis")
+            
+            # 🔥 Numéro devis
+            canvas.setFillColor(colors.HexColor('#D4E8DC'))
+            canvas.setFont('Helvetica', 11)
+            canvas.drawString(20*mm, page_height - 33*mm, f"N° {num_devis}")
+            
+            # 🔥 Date et Validité (à droite)
+            canvas.setFillColor(BLANC)
+            canvas.setFont('Helvetica-Bold', 10)
+            canvas.drawRightString(page_width - 20*mm, page_height - 18*mm, f"Date : {date_formatee}")
+            canvas.drawRightString(page_width - 20*mm, page_height - 25*mm, f"Validité : {validite}")
+            
+            # 🔥 FOOTER VERT (toute la largeur, en bas)
+            canvas.setFillColor(VERT_PROFOND)
+            canvas.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
+            
+            # 🔥 Nom entreprise dans le footer
+            canvas.setFillColor(BLANC)
+            canvas.setFont('Helvetica-Bold', 14)
+            canvas.drawString(20*mm, footer_height - 15*mm, company_name)
+            
+            # 🔥 Coordonnées dans le footer
+            canvas.setFont('Helvetica', 9)
+            canvas.setFillColor(colors.HexColor('#D4E8DC'))
+            
+            y_pos = footer_height - 22*mm
+            if company_phone:
+                canvas.drawString(20*mm, y_pos, f"Tél : {company_phone}")
+                y_pos -= 5*mm
+            if company_email:
+                canvas.drawString(20*mm, y_pos, f"Email : {company_email}")
+                y_pos -= 5*mm
+            if company_address:
+                canvas.drawString(20*mm, y_pos, f"Adresse : {company_address}")
+                y_pos -= 5*mm
+            if company_website:
+                canvas.drawString(20*mm, y_pos, f"Site : {company_website}")
+            
+            canvas.restoreState()
         
         # ============================================================
         # CONSTRUCTION DU CONTENU
@@ -1814,50 +1787,7 @@ def generate_pdf(id_devis):
         story = []
         
         # ------------------------------------------------------------
-        # 1. HEADER VERT (43mm de hauteur)
-        # ------------------------------------------------------------
-        
-        gauche_content = [
-            Paragraph("Devis", style_titre_devis),
-            Spacer(1, 2),
-            Paragraph(f"N° {num_devis}", style_num_devis)
-        ]
-        
-        droite_content = [
-            Paragraph(f"<b>Date :</b> {date_formatee}", style_header_info),
-            Paragraph(f"<b>Validité :</b> {validite}", style_header_info)
-        ]
-        
-        inner_header = Table(
-            [[gauche_content, droite_content]],
-            colWidths=[largeur_utile * 0.6, largeur_utile * 0.4]
-        )
-        inner_header.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        
-        header_table = Table(
-            [[inner_header]],
-            colWidths=[largeur_utile],
-            rowHeights=[43*mm]
-        )
-        header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), VERT_PROFOND),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 15),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-            ('TOPPADDING', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ]))
-        
-        story.append(header_table)
-        
-        # ------------------------------------------------------------
-        # 2. INFOS CLIENT
+        # 1. INFOS CLIENT
         # ------------------------------------------------------------
         
         client_lines = [f"<b>{client_nom}</b>"]
@@ -1874,7 +1804,6 @@ def generate_pdf(id_devis):
             Paragraph("Pour :", style_pour),
             Paragraph(client_text, style_client_info)
         ]
-        
         droite_client = [
             Paragraph(f"ID client : {client_id}", style_id_client)
         ]
@@ -1891,16 +1820,14 @@ def generate_pdf(id_devis):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         
-        story.append(Spacer(1, 10*mm))
         story.append(client_table)
         
         # ------------------------------------------------------------
-        # 3. TABLEAU DES PRESTATIONS (ÉTAPE 2)
+        # 2. TABLEAU DES PRESTATIONS
         # ------------------------------------------------------------
         
         story.append(Spacer(1, 18*mm))
         
-        # En-têtes du tableau
         table_header = [
             Paragraph("<b>Détail</b>", style_th),
             Paragraph("<b>Quantité</b>", style_th),
@@ -1908,27 +1835,16 @@ def generate_pdf(id_devis):
             Paragraph("<b>Total HT</b>", style_th)
         ]
         
-        # Données du tableau
         table_data = [table_header]
         
-        total_ht = 0
-        
         for ligne in lignes:
-            designation = ligne.get('designation', '')
-            quantite = ligne.get('quantite', 0)
-            prix_unitaire = ligne.get('prix_unitaire', 0)
-            total_ligne = ligne.get('total_ligne', 0)
-            
-            total_ht += total_ligne
-            
             table_data.append([
-                Paragraph(designation, style_td),
-                Paragraph(str(quantite), style_td_center),
-                Paragraph(f"{prix_unitaire:,.0f}".replace(',', ' '), style_td_center),
-                Paragraph(f"{total_ligne:,.0f}".replace(',', ' '), style_td_right)
+                Paragraph(ligne.get('designation', ''), style_td),
+                Paragraph(str(ligne.get('quantite', 0)), style_td_center),
+                Paragraph(f"{ligne.get('prix_unitaire', 0):,.0f}".replace(',', ' '), style_td_center),
+                Paragraph(f"{ligne.get('total_ligne', 0):,.0f}".replace(',', ' '), style_td_right)
             ])
         
-        # 🔥 Proportions : 52%, 16%, 16%, 16%
         col_widths = [
             largeur_utile * 0.52,
             largeur_utile * 0.16,
@@ -1936,11 +1852,8 @@ def generate_pdf(id_devis):
             largeur_utile * 0.16
         ]
         
-        # Création du tableau
         tableau = Table(table_data, colWidths=col_widths, repeatRows=1)
-        
-        tableau_style = [
-            # En-têtes
+        tableau.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), VERT_CLAIR),
             ('TEXTCOLOR', (0, 0), (-1, 0), BLANC),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -1950,72 +1863,50 @@ def generate_pdf(id_devis):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            
-            # Corps
             ('BACKGROUND', (0, 1), (-1, -1), BLANC),
             ('TEXTCOLOR', (0, 1), (-1, -1), GRIS_FONCE),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 8.5),
             ('TOPPADDING', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
-            
-            # Bordures
             ('GRID', (0, 0), (-1, -1), 0.5, GRIS_BORDURE),
             ('LINEBELOW', (0, 0), (-1, 0), 1, VERT_PROFOND),
-        ]
-        
-        tableau.setStyle(TableStyle(tableau_style))
+        ]))
         
         story.append(tableau)
         
         # ------------------------------------------------------------
-        # 4. ZONE RÉSERVÉE POUR LES TOTAUX (Étape 3)
+        # 3. PLACEHOLDER TOTAUX (Étape 3)
         # ------------------------------------------------------------
         
         story.append(Spacer(1, 15*mm))
-        
-        placeholder_totaux = Paragraph(
-            f"<i>(Total HT calculé : {total_ht:,.0f} FCFA — Étape 3 pour les totaux complets)</i>".replace(',', ' '),
-            ParagraphStyle('Placeholder2', parent=styles['Normal'],
-                          fontSize=9, textColor=GRIS_MOYEN, alignment=2)
-        )
-        story.append(placeholder_totaux)
+        story.append(Paragraph(
+            f"<i>(Total HT : {total_ht:,.0f} FCFA — Étape 3)</i>".replace(',', ' '),
+            ParagraphStyle('PH2', parent=styles['Normal'], fontSize=9, textColor=GRIS_MOYEN, alignment=2)
+        ))
         
         # ------------------------------------------------------------
-        # 5. ZONE RÉSERVÉE POUR LA SIGNATURE (Étape 4)
+        # 4. PLACEHOLDER SIGNATURE (Étape 4)
         # ------------------------------------------------------------
         
         story.append(Spacer(1, 15*mm))
-        
-        placeholder_signature = Paragraph(
+        story.append(Paragraph(
             "<i>(Zone signature — Étape 4)</i>",
-            ParagraphStyle('Placeholder3', parent=styles['Normal'],
-                          fontSize=9, textColor=GRIS_MOYEN, alignment=1)
-        )
-        story.append(placeholder_signature)
+            ParagraphStyle('PH3', parent=styles['Normal'], fontSize=9, textColor=GRIS_MOYEN, alignment=1)
+        ))
         
         # ------------------------------------------------------------
-        # 6. MESSAGE FINAL
+        # 5. MESSAGE FINAL
         # ------------------------------------------------------------
         
         story.append(Spacer(1, 10*mm))
-        
-        style_merci = ParagraphStyle(
-            'Merci',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=12,
-            textColor=VERT_PROFOND,
-            alignment=1
-        )
-        
         story.append(Paragraph("Merci pour votre confiance !", style_merci))
         
         # ============================================================
-        # CONSTRUCTION
+        # CONSTRUCTION AVEC CANVAS PERSONNALISÉ
         # ============================================================
         
-        doc.build(story)
+        doc.build(story, onFirstPage=draw_header_footer, onLaterPages=draw_header_footer)
         buffer.seek(0)
         
         return send_file(
