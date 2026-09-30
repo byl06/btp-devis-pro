@@ -1733,50 +1733,88 @@ def generate_pdf(id_devis):
             canvas.saveState()
             
             # 🔥 HEADER VERT (toute la largeur, du haut de la page)
-            canvas.setFillColor(VERT_PROFOND)
-            canvas.rect(0, page_height - header_height, page_width, header_height, fill=1, stroke=0)
-            
-            # 🔥 Titre "Devis" (blanc, grand)
-            canvas.setFillColor(BLANC)
-            canvas.setFont('Helvetica', 38)
-            canvas.drawString(20*mm, page_height - 25*mm, "Devis")
-            
-            # 🔥 Numéro devis
-            canvas.setFillColor(colors.HexColor('#D4E8DC'))
-            canvas.setFont('Helvetica', 11)
-            canvas.drawString(20*mm, page_height - 33*mm, f"N° {num_devis}")
-            
-            # 🔥 Date et Validité (à droite)
-            canvas.setFillColor(BLANC)
-            canvas.setFont('Helvetica-Bold', 10)
-            canvas.drawRightString(page_width - 20*mm, page_height - 18*mm, f"Date : {date_formatee}")
-            canvas.drawRightString(page_width - 20*mm, page_height - 25*mm, f"Validité : {validite}")
-            
-            # 🔥 FOOTER VERT (toute la largeur, en bas)
+                        # 🔥 FOOTER VERT (toute la largeur, en bas)
             canvas.setFillColor(VERT_PROFOND)
             canvas.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
             
-            # 🔥 Nom entreprise dans le footer
+            # 🔥 LOGO (à gauche, si présent)
+            logo_width = 0
+            if company_logo:
+                logo_path = os.path.join(os.path.dirname(__file__), 'uploads', company_logo)
+                if os.path.exists(logo_path):
+                    try:
+                        from reportlab.lib.utils import ImageReader
+                        img = ImageReader(logo_path)
+                        img_w, img_h = img.getSize()
+                        
+                        # Redimensionner le logo (max 80px x 80px)
+                        max_logo_size = 20*mm
+                        ratio = min(max_logo_size / img_w, max_logo_size / img_h)
+                        new_w = img_w * ratio
+                        new_h = img_h * ratio
+                        
+                        canvas.drawImage(
+                            logo_path,
+                            20*mm,
+                            footer_height - 25*mm,
+                            width=new_w,
+                            height=new_h,
+                            preserveAspectRatio=True,
+                            mask='auto'
+                        )
+                        logo_width = new_w + 5*mm
+                    except Exception as e:
+                        print(f"⚠️ Erreur logo footer: {e}")
+            
+            # 🔥 Nom de l'entreprise (à droite du logo ou à gauche si pas de logo)
             canvas.setFillColor(BLANC)
             canvas.setFont('Helvetica-Bold', 14)
-            canvas.drawString(20*mm, footer_height - 15*mm, company_name)
+            canvas.drawString(20*mm + logo_width, footer_height - 15*mm, company_name)
             
-            # 🔥 Coordonnées dans le footer
+            # 🔥 Ligne de séparation verticale (entre identité et coordonnées)
+            separator_x = 20*mm + logo_width + 60*mm
+            canvas.setStrokeColor(colors.HexColor('#7FAF91'))
+            canvas.setLineWidth(0.5)
+            canvas.line(separator_x, 10*mm, separator_x, footer_height - 10*mm)
+            
+            # 🔥 Coordonnées (à droite du séparateur)
             canvas.setFont('Helvetica', 9)
             canvas.setFillColor(colors.HexColor('#D4E8DC'))
             
-            y_pos = footer_height - 22*mm
+            y_pos = footer_height - 15*mm
             if company_phone:
-                canvas.drawString(20*mm, y_pos, f"Tél : {company_phone}")
+                canvas.drawString(separator_x + 8*mm, y_pos, f"Tél : {company_phone}")
                 y_pos -= 5*mm
             if company_email:
-                canvas.drawString(20*mm, y_pos, f"Email : {company_email}")
+                canvas.drawString(separator_x + 8*mm, y_pos, f"Email : {company_email}")
                 y_pos -= 5*mm
             if company_address:
-                canvas.drawString(20*mm, y_pos, f"Adresse : {company_address}")
+                canvas.drawString(separator_x + 8*mm, y_pos, f"Adresse : {company_address}")
                 y_pos -= 5*mm
             if company_website:
-                canvas.drawString(20*mm, y_pos, f"Site : {company_website}")
+                canvas.drawString(separator_x + 8*mm, y_pos, f"Site : {company_website}")
+            
+            # 🔥 Informations administratives (en bas du footer)
+            canvas.setFont('Helvetica', 7.5)
+            canvas.setFillColor(colors.HexColor('#B8D4C3'))
+            
+            infos_admin = []
+            nif = settings.get('nif', '')
+            rccm = settings.get('rccm', '')
+            if nif:
+                infos_admin.append(f"NIF : {nif}")
+            if rccm:
+                infos_admin.append(f"RCCM : {rccm}")
+            
+            if infos_admin:
+                admin_text = "  ·  ".join(infos_admin)
+                canvas.drawString(20*mm, 5*mm, admin_text)
+                        # 🔥 Mention BTP Devis Pro (désactivée par défaut - White Label)
+            show_branding = False  # Mettre à True pour afficher
+            if show_branding:
+                canvas.setFont('Helvetica', 6.5)
+                canvas.setFillColor(colors.HexColor('#A8C8B6'))
+                canvas.drawRightString(page_width - 20*mm, 5*mm, "Généré avec BTP Devis Pro")
             
             canvas.restoreState()
         
@@ -1947,11 +1985,158 @@ def generate_pdf(id_devis):
         # 4. PLACEHOLDER SIGNATURE (Étape 4)
         # ------------------------------------------------------------
         
+                # ------------------------------------------------------------
+        # 4. INFORMATIONS COMPLÉMENTAIRES (Projet, Description, Statut, etc.)
+        # ------------------------------------------------------------
+        
+        story.append(Spacer(1, 12*mm))
+        
+        # Style pour les titres de section
+        style_section_titre = ParagraphStyle(
+            'SectionTitre',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            textColor=VERT_PROFOND,
+            leading=12,
+            spaceAfter=4
+        )
+        
+        style_section_texte = ParagraphStyle(
+            'SectionTexte',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8.5,
+            textColor=GRIS_MOYEN,
+            leading=11
+        )
+        
+        # Récupérer les infos du projet
+        nom_projet = projet.get('nom_projet', '')
+        description_projet = projet.get('description', '')
+        localisation = projet.get('localisation', '')
+        statut_devis = devis.get('statut', 'brouillon')
+        
+        # Construire les infos complémentaires sur 2 colonnes
+        infos_gauche = []
+        infos_droite = []
+        
+        if nom_projet:
+            infos_gauche.append(Paragraph(f"<b>Projet :</b> {nom_projet}", style_section_texte))
+        
+        if description_projet:
+            infos_gauche.append(Paragraph(f"<b>Description :</b> {description_projet}", style_section_texte))
+        
+        if localisation:
+            infos_gauche.append(Paragraph(f"<b>Localisation :</b> {localisation}", style_section_texte))
+        
+        # Statut
+        infos_droite.append(Paragraph(f"<b>Statut :</b> {statut_devis.upper()}", style_section_texte))
+        
+        # Main d'œuvre si renseignée
+        # ⚠️ À adapter selon la structure réelle de tes données
+        main_oeuvre = devis.get('main_oeuvre', 0)
+        if main_oeuvre and float(main_oeuvre) > 0:
+            infos_droite.append(Paragraph(
+                f"<b>Main d'œuvre :</b> {float(main_oeuvre):,.0f} FCFA".replace(',', ' '),
+                style_section_texte
+            ))
+        
+        # Tableau à 2 colonnes pour les infos
+        if infos_gauche or infos_droite:
+            infos_complementaires = Table(
+                [[infos_gauche, infos_droite]],
+                colWidths=[largeur_utile * 0.6, largeur_utile * 0.4]
+            )
+            infos_complementaires.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ]))
+            story.append(infos_complementaires)
+        
+        # ------------------------------------------------------------
+        # 5. ZONE SIGNATURE
+        # ------------------------------------------------------------
+        
         story.append(Spacer(1, 15*mm))
-        story.append(Paragraph(
-            "<i>(Zone signature — Étape 4)</i>",
-            ParagraphStyle('PH3', parent=styles['Normal'], fontSize=9, textColor=GRIS_MOYEN, alignment=1)
-        ))
+        
+        # Titre "Bon pour accord"
+        style_bon_pour_accord = ParagraphStyle(
+            'BonPourAccord',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=11,
+            textColor=VERT_PROFOND,
+            alignment=1,
+            leading=14
+        )
+        
+        story.append(Paragraph("Bon pour accord", style_bon_pour_accord))
+        
+        story.append(Spacer(1, 4*mm))
+        
+        # Zone de signature (rectangle bordé)
+        # On utilise un tableau vide avec bordure
+        signature_zone = Table(
+            [[""]],
+            colWidths=[100*mm],
+            rowHeights=[28*mm]
+        )
+        signature_zone.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, VERT_CLAIR),
+            ('BACKGROUND', (0, 0), (-1, -1), BLANC),
+        ]))
+        
+        # Centrer la zone de signature
+        signature_container = Table(
+            [[signature_zone]],
+            colWidths=[largeur_utile]
+        )
+        signature_container.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        story.append(signature_container)
+        
+        # Texte sous la signature
+        style_sous_signature = ParagraphStyle(
+            'SousSignature',
+            parent=styles['Normal'],
+            fontName='Helvetica-Oblique',
+            fontSize=8,
+            textColor=GRIS_MOYEN,
+            alignment=1,
+            leading=10
+        )
+        story.append(Spacer(1, 3*mm))
+        story.append(Paragraph("à retourner daté et signé", style_sous_signature))
+        
+        # ------------------------------------------------------------
+        # 6. CONDITIONS (si renseignées)
+        # ------------------------------------------------------------
+        
+        conditions = devis.get('conditions', '')
+        if conditions:
+            story.append(Spacer(1, 8*mm))
+            story.append(Paragraph("<b>Conditions</b>", style_section_titre))
+            story.append(Paragraph(conditions, style_section_texte))
+        else:
+            # Conditions par défaut
+            story.append(Spacer(1, 8*mm))
+            story.append(Paragraph("<b>Conditions</b>", style_section_titre))
+            story.append(Paragraph(
+                "Devis valable 30 jours. Le commencement des travaux vaut acceptation. "
+                "Matériaux restant propriété de l'entreprise jusqu'au paiement intégral.",
+                style_section_texte
+            ))
         
         # ------------------------------------------------------------
         # 5. MESSAGE FINAL
