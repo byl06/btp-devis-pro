@@ -4,3 +4,29 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+
+# Variables d'environnement
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
