@@ -1559,8 +1559,7 @@ def generate_pdf(id_devis):
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
         from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, 
-            Image
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import mm
@@ -1639,6 +1638,13 @@ def generate_pdf(id_devis):
         company_website = settings.get('website', '')
         company_logo = settings.get('company_logo')
         
+        # Projet
+        nom_projet = projet.get('nom_projet', '')
+        description_projet = projet.get('description', '')
+        localisation_projet = projet.get('localisation', '')
+        statut_devis = devis.get('statut', 'brouillon')
+        
+        # Date
         date_creation = devis.get('date_creation', '')
         if date_creation:
             try:
@@ -1652,6 +1658,7 @@ def generate_pdf(id_devis):
         num_devis = f"{devis.get('id_devis', 0):06d}"
         validite = "30 jours"
         
+        # Lignes
         for ligne in lignes:
             ligne['prix_unitaire'] = float(ligne['prix_unitaire']) if ligne.get('prix_unitaire') else 0
             ligne['quantite'] = int(ligne['quantite']) if ligne.get('quantite') else 0
@@ -1659,23 +1666,27 @@ def generate_pdf(id_devis):
         
         total_ht = sum(l['total_ligne'] for l in lignes)
         
+        # Signature : valeur du devis > valeur des settings (par défaut True)
+        show_signature = devis.get('show_signature')
+        if show_signature is None:
+            show_signature = settings.get('show_signature', True)
+        
         # ============================================================
         # CRÉATION DU PDF
         # ============================================================
         
         buffer = io.BytesIO()
         page_width, page_height = A4
-        header_height = 35 * mm  # ← réduit de 43 à 35
-        footer_height = 45 * mm  # ← réduit de 55 à 45
+        header_height = 35 * mm
+        footer_height = 45 * mm
         
-        # 🔥 MARGES : on réserve de l'espace pour header et footer
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
             rightMargin=20*mm,
             leftMargin=20*mm,
-            topMargin=header_height + 3*mm,   # Header + petit espace
-            bottomMargin=footer_height + 3*mm  # Footer + petit espace
+            topMargin=header_height + 3*mm,
+            bottomMargin=footer_height + 3*mm
         )
         
         largeur_utile = page_width - 40*mm
@@ -1698,10 +1709,22 @@ def generate_pdf(id_devis):
             textColor=GRIS_MOYEN, leading=13
         )
         
+        style_info_projet = ParagraphStyle(
+            'InfoProjet', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=8.5,
+            textColor=GRIS_MOYEN, leading=12
+        )
+        
         style_id_client = ParagraphStyle(
             'IdClient', parent=styles['Normal'],
             fontName='Helvetica', fontSize=9,
             textColor=GRIS_MOYEN, alignment=2, leading=13
+        )
+        
+        style_statut = ParagraphStyle(
+            'Statut', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=8.5,
+            textColor=GRIS_MOYEN, alignment=2, leading=12
         )
         
         style_th = ParagraphStyle(
@@ -1719,67 +1742,62 @@ def generate_pdf(id_devis):
         style_td_center = ParagraphStyle('TDCenter', parent=style_td, alignment=1)
         style_td_right = ParagraphStyle('TDRight', parent=style_td, alignment=2)
         
+        style_section_titre = ParagraphStyle(
+            'SectionTitre', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=9,
+            textColor=VERT_PROFOND, leading=12, spaceAfter=4
+        )
+        
+        style_section_texte = ParagraphStyle(
+            'SectionTexte', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=8.5,
+            textColor=GRIS_MOYEN, leading=11
+        )
+        
+        style_bon_pour_accord = ParagraphStyle(
+            'BonPourAccord', parent=styles['Normal'],
+            fontName='Helvetica-Bold', fontSize=10,
+            textColor=VERT_PROFOND, alignment=1, leading=13
+        )
+        
         style_merci = ParagraphStyle(
             'Merci', parent=styles['Normal'],
             fontName='Helvetica-Bold', fontSize=11,
             textColor=VERT_PROFOND, alignment=1
         )
         
-        style_section_titre = ParagraphStyle(
-            'SectionTitre',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=9,
-            textColor=VERT_PROFOND,
-            leading=12,
-            spaceAfter=4
-        )
-        
-        style_section_texte = ParagraphStyle(
-            'SectionTexte',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=8.5,
-            textColor=GRIS_MOYEN,
-            leading=11
-        )
-        
         # ============================================================
-        # FONCTION POUR DESSINER HEADER + FOOTER SUR CHAQUE PAGE
+        # FONCTION HEADER + FOOTER
         # ============================================================
         
         def draw_header_footer(canvas, doc):
             canvas.saveState()
             
-            # ============================================================
-            # 🔥 HEADER VERT (toute la largeur, en haut)
-            # ============================================================
+            # ---------- HEADER ----------
             canvas.setFillColor(VERT_PROFOND)
             canvas.rect(0, page_height - header_height, page_width, header_height, fill=1, stroke=0)
             
-            # 🔥 Titre "Devis"
+            # Titre "Devis"
             canvas.setFillColor(BLANC)
-            canvas.setFont('Helvetica', 32)  # ← réduit
+            canvas.setFont('Helvetica', 32)
             canvas.drawString(20*mm, page_height - 22*mm, "Devis")
             
-            # 🔥 Numéro devis
+            # Numéro
             canvas.setFillColor(colors.HexColor('#D4E8DC'))
             canvas.setFont('Helvetica', 10)
             canvas.drawString(20*mm, page_height - 29*mm, f"N° {num_devis}")
             
-            # 🔥 Date et Validité (à droite)
+            # Date / Validité (droite)
             canvas.setFillColor(BLANC)
             canvas.setFont('Helvetica-Bold', 9)
             canvas.drawRightString(page_width - 20*mm, page_height - 16*mm, f"Date : {date_formatee}")
             canvas.drawRightString(page_width - 20*mm, page_height - 22*mm, f"Validité : {validite}")
             
-            # ============================================================
-            # 🔥 FOOTER VERT (toute la largeur, en bas)
-            # ============================================================
+            # ---------- FOOTER ----------
             canvas.setFillColor(VERT_PROFOND)
             canvas.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
             
-            # 🔥 LOGO
+            # Logo
             logo_width = 0
             if company_logo:
                 logo_path = os.path.join(os.path.dirname(__file__), 'uploads', company_logo)
@@ -1787,40 +1805,35 @@ def generate_pdf(id_devis):
                     try:
                         img = ImageReader(logo_path)
                         img_w, img_h = img.getSize()
-                        
-                        max_logo_size = 15*mm  # ← réduit
+                        max_logo_size = 15*mm
                         ratio = min(max_logo_size / img_w, max_logo_size / img_h)
                         new_w = img_w * ratio
                         new_h = img_h * ratio
-                        
                         canvas.drawImage(
                             logo_path,
                             20*mm,
                             footer_height - 20*mm,
-                            width=new_w,
-                            height=new_h,
-                            preserveAspectRatio=True,
-                            mask='auto'
+                            width=new_w, height=new_h,
+                            preserveAspectRatio=True, mask='auto'
                         )
                         logo_width = new_w + 4*mm
                     except Exception as e:
-                        print(f"⚠️ Erreur logo footer: {e}")
+                        print(f"⚠️ Erreur logo: {e}")
             
-            # 🔥 Nom entreprise
+            # Nom entreprise
             canvas.setFillColor(BLANC)
             canvas.setFont('Helvetica-Bold', 13)
             canvas.drawString(20*mm + logo_width, footer_height - 12*mm, company_name)
             
-            # 🔥 Séparateur vertical
+            # Séparateur
             separator_x = 20*mm + logo_width + 50*mm
             canvas.setStrokeColor(colors.HexColor('#7FAF91'))
             canvas.setLineWidth(0.5)
             canvas.line(separator_x, 8*mm, separator_x, footer_height - 8*mm)
             
-            # 🔥 Coordonnées
+            # Coordonnées
             canvas.setFont('Helvetica', 8.5)
             canvas.setFillColor(colors.HexColor('#D4E8DC'))
-            
             y_pos = footer_height - 12*mm
             if company_phone:
                 canvas.drawString(separator_x + 6*mm, y_pos, f"Tél : {company_phone}")
@@ -1834,10 +1847,9 @@ def generate_pdf(id_devis):
             if company_website:
                 canvas.drawString(separator_x + 6*mm, y_pos, f"Site : {company_website}")
             
-            # 🔥 Infos administratives
+            # Infos admin
             canvas.setFont('Helvetica', 7)
             canvas.setFillColor(colors.HexColor('#B8D4C3'))
-            
             infos_admin = []
             nif = settings.get('nif', '')
             rccm = settings.get('rccm', '')
@@ -1845,17 +1857,8 @@ def generate_pdf(id_devis):
                 infos_admin.append(f"NIF : {nif}")
             if rccm:
                 infos_admin.append(f"RCCM : {rccm}")
-            
             if infos_admin:
-                admin_text = "  ·  ".join(infos_admin)
-                canvas.drawString(20*mm, 4*mm, admin_text)
-            
-            # 🔥 Mention BTP Devis Pro (désactivée)
-            show_branding = False
-            if show_branding:
-                canvas.setFont('Helvetica', 6.5)
-                canvas.setFillColor(colors.HexColor('#A8C8B6'))
-                canvas.drawRightString(page_width - 20*mm, 4*mm, "Généré avec BTP Devis Pro")
+                canvas.drawString(20*mm, 4*mm, "  ·  ".join(infos_admin))
             
             canvas.restoreState()
         
@@ -1866,9 +1869,10 @@ def generate_pdf(id_devis):
         story = []
         
         # ------------------------------------------------------------
-        # 1. INFOS CLIENT
+        # 1. INFOS CLIENT + PROJET
         # ------------------------------------------------------------
         
+        # Colonne gauche : Client + Projet
         client_lines = [f"<b>{client_nom}</b>"]
         if client_telephone:
             client_lines.append(client_telephone)
@@ -1879,16 +1883,32 @@ def generate_pdf(id_devis):
         
         client_text = "<br/>".join(client_lines)
         
-        gauche_client = [
+        gauche_content = [
             Paragraph("Pour :", style_pour),
-            Paragraph(client_text, style_client_info)
-        ]
-        droite_client = [
-            Paragraph(f"ID client : {client_id}", style_id_client)
+            Paragraph(client_text, style_client_info),
         ]
         
+        # Ajouter les infos projet si présentes
+        if nom_projet or description_projet or localisation_projet:
+            gauche_content.append(Spacer(1, 4*mm))
+            if nom_projet:
+                gauche_content.append(Paragraph(f"<b>Projet :</b> {nom_projet}", style_info_projet))
+            if description_projet:
+                gauche_content.append(Paragraph(f"<b>Description :</b> {description_projet}", style_info_projet))
+            if localisation_projet:
+                gauche_content.append(Paragraph(f"<b>Localisation :</b> {localisation_projet}", style_info_projet))
+        
+        # Colonne droite : ID + Statut
+        droite_content = [
+            Paragraph(f"ID client : {client_id}", style_id_client),
+        ]
+        
+        if statut_devis:
+            droite_content.append(Spacer(1, 4*mm))
+            droite_content.append(Paragraph(f"<b>Statut :</b> {statut_devis.upper()}", style_statut))
+        
         client_table = Table(
-            [[gauche_client, droite_client]],
+            [[gauche_content, droite_content]],
             colWidths=[largeur_utile * 0.65, largeur_utile * 0.35]
         )
         client_table.setStyle(TableStyle([
@@ -1905,7 +1925,7 @@ def generate_pdf(id_devis):
         # 2. TABLEAU DES PRESTATIONS
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 10*mm))  # ← réduit de 18 à 10
+        story.append(Spacer(1, 10*mm))
         
         table_header = [
             Paragraph("<b>Détail</b>", style_th),
@@ -1940,13 +1960,13 @@ def generate_pdf(id_devis):
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
             ('ALIGN', (1, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, 0), 6),  # ← réduit
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             ('BACKGROUND', (0, 1), (-1, -1), BLANC),
             ('TEXTCOLOR', (0, 1), (-1, -1), GRIS_FONCE),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 8.5),
-            ('TOPPADDING', (0, 1), (-1, -1), 6),  # ← réduit
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
             ('GRID', (0, 0), (-1, -1), 0.5, GRIS_BORDURE),
             ('LINEBELOW', (0, 0), (-1, 0), 1, VERT_PROFOND),
@@ -1958,7 +1978,7 @@ def generate_pdf(id_devis):
         # 3. ZONE DES TOTAUX
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 6*mm))  # ← réduit de 10 à 6
+        story.append(Spacer(1, 6*mm))
         
         total_devis = float(devis.get('total', 0)) if devis.get('total') else total_ht
         tva_montant = 0
@@ -2009,114 +2029,53 @@ def generate_pdf(id_devis):
         story.append(totaux_container)
         
         # ------------------------------------------------------------
-        # 4. INFORMATIONS COMPLÉMENTAIRES
+        # 4. ZONE SIGNATURE (CONDITIONNELLE)
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 6*mm))  # ← réduit de 12 à 6
-        
-        nom_projet = projet.get('nom_projet', '')
-        description_projet = projet.get('description', '')
-        localisation = projet.get('localisation', '')
-        statut_devis = devis.get('statut', 'brouillon')
-        
-        infos_gauche = []
-        infos_droite = []
-        
-        if nom_projet:
-            infos_gauche.append(Paragraph(f"<b>Projet :</b> {nom_projet}", style_section_texte))
-        
-        if description_projet:
-            infos_gauche.append(Paragraph(f"<b>Description :</b> {description_projet}", style_section_texte))
-        
-        if localisation:
-            infos_gauche.append(Paragraph(f"<b>Localisation :</b> {localisation}", style_section_texte))
-        
-        infos_droite.append(Paragraph(f"<b>Statut :</b> {statut_devis.upper()}", style_section_texte))
-        
-        main_oeuvre = devis.get('main_oeuvre', 0)
-        if main_oeuvre and float(main_oeuvre) > 0:
-            infos_droite.append(Paragraph(
-                f"<b>Main d'œuvre :</b> {float(main_oeuvre):,.0f} FCFA".replace(',', ' '),
-                style_section_texte
-            ))
-        
-        if infos_gauche or infos_droite:
-            infos_complementaires = Table(
-                [[infos_gauche, infos_droite]],
-                colWidths=[largeur_utile * 0.6, largeur_utile * 0.4]
+        if show_signature:
+            story.append(Spacer(1, 8*mm))
+            story.append(Paragraph("Bon pour accord", style_bon_pour_accord))
+            story.append(Spacer(1, 3*mm))
+            
+            signature_zone = Table(
+                [[""]],
+                colWidths=[80*mm],
+                rowHeights=[20*mm]
             )
-            infos_complementaires.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            signature_zone.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 1, VERT_CLAIR),
+                ('BACKGROUND', (0, 0), (-1, -1), BLANC),
+            ]))
+            
+            signature_container = Table(
+                [[signature_zone]],
+                colWidths=[largeur_utile]
+            )
+            signature_container.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('LEFTPADDING', (0, 0), (-1, -1), 0),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 0),
                 ('TOPPADDING', (0, 0), (-1, -1), 0),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ]))
-            story.append(infos_complementaires)
+            
+            story.append(signature_container)
+            
+            style_sous_signature = ParagraphStyle(
+                'SousSignature', parent=styles['Normal'],
+                fontName='Helvetica-Oblique', fontSize=7.5,
+                textColor=GRIS_MOYEN, alignment=1, leading=9
+            )
+            story.append(Spacer(1, 2*mm))
+            story.append(Paragraph("à retourner daté et signé", style_sous_signature))
         
         # ------------------------------------------------------------
-        # 5. ZONE SIGNATURE
-        # ------------------------------------------------------------
-        
-        story.append(Spacer(1, 8*mm))  # ← réduit de 15 à 8
-        
-        style_bon_pour_accord = ParagraphStyle(
-            'BonPourAccord',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=10,
-            textColor=VERT_PROFOND,
-            alignment=1,
-            leading=13
-        )
-        
-        story.append(Paragraph("Bon pour accord", style_bon_pour_accord))
-        story.append(Spacer(1, 3*mm))
-        
-        # Zone de signature réduite
-        signature_zone = Table(
-            [[""]],
-            colWidths=[80*mm],   # ← réduit de 100 à 80
-            rowHeights=[20*mm]   # ← réduit de 28 à 20
-        )
-        signature_zone.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, VERT_CLAIR),
-            ('BACKGROUND', (0, 0), (-1, -1), BLANC),
-        ]))
-        
-        signature_container = Table(
-            [[signature_zone]],
-            colWidths=[largeur_utile]
-        )
-        signature_container.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        
-        story.append(signature_container)
-        
-        style_sous_signature = ParagraphStyle(
-            'SousSignature',
-            parent=styles['Normal'],
-            fontName='Helvetica-Oblique',
-            fontSize=7.5,
-            textColor=GRIS_MOYEN,
-            alignment=1,
-            leading=9
-        )
-        story.append(Spacer(1, 2*mm))
-        story.append(Paragraph("à retourner daté et signé", style_sous_signature))
-        
-        # ------------------------------------------------------------
-        # 6. CONDITIONS
+        # 5. CONDITIONS
         # ------------------------------------------------------------
         
         conditions = devis.get('conditions', '')
-        story.append(Spacer(1, 5*mm))  # ← réduit de 8 à 5
+        story.append(Spacer(1, 6*mm))
         story.append(Paragraph("<b>Conditions</b>", style_section_titre))
         if conditions:
             story.append(Paragraph(conditions, style_section_texte))
@@ -2128,10 +2087,10 @@ def generate_pdf(id_devis):
             ))
         
         # ------------------------------------------------------------
-        # 7. MESSAGE FINAL
+        # 6. MESSAGE FINAL
         # ------------------------------------------------------------
         
-        story.append(Spacer(1, 5*mm))  # ← réduit de 10 à 5
+        story.append(Spacer(1, 5*mm))
         story.append(Paragraph("Merci pour votre confiance !", style_merci))
         
         # ============================================================
@@ -2153,6 +2112,9 @@ def generate_pdf(id_devis):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+        
 # ==================== ABONNEMENT ====================
 @app.route('/api/abonnement/statut', methods=['GET'])
 @jwt_required()
@@ -2297,92 +2259,7 @@ def get_settings():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@app.route('/api/settings/import-header', methods=['POST'])
-@jwt_required()
-def import_header():
-    try:
-        user_id = get_jwt_identity()
-        user_id = int(user_id)
-        
-        if 'header_file' not in request.files:
-            return jsonify({'success': False, 'message': 'Aucun fichier'}), 400
-        
-        file = request.files['header_file']
-        if file.filename == '':
-            return jsonify({'success': False, 'message': 'Fichier vide'}), 400
-        
-        # 🔥 Vérifier l'extension (images uniquement)
-        ext = file.filename.rsplit('.', 1)[-1].lower()
-        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-        
-        if ext not in allowed_extensions:
-            return jsonify({'success': False, 'message': f'Format non supporté. Utilisez: {", ".join(allowed_extensions)}'}), 400
-        
-        # Sauvegarder le fichier
-        import os
-        from datetime import datetime
-        filename = f"header_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
-        
-        upload_folder = os.path.join(os.path.dirname(__file__), 'uploads', 'headers')
-        os.makedirs(upload_folder, exist_ok=True)
-        
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
-        print(f"✅ En-tête image sauvegardé: {filepath}")
-        
-        # 🔥 Mettre à jour dans Supabase
-        import requests
-        supabase_url = os.environ.get('SUPABASE_URL', '')
-        supabase_key = os.environ.get('SUPABASE_KEY', '')
 
-        headers = {
-            "Authorization": f"Bearer {supabase_key}",
-            "apikey": supabase_key,
-            "Content-Type": "application/json"
-        }
-        
-        # Vérifier si settings existe
-        check_response = requests.get(
-            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
-            headers=headers
-        )
-        
-        if check_response.status_code == 200 and check_response.json():
-            # Mettre à jour
-            update_data = {
-                "custom_header": filename,
-                "updated_at": datetime.now().isoformat()
-            }
-            response = requests.patch(
-                f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
-                headers=headers,
-                json=update_data
-            )
-        else:
-            # Créer les settings
-            settings_data = {
-                "id_user": user_id,
-                "custom_header": filename,
-                "company_name": "Mon Entreprise",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            response = requests.post(
-                f"{supabase_url}/rest/v1/settings",
-                headers=headers,
-                json=settings_data
-            )
-        
-        if response.status_code in [200, 201, 204]:
-            return jsonify({'success': True, 'message': 'En-tête image importé avec succès'})
-        else:
-            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
-        
-    except Exception as e:
-        print(f"❌ Erreur import_header: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)}), 500
     
 
 @app.route('/api/preview-imported-header', methods=['GET'])
