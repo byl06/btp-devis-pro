@@ -5682,6 +5682,17 @@ def admin_changer_offre(id_user):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/test-version', methods=['GET'])
+def test_version():
+    return jsonify({
+        'version': 'v2-paiement',
+        'timestamp': '2026-10-05',
+        'routes_paiement': [
+            str(rule) for rule in app.url_map.iter_rules() 
+            if 'paiement' in str(rule)
+        ]
+    })
+
 @app.route('/api/admin/abonnement/<int:id_user>/suspendre', methods=['POST'])
 @jwt_required()
 def admin_suspendre_abonnement(id_user):
