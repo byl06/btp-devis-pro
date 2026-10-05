@@ -5577,76 +5577,79 @@ def initier_paiement():
 @app.route('/api/paiement/webhook', methods=['POST'])
 def webhook_fedapay():
     try:
-        # 🔥 LOG DU PAYLOAD COMPLET
-        print("=" * 60)
-        print("🔔 WEBHOOK REÇU")
-        print("=" * 60)
-        print(f"📋 Headers: {dict(request.headers)}")
-        print(f"📋 Body brut: {request.get_data(as_text=True)}")
-        print(f"📋 JSON: {request.json}")
-        print("=" * 60)
-        # 1. Récupérer les données du webhook
+        # 🔥 Récupérer le payload
         event = request.json
         event_type = event.get('name')
-        event_data = event.get('data', {})
+        entity = event.get('entity', {})  # 🔥 Les données sont dans 'entity' !
         
         print(f"🔔 Webhook reçu: {event_type}")
-        print(f"🔔 Data: {event_data}")
         
-        # 2. Extraire l'ID de la transaction
-        transaction_id = event_data.get('id')
+        # 🔥 Extraire les données depuis 'entity'
+        transaction_id = entity.get('id')
+        reference = entity.get('reference')
+        montant = entity.get('amount')
+        description = entity.get('description', '')
+        statut = entity.get('status')
+        
+        # Récupérer l'email du client
+        customer = entity.get('customer', {})
+        customer_email = customer.get('email', '')
+        
+        print(f"🔍 Transaction ID: {transaction_id}")
+        print(f"🔍 Statut: {statut}")
+        print(f"🔍 Email client: {customer_email}")
+        print(f"🔍 Montant: {montant}")
         
         if not transaction_id:
             print("❌ Pas d'ID de transaction")
             return jsonify({'error': 'ID manquant'}), 400
         
-        # 3. Vérifier le statut directement auprès de FedaPay
-        # 🔥 C'est la méthode la plus fiable
-        fedapay_key = os.environ.get('FEDAPAY_SECRET_KEY')
-        
-        fedapay_response = requests.get(
-            f"https://sandbox-api.fedapay.com/v1/transactions/{transaction_id}",
-            headers={
-                "Authorization": f"Bearer {fedapay_key}",
-                "Content-Type": "application/json"
-            }
-        )
-        
-        if fedapay_response.status_code != 200:
-            print(f"❌ Erreur vérification FedaPay: {fedapay_response.text}")
-            return jsonify({'error': 'Transaction non trouvée'}), 404
-        
-        fedapay_data = fedapay_response.json()
-        transaction = fedapay_data.get('v1/transaction', fedapay_data)
-        
-        statut_fedapay = transaction.get('status')
-        reference = transaction.get('reference')
-        montant = transaction.get('amount')
-        description = transaction.get('description', '')
-        customer_email = ''
-        
-        # Récupérer l'email du customer
-        customer_id = transaction.get('customer_id')
-        if customer_id:
-            customer_response = requests.get(
-                f"https://sandbox-api.fedapay.com/v1/customers/{customer_id}",
-                headers={"Authorization": f"Bearer {fedapay_key}"}
-            )
-            if customer_response.status_code == 200:
-                customer_data = customer_response.json()
-                customer = customer_data.get('v1/customer', customer_data)
-                customer_email = customer.get('email', '')
-        
-        print(f"🔍 Statut FedaPay confirmé: {statut_fedapay}")
-        print(f"🔍 Reference: {reference}")
-        print(f"🔍 Email: {customer_email}")
-        
         # 4. Si le paiement est approuvé, activer l'abonnement
-        if statut_fedapay == 'approved':
+        if statut == 'approved' and customer_email:
             # Trouver l'utilisateur par email
-            if customer_email:
-                user_response = requests.get(
-                    f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?email=eq.{customer_email}",
+            user_response = requests.get(
+                f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?email=eq.{customer_email}",
+                headers={
+                    "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                    "apikey": os.environ.get('SUPABASE_KEY'),
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            if user_response.status_code == 200 and user_response.json():
+                user = user_response.json()[0]
+                user_id = user.get('id_user')
+                
+                print(f"👤 Utilisateur trouvé: {user_id}")
+                
+                # Extraire l'offre depuis la description
+                offre = 'starter'  # Par défaut
+                description_lower = description.lower()
+                if 'artisan' in description_lower:
+                    offre = 'artisan'
+                elif 'pro' in description_lower:
+                    offre = 'pro'
+                elif 'annuel' in description_lower or 'annuelle' in description_lower:
+                    offre = 'annuel'
+                elif 'starter' in description_lower:
+                    offre = 'starter'
+                
+                # Calculer la durée
+                durees = {
+                    'artisan': 30,
+                    'starter': 30,
+                    'pro': 30,
+                    'annuel': 365
+                }
+                jours = durees.get(offre, 30)
+                
+                from datetime import datetime, timedelta
+                date_debut = datetime.now()
+                date_fin = date_debut + timedelta(days=jours)
+                
+                # Vérifier si l'utilisateur a déjà un abonnement
+                abo_response = requests.get(
+                    f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_user=eq.{user_id}",
                     headers={
                         "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
                         "apikey": os.environ.get('SUPABASE_KEY'),
@@ -5654,83 +5657,47 @@ def webhook_fedapay():
                     }
                 )
                 
-                if user_response.status_code == 200 and user_response.json():
-                    user = user_response.json()[0]
-                    user_id = user.get('id_user')
-                    
-                    # Extraire l'offre depuis la description
-                    offre = 'starter'  # Par défaut
-                    if 'artisan' in description.lower():
-                        offre = 'artisan'
-                    elif 'pro' in description.lower():
-                        offre = 'pro'
-                    elif 'annuel' in description.lower() or 'annuelle' in description.lower():
-                        offre = 'annuel'
-                    
-                    # Calculer la durée
-                    durees = {
-                        'artisan': 30,
-                        'starter': 30,
-                        'pro': 30,
-                        'annuel': 365
-                    }
-                    jours = durees.get(offre, 30)
-                    
-                    from datetime import datetime, timedelta
-                    date_fin = datetime.now() + timedelta(days=jours)
-                    
-                    # Vérifier si l'utilisateur a déjà un abonnement
-                    abo_response = requests.get(
-                        f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_user=eq.{user_id}",
-                        headers={
-                            "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
-                            "apikey": os.environ.get('SUPABASE_KEY'),
-                            "Content-Type": "application/json"
+                abo_headers = {
+                    "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                    "apikey": os.environ.get('SUPABASE_KEY'),
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation"
+                }
+                
+                if abo_response.status_code == 200 and abo_response.json():
+                    # Mettre à jour l'abonnement existant
+                    abo_id = abo_response.json()[0].get('id_abonnement')
+                    update_response = requests.patch(
+                        f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_abonnement=eq.{abo_id}",
+                        headers=abo_headers,
+                        json={
+                            "statut": "actif",
+                            "date_debut": date_debut.isoformat(),
+                            "date_fin": date_fin.isoformat(),
+                            "type_abonnement": offre
                         }
                     )
-                    
-                    if abo_response.status_code == 200 and abo_response.json():
-                        # Mettre à jour
-                        abo_id = abo_response.json()[0].get('id_abonnement')
-                        requests.patch(
-                            f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_abonnement=eq.{abo_id}",
-                            headers={
-                                "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
-                                "apikey": os.environ.get('SUPABASE_KEY'),
-                                "Content-Type": "application/json"
-                            },
-                            json={
-                                "statut": "actif",
-                                "date_fin": date_fin.isoformat(),
-                                "type_abonnement": offre
-                            }
-                        )
-                    else:
-                        # Créer
-                        requests.post(
-                            f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements",
-                            headers={
-                                "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
-                                "apikey": os.environ.get('SUPABASE_KEY'),
-                                "Content-Type": "application/json"
-                            },
-                            json={
-                                "id_user": user_id,
-                                "statut": "actif",
-                                "date_debut": datetime.now().isoformat(),
-                                "date_fin": date_fin.isoformat(),
-                                "type_abonnement": offre
-                            }
-                        )
-                    
-                    # Enregistrer la transaction
+                    print(f"✅ Abonnement {offre} mis à jour pour user {user_id}")
+                else:
+                    # Créer un nouvel abonnement
+                    create_response = requests.post(
+                        f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements",
+                        headers=abo_headers,
+                        json={
+                            "id_user": user_id,
+                            "statut": "actif",
+                            "date_debut": date_debut.isoformat(),
+                            "date_fin": date_fin.isoformat(),
+                            "type_abonnement": offre
+                        }
+                    )
+                    print(f"✅ Abonnement {offre} créé pour user {user_id}")
+                
+                # Enregistrer la transaction dans Supabase
+                try:
                     requests.post(
                         f"{os.environ.get('SUPABASE_URL')}/rest/v1/transactions_fedapay",
-                        headers={
-                            "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
-                            "apikey": os.environ.get('SUPABASE_KEY'),
-                            "Content-Type": "application/json"
-                        },
+                        headers=abo_headers,
                         json={
                             "id_user": user_id,
                             "transaction_id": str(transaction_id),
@@ -5740,10 +5707,12 @@ def webhook_fedapay():
                             "reference": reference
                         }
                     )
-                    
-                    print(f"✅ Abonnement {offre} activé pour user {user_id}")
-                else:
-                    print(f"⚠️ Utilisateur non trouvé: {customer_email}")
+                    print(f"💾 Transaction enregistrée dans Supabase")
+                except Exception as e:
+                    print(f"⚠️ Erreur enregistrement transaction: {e}")
+                
+            else:
+                print(f"⚠️ Utilisateur non trouvé: {customer_email}")
         
         return jsonify({'received': True}), 200
         
