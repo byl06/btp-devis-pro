@@ -5637,6 +5637,57 @@ def webhook_fedapay():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+# ============================================================
+# PAGE CALLBACK FEDAPAY
+# ============================================================
+
+@app.route('/paiement/callback')
+def paiement_callback():
+    """Page de retour après paiement FedaPay"""
+    from flask import send_from_directory
+    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    return send_from_directory(frontend_path, 'paiement-callback.html')
+
+
+@app.route('/api/paiement/verifier/<int:transaction_id>', methods=['GET'])
+@jwt_required()
+def verifier_paiement(transaction_id):
+    """Vérifie le statut d'une transaction FedaPay"""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        fedapay_key = os.environ.get('FEDAPAY_SECRET_KEY')
+        
+        # Appeler FedaPay pour vérifier le statut
+        response = requests.get(
+            f"https://sandbox-api.fedapay.com/v1/transactions/{transaction_id}",
+            headers={
+                "Authorization": f"Bearer {fedapay_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'message': 'Transaction non trouvée'
+            }), 404
+        
+        data = response.json()
+        transaction = data.get('v1/transaction', data)
+        
+        return jsonify({
+            'success': True,
+            'statut': transaction.get('status'),
+            'reference': transaction.get('reference'),
+            'montant': transaction.get('amount'),
+            'offre': transaction.get('description', '')
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur verifier_paiement: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/api/db-reset', methods=['POST'])
