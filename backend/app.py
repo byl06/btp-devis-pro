@@ -22,6 +22,8 @@ from flask_limiter.util import get_remote_address
 from flask_jwt_extended import create_access_token, set_access_cookies, unset_jwt_cookies
 import os
 import re
+import hmac
+import hashlib
 from dotenv import load_dotenv
 import os
 
@@ -5466,6 +5468,177 @@ def marquer_notification_lue(id_notification):
         print(f"❌ Erreur: {e}")
         return jsonify({'error': str(e)}), 500
     
+
+@app.route('/api/paiement/initier', methods=['POST'])
+@jwt_required()
+def initier_paiement():
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        data = request.json
+        
+        # 1. Récupérer l'offre choisie
+        offre = data.get('offre')  # artisan, starter, pro, annuel
+        montant = data.get('montant')  # Montant en FCFA
+        description = data.get('description', f'Abonnement {offre}')
+        
+        if not offre or not montant:
+            return jsonify({'success': False, 'message': 'Offre et montant requis'}), 400
+        
+        # 2. Récupérer les infos utilisateur pour le customer
+        user_response = requests.get(
+            f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?id_user=eq.{user_id}",
+            headers={
+                "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                "apikey": os.environ.get('SUPABASE_KEY'),
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if user_response.status_code != 200 or not user_response.json():
+            return jsonify({'success': False, 'message': 'Utilisateur non trouvé'}), 404
+        
+        user = user_response.json()[0]
+        
+        # 3. Créer la transaction sur FedaPay
+        fedapay_url = "https://sandbox-api.fedapay.com/v1/transactions"
+        fedapay_key = os.environ.get('FEDAPAY_SECRET_KEY')
+        
+        transaction_data = {
+            "description": description,
+            "amount": int(montant),
+            "currency": {"iso": "XOF"},
+            "callback_url": "https://btp-devis-pro-1.onrender.com/paiement/callback",
+            "customer": {
+                "firstname": user.get('nom', 'Client'),
+                "lastname": "",
+                "email": user.get('email', ''),
+                "phone_number": {
+                    "number": user.get('telephone', ''),
+                    "country": "bj"
+                }
+            }
+        }
+        
+        print(f"🔍 Création transaction FedaPay: {transaction_data}")
+        
+        transaction_response = requests.post(
+            fedapay_url,
+            headers={
+                "Authorization": f"Bearer {fedapay_key}",
+                "Content-Type": "application/json"
+            },
+            json=transaction_data
+        )
+        
+        print(f"🔍 Réponse FedaPay: {transaction_response.status_code}")
+        print(f"🔍 {transaction_response.text}")
+        
+        if transaction_response.status_code not in [200, 201]:
+            return jsonify({
+                'success': False, 
+                'message': f'Erreur FedaPay: {transaction_response.text}'
+            }), 500
+        
+        transaction = transaction_response.json()
+        transaction_id = transaction.get('id')
+        
+        # 4. Générer le token de paiement
+        token_url = f"https://sandbox-api.fedapay.com/v1/transactions/{transaction_id}/token"
+        
+        token_response = requests.post(
+            token_url,
+            headers={
+                "Authorization": f"Bearer {fedapay_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if token_response.status_code not in [200, 201]:
+            return jsonify({
+                'success': False, 
+                'message': f'Erreur token: {token_response.text}'
+            }), 500
+        
+        token_data = token_response.json()
+        
+        return jsonify({
+            'success': True,
+            'transaction_id': transaction_id,
+            'token': token_data.get('token'),
+            'url': token_data.get('url'),
+            'message': 'Transaction créée avec succès'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur initier_paiement: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/paiement/webhook', methods=['POST'])
+def webhook_fedapay():
+    try:
+        # 1. Récupérer la signature
+        signature = request.headers.get('X-FEDAPAY-SIGNATURE')
+        webhook_secret = os.environ.get('FEDAPAY_WEBHOOK_SECRET')
+        
+        if not signature:
+            print("❌ Webhook sans signature")
+            return jsonify({'error': 'Signature manquante'}), 401
+        
+        # 2. Vérifier la signature
+        import hmac
+        import hashlib
+        
+        payload = request.get_data()
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(signature, expected_signature):
+            print("❌ Signature invalide")
+            return jsonify({'error': 'Signature invalide'}), 401
+        
+        # 3. Traiter l'événement
+        event = request.json
+        event_type = event.get('name')
+        event_data = event.get('data', {})
+        
+        print(f"🔔 Webhook reçu: {event_type}")
+        print(f"🔔 Data: {event_data}")
+        
+        if event_type == 'transaction.approved':
+            # Paiement réussi
+            transaction_id = event_data.get('id')
+            merchant_reference = event_data.get('merchant_reference')
+            
+            # Extraire l'user_id de la référence (ex: "user_5_offre_pro")
+            # On va utiliser custom_metadata ou merchant_reference
+            
+            # Mettre à jour l'abonnement dans Supabase
+            # ...
+            
+            print(f"✅ Paiement approuvé: {transaction_id}")
+            
+        elif event_type == 'transaction.declined':
+            print(f"❌ Paiement refusé: {event_data.get('id')}")
+            
+        elif event_type == 'transaction.canceled':
+            print(f"⚠️ Paiement annulé: {event_data.get('id')}")
+            
+        elif event_type == 'transaction.expired':
+            print(f"⏰ Paiement expiré: {event_data.get('id')}")
+        
+        return jsonify({'received': True}), 200
+        
+    except Exception as e:
+        print(f"❌ Erreur webhook: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/db-reset', methods=['POST'])
