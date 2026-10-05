@@ -5478,14 +5478,14 @@ def initier_paiement():
         data = request.json
         
         # 1. Récupérer l'offre choisie
-        offre = data.get('offre')  # artisan, starter, pro, annuel
-        montant = data.get('montant')  # Montant en FCFA
+        offre = data.get('offre')
+        montant = data.get('montant')
         description = data.get('description', f'Abonnement {offre}')
         
         if not offre or not montant:
             return jsonify({'success': False, 'message': 'Offre et montant requis'}), 400
         
-        # 2. Récupérer les infos utilisateur pour le customer
+        # 2. Récupérer les infos utilisateur
         user_response = requests.get(
             f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?id_user=eq.{user_id}",
             headers={
@@ -5541,32 +5541,30 @@ def initier_paiement():
             }), 500
         
         transaction = transaction_response.json()
-        transaction_id = transaction.get('id')
         
-        # 4. Générer le token de paiement
-        token_url = f"https://sandbox-api.fedapay.com/v1/transactions/{transaction_id}/token"
+        # 🔥 FedaPay enveloppe la réponse dans 'v1/transaction'
+        transaction_info = transaction.get('v1/transaction', transaction)
         
-        token_response = requests.post(
-            token_url,
-            headers={
-                "Authorization": f"Bearer {fedapay_key}",
-                "Content-Type": "application/json"
-            }
-        )
+        transaction_id = transaction_info.get('id')
+        payment_token = transaction_info.get('payment_token')
+        payment_url = transaction_info.get('payment_url')
+        reference = transaction_info.get('reference')
         
-        if token_response.status_code not in [200, 201]:
+        print(f"🔍 Transaction ID: {transaction_id}")
+        print(f"🔍 Payment URL: {payment_url}")
+        
+        if not payment_url:
             return jsonify({
                 'success': False, 
-                'message': f'Erreur token: {token_response.text}'
+                'message': 'URL de paiement non reçue de FedaPay'
             }), 500
-        
-        token_data = token_response.json()
         
         return jsonify({
             'success': True,
             'transaction_id': transaction_id,
-            'token': token_data.get('token'),
-            'url': token_data.get('url'),
+            'reference': reference,
+            'token': payment_token,
+            'url': payment_url,
             'message': 'Transaction créée avec succès'
         })
         
