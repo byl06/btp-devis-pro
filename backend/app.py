@@ -5580,9 +5580,11 @@ def webhook_fedapay():
         # 🔥 Récupérer le payload
         event = request.json
         event_type = event.get('name')
-        entity = event.get('entity', {})  # 🔥 Les données sont dans 'entity' !
+        entity = event.get('entity', {})  # 🔥 Les données sont dans 'entity'
         
+        print("=" * 60)
         print(f"🔔 Webhook reçu: {event_type}")
+        print("=" * 60)
         
         # 🔥 Extraire les données depuis 'entity'
         transaction_id = entity.get('id')
@@ -5604,8 +5606,32 @@ def webhook_fedapay():
             print("❌ Pas d'ID de transaction")
             return jsonify({'error': 'ID manquant'}), 400
         
-        # 4. Si le paiement est approuvé, activer l'abonnement
+        # ============================================================
+        # 🔥 VÉRIFIER SI LA TRANSACTION A DÉJÀ ÉTÉ TRAITÉE
+        # ============================================================
+        
+        check_response = requests.get(
+            f"{os.environ.get('SUPABASE_URL')}/rest/v1/transactions_fedapay?transaction_id=eq.{transaction_id}",
+            headers={
+                "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                "apikey": os.environ.get('SUPABASE_KEY'),
+                "Content-Type": "application/json"
+            }
+        )
+        
+        if check_response.status_code == 200 and check_response.json():
+            print(f"⏭️ Transaction {transaction_id} déjà traitée, ignorée")
+            return jsonify({'received': True, 'message': 'Déjà traitée'}), 200
+        
+        print(f"🆕 Nouvelle transaction: {transaction_id}")
+        
+        # ============================================================
+        # TRAITEMENT DU PAIEMENT
+        # ============================================================
+        
+        # Si le paiement est approuvé, activer l'abonnement
         if statut == 'approved' and customer_email:
+            
             # Trouver l'utilisateur par email
             user_response = requests.get(
                 f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?email=eq.{customer_email}",
@@ -5647,22 +5673,19 @@ def webhook_fedapay():
                 date_debut = datetime.now()
                 date_fin = date_debut + timedelta(days=jours)
                 
-                # Vérifier si l'utilisateur a déjà un abonnement
-                abo_response = requests.get(
-                    f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_user=eq.{user_id}",
-                    headers={
-                        "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
-                        "apikey": os.environ.get('SUPABASE_KEY'),
-                        "Content-Type": "application/json"
-                    }
-                )
-                
+                # Headers pour Supabase
                 abo_headers = {
                     "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
                     "apikey": os.environ.get('SUPABASE_KEY'),
                     "Content-Type": "application/json",
                     "Prefer": "return=representation"
                 }
+                
+                # Vérifier si l'utilisateur a déjà un abonnement
+                abo_response = requests.get(
+                    f"{os.environ.get('SUPABASE_URL')}/rest/v1/abonnements?id_user=eq.{user_id}",
+                    headers=abo_headers
+                )
                 
                 if abo_response.status_code == 200 and abo_response.json():
                     # Mettre à jour l'abonnement existant
@@ -5695,24 +5718,89 @@ def webhook_fedapay():
                 
                 # Enregistrer la transaction dans Supabase
                 try:
-                    requests.post(
+                    transaction_data = {
+                        "id_user": user_id,
+                        "transaction_id": str(transaction_id),
+                        "offre": offre,
+                        "montant": montant,
+                        "statut": "approved",
+                        "reference": reference
+                    }
+                    
+                    trans_response = requests.post(
                         f"{os.environ.get('SUPABASE_URL')}/rest/v1/transactions_fedapay",
                         headers=abo_headers,
-                        json={
-                            "id_user": user_id,
-                            "transaction_id": str(transaction_id),
-                            "offre": offre,
-                            "montant": montant,
-                            "statut": "approved",
-                            "reference": reference
-                        }
+                        json=transaction_data
                     )
-                    print(f"💾 Transaction enregistrée dans Supabase")
+                    
+                    if trans_response.status_code in [200, 201]:
+                        print(f"💾 Transaction enregistrée dans Supabase")
+                    else:
+                        print(f"⚠️ Erreur enregistrement transaction: {trans_response.text}")
                 except Exception as e:
                     print(f"⚠️ Erreur enregistrement transaction: {e}")
                 
+                # Envoyer une notification à l'utilisateur
+                try:
+                    notification_data = {
+                        "id_user": user_id,
+                        "message": f"✅ Votre abonnement {offre} a été activé avec succès !",
+                        "type": "paiement",
+                        "date_creation": datetime.now().isoformat()
+                    }
+                    requests.post(
+                        f"{os.environ.get('SUPABASE_URL')}/rest/v1/notifications",
+                        headers=abo_headers,
+                        json=notification_data
+                    )
+                    print(f"📬 Notification envoyée à user {user_id}")
+                except Exception as e:
+                    print(f"⚠️ Erreur notification: {e}")
+                
             else:
                 print(f"⚠️ Utilisateur non trouvé: {customer_email}")
+        
+        elif statut == 'declined':
+            print(f"❌ Paiement refusé: {transaction_id}")
+            
+            # Enregistrer la transaction échouée
+            try:
+                if customer_email:
+                    user_response = requests.get(
+                        f"{os.environ.get('SUPABASE_URL')}/rest/v1/utilisateur?email=eq.{customer_email}",
+                        headers={
+                            "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                            "apikey": os.environ.get('SUPABASE_KEY'),
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    if user_response.status_code == 200 and user_response.json():
+                        user_id = user_response.json()[0].get('id_user')
+                        
+                        requests.post(
+                            f"{os.environ.get('SUPABASE_URL')}/rest/v1/transactions_fedapay",
+                            headers={
+                                "Authorization": f"Bearer {os.environ.get('SUPABASE_KEY')}",
+                                "apikey": os.environ.get('SUPABASE_KEY'),
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "id_user": user_id,
+                                "transaction_id": str(transaction_id),
+                                "offre": 'starter',
+                                "montant": montant,
+                                "statut": "declined",
+                                "reference": reference
+                            }
+                        )
+            except Exception as e:
+                print(f"⚠️ Erreur enregistrement: {e}")
+        
+        elif statut == 'canceled':
+            print(f"⚠️ Paiement annulé: {transaction_id}")
+        
+        elif statut == 'expired':
+            print(f"⏰ Paiement expiré: {transaction_id}")
         
         return jsonify({'received': True}), 200
         
