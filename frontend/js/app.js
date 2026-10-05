@@ -569,6 +569,17 @@ async openDevisRapide() {
                         </div>
                     </div>
                     
+                                        <!-- 🔥 Option zone de signature -->
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:1rem; padding:0.75rem; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
+                        <input type="checkbox" 
+                               id="rapide-devis-show-signature" 
+                               ${this.currentSettings?.show_signature !== false ? 'checked' : ''} 
+                               style="width:18px; height:18px; cursor:pointer; accent-color:#10B981;">
+                        <label for="rapide-devis-show-signature" style="cursor:pointer; margin:0; font-size:0.9rem; color:white;">
+                            Ajouter une zone de signature
+                        </label>
+                    </div>
+                    
                     <div class="form-actions" style="margin-top:1.5rem;">
                         <button type="submit" class="btn-primary" style="width:100%; padding:12px;">
                             <i class="fas fa-file-invoice"></i> Générer le devis
@@ -758,7 +769,10 @@ async openDevisRapide() {
         const id_client = modal.querySelector('#rapide-client').value;
         const id_projet = modal.querySelector('#rapide-projet').value;
         
-        let payload = { lignes: [] };
+        let payload = { 
+            lignes: [],
+            show_signature: modal.querySelector('#rapide-devis-show-signature').checked  // 🔥 AJOUTER
+        };
         
         // Client
         if (id_client === 'new') {
