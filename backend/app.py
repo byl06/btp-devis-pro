@@ -5577,6 +5577,14 @@ def initier_paiement():
 @app.route('/api/paiement/webhook', methods=['POST'])
 def webhook_fedapay():
     try:
+        # 🔥 LOG DU PAYLOAD COMPLET
+        print("=" * 60)
+        print("🔔 WEBHOOK REÇU")
+        print("=" * 60)
+        print(f"📋 Headers: {dict(request.headers)}")
+        print(f"📋 Body brut: {request.get_data(as_text=True)}")
+        print(f"📋 JSON: {request.json}")
+        print("=" * 60)
         # 1. Récupérer les données du webhook
         event = request.json
         event_type = event.get('name')
