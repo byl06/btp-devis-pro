@@ -147,6 +147,10 @@ class BTPDevisApp {
 setTimeout(() => {
     this.showAbonnementNotification();
 }, 3000);
+// Vérifier les nouvelles actualités
+setTimeout(() => {
+    this.verifierNouvellesActualites();
+}, 2000);
     }
     
    updateUserInfo() {
@@ -345,6 +349,10 @@ async saveHeaderSettings() {
                     pageTitle.textContent = 'Factures';
                     contentArea.innerHTML = await this.renderFactures();
                     break;
+                case 'actualites':
+    pageTitle.textContent = 'Actualités';
+    contentArea.innerHTML = await this.renderActualites();
+    break;
 
                 case 'admin':
     pageTitle.textContent = 'Administration';
@@ -3395,6 +3403,7 @@ renderOffresPaiement() {
         </div>
     `;
 }
+
 // ============================================================
 // PAIEMENT AVEC FEDAPAY
 // ============================================================
@@ -3457,6 +3466,122 @@ async payerAvecFedapay(offre, montant) {
     } catch (error) {
         console.error('❌ Erreur payerAvecFedapay:', error);
         Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// ============================================================
+// PAGE ACTUALITÉS
+// ============================================================
+
+async renderActualites() {
+    try {
+        const response = await fetch('https://btp-devis-pro-1.onrender.com/api/actualites');
+        const actualites = await response.json();
+        
+        const isAdmin = this.currentUser && 
+                       (this.currentUser.email === 'admin@btp.com' || 
+                        this.currentUser.email === 'bylgaitb@gmail.com');
+        
+        // Marquer comme lues
+        localStorage.setItem('actualites_derniere_lecture', new Date().toISOString());
+        const badge = document.getElementById('actualites-badge');
+        if (badge) badge.style.display = 'none';
+        
+        if (!actualites || actualites.length === 0) {
+            return `
+                <div class="glass-card" style="text-align:center; padding:60px;">
+                    <i class="fas fa-newspaper" style="font-size:48px; opacity:0.3; margin-bottom:1rem; display:block;"></i>
+                    <h3>Aucune actualité</h3>
+                    <p style="color:#94A3B8;">Revenez plus tard pour découvrir les nouveautés.</p>
+                </div>
+            `;
+        }
+        
+        // Types d'actualités
+        const typeLabels = {
+            'info': 'ℹ️ Information',
+            'feature': '🎉 Nouveauté',
+            'coming': '🚀 À venir',
+            'maintenance': '🔧 Maintenance',
+            'alert': '⚠️ Important'
+        };
+        
+        return `
+            <div class="page-content">
+                <!-- En-tête -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                    <div>
+                        <h3 style="font-weight:600;"><i class="fas fa-newspaper" style="color:#06B6D4;"></i> Actualités</h3>
+                        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
+                            ${actualites.length} actualité${actualites.length > 1 ? 's' : ''}
+                        </p>
+                    </div>
+                    ${isAdmin ? `
+                        <button class="btn-primary" onclick="app.openCreateActualiteModal()" style="background:linear-gradient(135deg, #06B6D4, #0891B2);">
+                            <i class="fas fa-plus"></i> Nouvelle actualité
+                        </button>
+                    ` : ''}
+                </div>
+                
+                <!-- Liste des actualités -->
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    ${actualites.map(a => {
+                        const couleur = a.couleur || '#06B6D4';
+                        const icon = a.icon || 'fa-newspaper';
+                        const typeLabel = typeLabels[a.type] || typeLabels['info'];
+                        
+                        const date = new Date(a.date_publication);
+                        const dateFormatee = date.toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        });
+                        
+                        return `
+                            <div class="glass-card" style="border-left:4px solid ${couleur}; position:relative;">
+                                <div style="display:flex; gap:1rem; align-items:flex-start;">
+                                    <div style="width:50px; height:50px; background:${couleur}22; border-radius:12px; display:flex; align-items:center; justify-content:center; color:${couleur}; flex-shrink:0;">
+                                        <i class="fas ${icon}" style="font-size:1.2rem;"></i>
+                                    </div>
+                                    <div style="flex:1;">
+                                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+                                            <div style="flex:1;">
+                                                <span style="display:inline-block; font-size:0.7rem; color:${couleur}; background:${couleur}15; padding:2px 10px; border-radius:12px; margin-bottom:6px;">
+                                                    ${typeLabel}
+                                                </span>
+                                                <h4 style="font-weight:600; font-size:1.05rem; margin-bottom:4px;">
+                                                    ${this.escapeHtml(a.titre)}
+                                                </h4>
+                                                <p style="font-size:0.8rem; color:#94A3B8; margin-bottom:10px;">
+                                                    <i class="fas fa-calendar"></i> ${dateFormatee}
+                                                </p>
+                                                <p style="font-size:0.9rem; color:#CBD5E1; line-height:1.6;">
+                                                    ${this.escapeHtml(a.contenu)}
+                                                </p>
+                                            </div>
+                                            ${isAdmin ? `
+                                                <div style="display:flex; gap:4px; flex-shrink:0;">
+                                                    <button class="btn-icon" onclick="app.editActualite(${a.id_actualite})" title="Modifier" style="background:#F59E0B;color:white;">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn-icon" onclick="app.deleteActualite(${a.id_actualite})" title="Supprimer" style="background:#EF4444;color:white;">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('❌ Erreur renderActualites:', error);
+        return '<div class="glass-card">❌ Erreur chargement des actualités</div>';
     }
 }
 
@@ -4854,6 +4979,59 @@ async fetchNotifications() {
     } catch (error) {
         console.error("Erreur fetchNotifications:", error);
         return [];
+    }
+}
+
+// ============================================================
+// VÉRIFIER LES NOUVELLES ACTUALITÉS
+// ============================================================
+
+async verifierNouvellesActualites() {
+    try {
+        const response = await fetch('https://btp-devis-pro-1.onrender.com/api/actualites');
+        const actualites = await response.json();
+        
+        if (!actualites || actualites.length === 0) return;
+        
+        // Dernière lecture
+        const derniereLecture = localStorage.getItem('actualites_derniere_lecture');
+        
+        if (!derniereLecture) {
+            // Jamais lu → afficher le badge avec le nombre total
+            this.updateActualitesBadge(actualites.length);
+            return;
+        }
+        
+        // Compter les nouvelles actualités
+        const derniereLectureDate = new Date(derniereLecture);
+        const nouvelles = actualites.filter(a => 
+            new Date(a.date_publication) > derniereLectureDate
+        );
+        
+        if (nouvelles.length > 0) {
+            this.updateActualitesBadge(nouvelles.length);
+        } else {
+            this.updateActualitesBadge(0);
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur verifierNouvellesActualites:', error);
+    }
+}
+
+// ============================================================
+// METTRE À JOUR LE BADGE
+// ============================================================
+
+updateActualitesBadge(count) {
+    const badge = document.getElementById('actualites-badge');
+    if (!badge) return;
+    
+    if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
     }
 }
 // Afficher les notifications au chargement
