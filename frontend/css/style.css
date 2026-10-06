@@ -1130,6 +1130,7 @@ h4 {
         backdrop-filter: none !important;
         border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
         transition: left 0.3s ease;
+        z-index: 1001; 
     }
 
     .sidebar.open {
