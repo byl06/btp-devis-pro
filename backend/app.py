@@ -4199,6 +4199,176 @@ def generate_pdf_normalise(id_facture):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+# ============================================================
+# ACTUALITÉS
+# ============================================================
+
+@app.route('/api/actualites', methods=['GET'])
+def get_actualites():
+    """Récupère toutes les actualités actives"""
+    try:
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/actualites?actif=eq.true&order=date_publication.desc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([]), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur get_actualites: {e}")
+        return jsonify([]), 500
+
+
+@app.route('/api/actualites', methods=['POST'])
+@jwt_required()
+def create_actualite():
+    """Crée une nouvelle actualité (admin uniquement)"""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        # Vérifier que c'est l'admin
+        if user_id != 1:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        data = request.json
+        from datetime import datetime
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        actualite_data = {
+            "titre": data.get('titre', '').strip(),
+            "contenu": data.get('contenu', '').strip(),
+            "type": data.get('type', 'info'),
+            "icon": data.get('icon', 'fa-newspaper'),
+            "couleur": data.get('couleur', '#06B6D4'),
+            "actif": data.get('actif', True),
+            "date_publication": datetime.now().isoformat()
+        }
+        
+        if not actualite_data['titre'] or not actualite_data['contenu']:
+            return jsonify({'success': False, 'message': 'Titre et contenu requis'}), 400
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/actualites",
+            headers=headers,
+            json=actualite_data
+        )
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Actualité créée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur create_actualite: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/actualites/<int:id_actualite>', methods=['PUT'])
+@jwt_required()
+def update_actualite(id_actualite):
+    """Modifie une actualité (admin uniquement)"""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        if user_id != 1:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        data = request.json
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {
+            "titre": data.get('titre', '').strip(),
+            "contenu": data.get('contenu', '').strip(),
+            "type": data.get('type', 'info'),
+            "icon": data.get('icon', 'fa-newspaper'),
+            "couleur": data.get('couleur', '#06B6D4'),
+            "actif": data.get('actif', True)
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/actualites?id_actualite=eq.{id_actualite}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Actualité modifiée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur update_actualite: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/actualites/<int:id_actualite>', methods=['DELETE'])
+@jwt_required()
+def delete_actualite(id_actualite):
+    """Supprime une actualité (admin uniquement)"""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        if user_id != 1:
+            return jsonify({'success': False, 'message': 'Non autorisé'}), 403
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.delete(
+            f"{supabase_url}/rest/v1/actualites?id_actualite=eq.{id_actualite}",
+            headers=headers
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Actualité supprimée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+        
+    except Exception as e:
+        print(f"❌ Erreur delete_actualite: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/facture/<int:id_facture>/normaliser', methods=['POST'])
 @jwt_required()
