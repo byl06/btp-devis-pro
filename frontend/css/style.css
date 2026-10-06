@@ -292,30 +292,33 @@ h4 {
 /* Sidebar */
 /* Sidebar - Version réduite */
 .sidebar {
-    width: 240px;  /* Réduit de 280px à 240px */
+    width: 200px;  /* 🔥 Réduit de 240px à 200px */
     background: var(--glass-bg);
     backdrop-filter: blur(20px);
     border-right: 1px solid var(--glass-border);
-    padding: 1.5rem 0.8rem;  /* Réduit */
+    padding: 1.2rem 0.6rem;
     display: flex;
     flex-direction: column;
     position: fixed;
+    top: 0;
+    left: 0;
     height: 100vh;
-    overflow-y: auto;  /* Scroll si nécessaire */
+    overflow-y: auto;
+    z-index: 100;
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 1.1rem;  /* Réduit */
+    gap: 8px;
+    font-size: 0.95rem;  /* Réduit */
     font-weight: bold;
-    margin-bottom: 1.5rem;  /* Réduit de 3rem */
-    padding: 0 0.8rem;
+    margin-bottom: 1.2rem;
+    padding: 0 0.5rem;
 }
 
 .logo i {
-    font-size: 1.6rem;  /* Réduit */
+    font-size: 1.4rem;  /* Réduit */
     color: var(--accent);
 }
 
@@ -323,45 +326,45 @@ h4 {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;  /* Réduit de 8px */
+    gap: 3px;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 0.8rem;  /* Réduit de 12px */
-    border-radius: 10px;
+    gap: 8px;
+    padding: 8px 0.6rem;
+    border-radius: 8px;
     color: var(--text-secondary);
     text-decoration: none;
     transition: all 0.3s;
-    font-size: 0.9rem;  /* Réduit */
+    font-size: 0.8rem;
 }
 
 .nav-item i {
-    font-size: 1rem;  /* Réduit */
-    width: 20px;
+    font-size: 0.9rem;
+    width: 18px;
     text-align: center;
 }
 
 .user-info {
     margin-top: auto;
-    padding: 0.8rem;  /* Réduit */
+    padding: 0.6rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-top: 1px solid var(--glass-border);
     background: rgba(0,0,0,0.2);
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .user-name {
     font-weight: bold;
-    font-size: 0.8rem;  /* Réduit */
+    font-size: 0.7rem;
 }
 
 .user-email {
-    font-size: 0.65rem;  /* Réduit */
+    font-size: 0.6rem;
     color: var(--text-secondary);
 }
 
@@ -369,10 +372,10 @@ h4 {
     background: rgba(239, 68, 68, 0.8);
     border: none;
     color: white;
-    padding: 6px 8px;  /* Réduit */
-    border-radius: 8px;
+    padding: 5px 7px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
 }
 
 .logout-btn:hover {
@@ -382,9 +385,16 @@ h4 {
 /* Main Content - Ajusté */
 .main-content {
     flex: 1;
-    margin-left: 240px;  /* Ajusté */
-    padding: 1.5rem;  /* Réduit */
+    margin-left: 200px;  /* 🔥 Aligné avec la sidebar */
+    padding: 1.2rem;
     min-height: 100vh;
+    width: calc(100% - 200px);
+    box-sizing: border-box;
+}
+#actualites-badge {
+    font-size: 0.6rem !important;
+    padding: 1px 5px !important;
+    border-radius: 8px;
 }
 
 .glass-header {
