@@ -3236,12 +3236,12 @@ async renderAbonnementContent() {
                 <div style="text-align:center; padding:30px; background:rgba(239,68,68,0.1); border-radius:12px;">
                     <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#EF4444;"></i>
                     <h3 style="color:#EF4444; margin-top:10px;">⚠️ Aucun abonnement actif</h3>
-                    <p style="color:#94A3B8;">Contactez l'administrateur pour souscrire à un abonnement.</p>
-                    <button class="btn-primary" onclick="app.showPricingModal()" style="margin-top:15px;">
-                        <i class="fas fa-crown"></i> Voir les offres
-                    </button>
+                    <p style="color:#94A3B8;">Choisissez une offre ci-dessous pour activer votre compte.</p>
                 </div>
             `;
+            
+            // 🔥 Ajouter les offres directement
+            container.innerHTML += this.renderOffresPaiement();
             return;
         }
         
@@ -3264,6 +3264,7 @@ async renderAbonnementContent() {
         const progression = Math.min((maxJours - joursRestants) / maxJours * 100, 100);
         
         container.innerHTML = `
+            <!-- Carte abonnement actuel -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
                 <div style="background:${config.bg}; border-radius:12px; padding:1.5rem; border:1px solid ${config.color}33;">
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
@@ -3300,6 +3301,7 @@ async renderAbonnementContent() {
                 </div>
             </div>
             
+            <!-- Barre de progression -->
             <div style="margin-bottom:1.5rem;">
                 <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-bottom:4px;">
                     <span>0%</span>
@@ -3311,73 +3313,8 @@ async renderAbonnementContent() {
                 </div>
             </div>
             
-            // Dans renderAbonnementContent(), trouve la partie des offres
-// Remplace le bloc des 4 offres par :
-
-<div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:1.5rem; border:1px solid #334155;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h4 style="font-weight:600;"><i class="fas fa-crown" style="color:#F59E0B;"></i> Changer d'offre</h4>
-        <span style="font-size:0.7rem; color:#94A3B8;">Paiement sécurisé par FedaPay</span>
-    </div>
-    
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:1rem;">
-        
-        <!-- Artisan -->
-        <div style="background:rgba(217,119,6,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(217,119,6,0.2);">
-            <div style="font-size:1.5rem;">🛠️</div>
-            <div style="font-weight:bold; font-size:0.9rem;">Artisan</div>
-            <div style="font-size:1.1rem; font-weight:600; color:#D97706;">7 000 FCFA</div>
-            <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
-            <button onclick="app.payerAvecFedapay('artisan', 7000)" 
-                    style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #D97706, #B45309); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <i class="fas fa-credit-card"></i> Payer
-            </button>
-        </div>
-        
-        <!-- Starter -->
-        <div style="background:rgba(16,185,129,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(16,185,129,0.2);">
-            <div style="font-size:1.5rem;">🟢</div>
-            <div style="font-weight:bold; font-size:0.9rem;">Starter</div>
-            <div style="font-size:1.1rem; font-weight:600; color:#10B981;">15 000 FCFA</div>
-            <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
-            <button onclick="app.payerAvecFedapay('starter', 15000)" 
-                    style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <i class="fas fa-credit-card"></i> Payer
-            </button>
-        </div>
-        
-        <!-- Pro -->
-        <div style="background:rgba(6,182,212,0.05); border-radius:10px; padding:1rem; text-align:center; border:2px solid rgba(6,182,212,0.3); position:relative;">
-            <div style="position:absolute; top:-8px; right:-8px; background:#06B6D4; color:white; font-size:0.6rem; padding:2px 8px; border-radius:20px;">⭐ POPULAIRE</div>
-            <div style="font-size:1.5rem;">🔵</div>
-            <div style="font-weight:bold; font-size:0.9rem;">Pro</div>
-            <div style="font-size:1.1rem; font-weight:600; color:#06B6D4;">30 000 FCFA</div>
-            <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
-            <button onclick="app.payerAvecFedapay('pro', 30000)" 
-                    style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #06B6D4, #0891B2); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <i class="fas fa-credit-card"></i> Payer
-            </button>
-        </div>
-        
-        <!-- Annuel -->
-        <div style="background:rgba(245,158,11,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(245,158,11,0.2);">
-            <div style="font-size:1.5rem;">🔴</div>
-            <div style="font-weight:bold; font-size:0.9rem;">Annuel</div>
-            <div style="font-size:1.1rem; font-weight:600; color:#F59E0B;">250 000 FCFA</div>
-            <div style="font-size:0.7rem; color:#94A3B8;">/an (2 mois offerts)</div>
-            <button onclick="app.payerAvecFedapay('annuel', 250000)" 
-                    style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #F59E0B, #D97706); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <i class="fas fa-credit-card"></i> Payer
-            </button>
-        </div>
-        
-    </div>
-    
-    <div style="text-align:center; margin-top:1rem; font-size:0.75rem; color:#94A3B8;">
-        <i class="fas fa-shield-alt" style="color:#10B981;"></i> 
-        Paiement 100% sécurisé · Mobile Money, Carte bancaire
-    </div>
-</div>
+            <!-- 🔥 OFFRES AVEC BOUTON PAYER -->
+            ${this.renderOffresPaiement()}
         `;
         
     } catch (error) {
@@ -3389,6 +3326,75 @@ async renderAbonnementContent() {
     }
 }
 
+// ============================================================
+// AFFICHER LES OFFRES AVEC BOUTON PAYER
+// ============================================================
+
+renderOffresPaiement() {
+    return `
+        <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:1.5rem; border:1px solid #334155;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h4 style="font-weight:600;"><i class="fas fa-crown" style="color:#F59E0B;"></i> Choisir une offre</h4>
+                <span style="font-size:0.7rem; color:#94A3B8;">
+                    <i class="fas fa-shield-alt" style="color:#10B981;"></i> Paiement sécurisé par FedaPay
+                </span>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:1rem;">
+                
+                <!-- Artisan -->
+                <div style="background:rgba(217,119,6,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(217,119,6,0.2);">
+                    <div style="font-size:1.5rem;">🛠️</div>
+                    <div style="font-weight:bold; font-size:0.9rem;">Artisan</div>
+                    <div style="font-size:1.1rem; font-weight:600; color:#D97706;">7 000 FCFA</div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                    <button onclick="app.payerAvecFedapay('artisan', 7000)" 
+                            style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #D97706, #B45309); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <i class="fas fa-credit-card"></i> Payer
+                    </button>
+                </div>
+                
+                <!-- Starter -->
+                <div style="background:rgba(16,185,129,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(16,185,129,0.2);">
+                    <div style="font-size:1.5rem;">🟢</div>
+                    <div style="font-weight:bold; font-size:0.9rem;">Starter</div>
+                    <div style="font-size:1.1rem; font-weight:600; color:#10B981;">15 000 FCFA</div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                    <button onclick="app.payerAvecFedapay('starter', 15000)" 
+                            style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #10B981, #059669); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <i class="fas fa-credit-card"></i> Payer
+                    </button>
+                </div>
+                
+                <!-- Pro -->
+                <div style="background:rgba(6,182,212,0.05); border-radius:10px; padding:1rem; text-align:center; border:2px solid rgba(6,182,212,0.3); position:relative;">
+                    <div style="position:absolute; top:-8px; right:-8px; background:#06B6D4; color:white; font-size:0.6rem; padding:2px 8px; border-radius:20px;">⭐ POPULAIRE</div>
+                    <div style="font-size:1.5rem;">🔵</div>
+                    <div style="font-weight:bold; font-size:0.9rem;">Pro</div>
+                    <div style="font-size:1.1rem; font-weight:600; color:#06B6D4;">30 000 FCFA</div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">/mois</div>
+                    <button onclick="app.payerAvecFedapay('pro', 30000)" 
+                            style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #06B6D4, #0891B2); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <i class="fas fa-credit-card"></i> Payer
+                    </button>
+                </div>
+                
+                <!-- Annuel -->
+                <div style="background:rgba(245,158,11,0.05); border-radius:10px; padding:1rem; text-align:center; border:1px solid rgba(245,158,11,0.2);">
+                    <div style="font-size:1.5rem;">🔴</div>
+                    <div style="font-weight:bold; font-size:0.9rem;">Annuel</div>
+                    <div style="font-size:1.1rem; font-weight:600; color:#F59E0B;">250 000 FCFA</div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">/an (2 mois offerts)</div>
+                    <button onclick="app.payerAvecFedapay('annuel', 250000)" 
+                            style="margin-top:10px; padding:8px 12px; font-size:0.75rem; background:linear-gradient(135deg, #F59E0B, #D97706); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <i class="fas fa-credit-card"></i> Payer
+                    </button>
+                </div>
+                
+            </div>
+        </div>
+    `;
+}
 // ============================================================
 // PAIEMENT AVEC FEDAPAY
 // ============================================================
