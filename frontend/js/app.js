@@ -4257,6 +4257,234 @@ modal.querySelectorAll('.materiaux-item').forEach(item => {
     }
 }
 
+// ============================================================
+// CRÉER UNE ACTUALITÉ (ADMIN)
+// ============================================================
+
+openCreateActualiteModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:550px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-newspaper" style="color:#06B6D4;"></i> Nouvelle actualité</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="actualite-form">
+                    <div class="form-group">
+                        <label>Titre *</label>
+                        <input type="text" id="actu-titre" required placeholder="Ex: Nouvelle fonctionnalité" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                    </div>
+                    <div class="form-group">
+                        <label>Contenu *</label>
+                        <textarea id="actu-contenu" rows="4" required placeholder="Décrivez l'actualité..." style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;"></textarea>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="actu-type" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                                <option value="info">ℹ️ Information</option>
+                                <option value="feature">🎉 Nouveauté</option>
+                                <option value="coming">🚀 À venir</option>
+                                <option value="maintenance">🔧 Maintenance</option>
+                                <option value="alert">⚠️ Important</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Couleur</label>
+                            <input type="color" id="actu-couleur" value="#06B6D4" style="width:100%; height:42px; border-radius:8px; background:#0F172A; border:1px solid #334155; cursor:pointer;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Icône FontAwesome</label>
+                        <input type="text" id="actu-icon" value="fa-newspaper" placeholder="Ex: fa-newspaper" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                        <p style="font-size:0.7rem; color:#64748B; margin-top:5px;">
+                            <i class="fas fa-info-circle"></i> Ex: fa-newspaper, fa-robot, fa-credit-card...
+                        </p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #06B6D4, #0891B2);">
+                            <i class="fas fa-save"></i> Publier
+                        </button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    
+    const form = modal.querySelector('#actualite-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const data = {
+            titre: document.getElementById('actu-titre').value.trim(),
+            contenu: document.getElementById('actu-contenu').value.trim(),
+            type: document.getElementById('actu-type').value,
+            couleur: document.getElementById('actu-couleur').value,
+            icon: document.getElementById('actu-icon').value.trim() || 'fa-newspaper'
+        };
+        
+        try {
+            const response = await apiRequest('/api/actualites', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                Toast.success('✅ Actualité publiée !');
+                modal.remove();
+                this.loadPage('actualites');
+            } else {
+                Toast.error(result.message || '❌ Erreur');
+            }
+        } catch (error) {
+            Toast.error('❌ Erreur de connexion');
+        }
+    });
+}
+
+// ============================================================
+// MODIFIER UNE ACTUALITÉ (ADMIN)
+// ============================================================
+
+async editActualite(id) {
+    try {
+        const response = await fetch('https://btp-devis-pro-1.onrender.com/api/actualites');
+        const actualites = await response.json();
+        const actu = actualites.find(a => a.id_actualite === id);
+        
+        if (!actu) {
+            Toast.error('❌ Actualité non trouvée');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:550px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-edit" style="color:#F59E0B;"></i> Modifier l'actualité</h2>
+                    <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-actualite-form">
+                        <div class="form-group">
+                            <label>Titre *</label>
+                            <input type="text" id="edit-actu-titre" value="${this.escapeHtml(actu.titre)}" required style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-group">
+                            <label>Contenu *</label>
+                            <textarea id="edit-actu-contenu" rows="4" required style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">${this.escapeHtml(actu.contenu)}</textarea>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                            <div class="form-group">
+                                <label>Type</label>
+                                <select id="edit-actu-type" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                                    <option value="info" ${actu.type === 'info' ? 'selected' : ''}>ℹ️ Information</option>
+                                    <option value="feature" ${actu.type === 'feature' ? 'selected' : ''}>🎉 Nouveauté</option>
+                                    <option value="coming" ${actu.type === 'coming' ? 'selected' : ''}>🚀 À venir</option>
+                                    <option value="maintenance" ${actu.type === 'maintenance' ? 'selected' : ''}>🔧 Maintenance</option>
+                                    <option value="alert" ${actu.type === 'alert' ? 'selected' : ''}>⚠️ Important</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Couleur</label>
+                                <input type="color" id="edit-actu-couleur" value="${actu.couleur || '#06B6D4'}" style="width:100%; height:42px; border-radius:8px; background:#0F172A; border:1px solid #334155; cursor:pointer;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Icône FontAwesome</label>
+                            <input type="text" id="edit-actu-icon" value="${actu.icon || 'fa-newspaper'}" style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white;">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #F59E0B, #D97706);">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                            <button type="button" class="btn-secondary close-modal">Annuler</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const closeBtns = modal.querySelectorAll('.close-modal');
+        closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        
+        const form = modal.querySelector('#edit-actualite-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                titre: document.getElementById('edit-actu-titre').value.trim(),
+                contenu: document.getElementById('edit-actu-contenu').value.trim(),
+                type: document.getElementById('edit-actu-type').value,
+                couleur: document.getElementById('edit-actu-couleur').value,
+                icon: document.getElementById('edit-actu-icon').value.trim() || 'fa-newspaper'
+            };
+            
+            try {
+                const response = await apiRequest(`/api/actualites/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    Toast.success('✅ Actualité modifiée !');
+                    modal.remove();
+                    this.loadPage('actualites');
+                } else {
+                    Toast.error(result.message || '❌ Erreur');
+                }
+            } catch (error) {
+                Toast.error('❌ Erreur de connexion');
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Erreur editActualite:', error);
+        Toast.error('❌ Erreur');
+    }
+}
+
+// ============================================================
+// SUPPRIMER UNE ACTUALITÉ (ADMIN)
+// ============================================================
+
+async deleteActualite(id) {
+    if (!confirm('🗑️ Supprimer cette actualité ?')) return;
+    
+    try {
+        const response = await apiRequest(`/api/actualites/${id}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Actualité supprimée !');
+            this.loadPage('actualites');
+        } else {
+            Toast.error(result.message || '❌ Erreur');
+        }
+    } catch (error) {
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
 
 
 async renderParametres() {

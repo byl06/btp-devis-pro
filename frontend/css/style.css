@@ -27,30 +27,32 @@ body {
 }
 
 /* Sidebar */
+/* Sidebar - Version réduite */
 .sidebar {
-    width: 280px;
+    width: 240px;  /* Réduit de 280px à 240px */
     background: var(--glass-bg);
     backdrop-filter: blur(20px);
     border-right: 1px solid var(--glass-border);
-    padding: 2rem 1rem;
+    padding: 1.5rem 0.8rem;  /* Réduit */
     display: flex;
     flex-direction: column;
     position: fixed;
     height: 100vh;
+    overflow-y: auto;  /* Scroll si nécessaire */
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 1.3rem;
+    gap: 10px;
+    font-size: 1.1rem;  /* Réduit */
     font-weight: bold;
-    margin-bottom: 3rem;
-    padding: 0 1rem;
+    margin-bottom: 1.5rem;  /* Réduit de 3rem */
+    padding: 0 0.8rem;
 }
 
 .logo i {
-    font-size: 2rem;
+    font-size: 1.6rem;  /* Réduit */
     color: var(--accent);
 }
 
@@ -58,46 +60,45 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;  /* Réduit de 8px */
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 1rem;
-    border-radius: 12px;
+    gap: 10px;
+    padding: 10px 0.8rem;  /* Réduit de 12px */
+    border-radius: 10px;
     color: var(--text-secondary);
     text-decoration: none;
     transition: all 0.3s;
+    font-size: 0.9rem;  /* Réduit */
 }
 
-.nav-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-}
-
-.nav-item.active {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
+.nav-item i {
+    font-size: 1rem;  /* Réduit */
+    width: 20px;
+    text-align: center;
 }
 
 .user-info {
     margin-top: auto;
-    padding: 1rem;
+    padding: 0.8rem;  /* Réduit */
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-top: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
 }
 
 .user-name {
     font-weight: bold;
-    font-size: 0.9rem;
+    font-size: 0.8rem;  /* Réduit */
 }
 
 .user-email {
-    font-size: 0.75rem;
+    font-size: 0.65rem;  /* Réduit */
     color: var(--text-secondary);
 }
 
@@ -105,16 +106,22 @@ body {
     background: rgba(239, 68, 68, 0.8);
     border: none;
     color: white;
-    padding: 8px;
+    padding: 6px 8px;  /* Réduit */
     border-radius: 8px;
     cursor: pointer;
+    font-size: 0.8rem;
 }
 
-/* Main Content */
+.logout-btn:hover {
+    background: rgba(239, 68, 68, 1);
+}
+
+/* Main Content - Ajusté */
 .main-content {
     flex: 1;
-    margin-left: 280px;
-    padding: 2rem;
+    margin-left: 240px;  /* Ajusté */
+    padding: 1.5rem;  /* Réduit */
+    min-height: 100vh;
 }
 
 .glass-header {
@@ -634,6 +641,13 @@ body {
 
 .pricing-footer strong {
     color: #06B6D4;
+}
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+        padding-top: 60px;
+    }
 }
 
 /* Responsive */
