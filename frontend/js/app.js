@@ -2281,6 +2281,10 @@ viewFactureNormalisee(id_facture) {
 // ASSISTANT IA — RENDU DE LA PAGE
 // ============================================================
 
+// ============================================================
+// ASSISTANT IA — RENDU DE LA PAGE (CHAT)
+// ============================================================
+
 async renderAssistantIA() {
     return `
         <div class="ia-header">
@@ -2295,54 +2299,54 @@ async renderAssistantIA() {
                             <i class="fas fa-bolt"></i> BETA
                         </span>
                     </h1>
-                    <p>Générez vos devis en langage naturel — l'IA s'occupe du reste.</p>
+                    <p>Discutez avec l'IA pour générer votre devis.</p>
                 </div>
             </div>
             <div class="ia-counter" id="ia-counter">
                 <i class="fas fa-bolt" style="color: var(--warning);"></i>
                 <span id="ia-counter-text">Chargement...</span>
-                <div class="ia-counter-bar">
-                    <div class="ia-counter-bar-fill" id="ia-counter-fill"></div>
-                </div>
             </div>
         </div>
 
-        <!-- ÉTAPE 1 : PROMPT -->
+        <!-- CHAT -->
         <div class="ia-card">
             <div class="ia-card-inner">
-                <div class="ia-textarea-wrapper">
+                <!-- Zone de messages -->
+                <div class="ia-chat" id="ia-chat">
+                    <!-- Message d'accueil -->
+                    <div class="ia-message ai">
+                        <div class="ia-message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div>
+                            <div class="ia-message-bubble">
+                                Bonjour 👋 Je suis votre assistant IA.
+                                <br><br>
+                                Décrivez-moi votre projet, et je génère votre devis.
+                                <br>
+                                <em style="font-size: 0.85rem; opacity: 0.7;">Ex : "Je veux un devis pour une maison de 100m² à Cotonou"</em>
+                            </div>
+                            <span class="ia-message-time">Maintenant</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zone de saisie -->
+                <div class="ia-chat-input-wrapper">
                     <textarea
-                        class="ia-textarea"
-                        id="ia-prompt"
-                        placeholder="Ex : Je veux un devis pour une maison de 100m² à Cotonou, avec 3 chambres, 2 salles de bain, un toit en tôle et une cuisine équipée..."
+                        class="ia-chat-input"
+                        id="ia-chat-input"
+                        placeholder="Écrivez votre message..."
+                        rows="1"
                     ></textarea>
-                </div>
-                <div class="ia-textarea-actions">
-                    <div class="ia-hint">
-                        <i class="fas fa-lightbulb"></i>
-                        Plus votre description est détaillée, plus le devis sera précis.
-                    </div>
-                    <div class="ia-buttons">
-                        <button class="btn btn-ai" id="btn-ia-generate">
-                            <i class="fas fa-wand-magic-sparkles"></i>
-                            Générer le devis
-                        </button>
-                    </div>
+                    <button class="ia-chat-send" id="ia-chat-send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- LOADING -->
-        <div class="ia-loading" id="ia-loading">
-            <div class="ia-loading-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-            <p id="ia-loading-text">L'IA analyse votre demande...</p>
-        </div>
-
-        <!-- ÉTAPE 2 : VISUALISATION -->
+        <!-- VISUALISATION -->
         <div class="ia-visualisation" id="ia-visualisation">
             <div class="ia-card">
                 <div class="ia-card-inner">
@@ -2351,13 +2355,8 @@ async renderAssistantIA() {
                             <i class="fas fa-file-invoice" style="color: var(--ai-start);"></i>
                             Devis généré
                         </div>
-                        <button class="btn btn-ghost" style="padding: 6px 14px; font-size: 0.75rem;" id="btn-ia-reprompt-top">
-                            <i class="fas fa-rotate"></i>
-                            Re-prompt
-                        </button>
                     </div>
 
-                    <!-- Client / Projet -->
                     <div class="ia-form-row">
                         <div class="ia-form-group">
                             <label><i class="fas fa-user"></i> Client</label>
@@ -2373,7 +2372,6 @@ async renderAssistantIA() {
                         </div>
                     </div>
 
-                    <!-- Tableau des lignes -->
                     <div class="ia-table-wrapper">
                         <table class="ia-table">
                             <thead>
@@ -2385,9 +2383,7 @@ async renderAssistantIA() {
                                     <th style="width: 60px;"></th>
                                 </tr>
                             </thead>
-                            <tbody id="ia-table-body">
-                                <!-- Rempli par JS -->
-                            </tbody>
+                            <tbody id="ia-table-body"></tbody>
                         </table>
                     </div>
 
@@ -2396,7 +2392,6 @@ async renderAssistantIA() {
                         Ajouter une ligne
                     </button>
 
-                    <!-- Récapitulatif -->
                     <div class="ia-summary">
                         <div class="ia-summary-row">
                             <span>Sous-total matériaux</span>
@@ -2412,7 +2407,6 @@ async renderAssistantIA() {
                         </div>
                     </div>
 
-                    <!-- Actions -->
                     <div class="ia-final-actions">
                         <div class="ia-final-actions-left">
                             <button class="btn btn-warning" id="btn-ia-reprompt">
@@ -2433,18 +2427,6 @@ async renderAssistantIA() {
                     </div>
                 </div>
             </div>
-
-            <!-- Astuce -->
-            <div class="ia-tip">
-                <i class="fas fa-circle-info"></i>
-                <div>
-                    <div class="ia-tip-title">Astuce</div>
-                    <div class="ia-tip-text">
-                        Vous pouvez modifier chaque ligne directement dans le tableau avant de valider.
-                        Si le résultat ne vous convient pas, cliquez sur <strong>Re-prompt</strong> pour ajuster la description.
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Conteneur des notifications -->
@@ -2456,43 +2438,44 @@ async renderAssistantIA() {
 // ASSISTANT IA — INITIALISATION
 // ============================================================
 
+// ============================================================
+// ASSISTANT IA — INITIALISATION
+// ============================================================
+
 async initAssistantIA() {
+    // État de la conversation
+    this.iaHistorique = [];
+    this.iaTourCount = 0;
+    this.iaEnCours = false;
+
     // Charger le quota
     await this.chargerQuotaIA();
 
     // Charger clients et projets
     await this.chargerClientsProjetsIA();
 
-    // Bouton Générer
-    const btnGenerate = document.getElementById('btn-ia-generate');
-    if (btnGenerate) {
-        btnGenerate.addEventListener('click', () => this.genererDevisIA());
-    }
-    // Gérer le select client
-const selectClient = document.getElementById('ia-select-client');
-if (selectClient) {
-    selectClient.addEventListener('change', function() {
-        if (this.value === 'new') {
-            // Ouvrir la modale de création client
-            app.openCreateClientModalIA();
-            // Réinitialiser le select
-            this.value = '';
-        }
-    });
-}
+    // Zone de saisie
+    const input = document.getElementById('ia-chat-input');
+    const sendBtn = document.getElementById('ia-chat-send');
 
-// Gérer le select projet
-const selectProjet = document.getElementById('ia-select-projet');
-if (selectProjet) {
-    selectProjet.addEventListener('change', function() {
-        if (this.value === 'new') {
-            // Ouvrir la modale de création projet
-            app.openCreateProjetModalIA();
-            // Réinitialiser le select
-            this.value = '';
-        }
-    });
-}
+    if (sendBtn) {
+        sendBtn.addEventListener('click', () => this.envoyerMessageIA());
+    }
+
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.envoyerMessageIA();
+            }
+        });
+
+        // Auto-resize
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+    }
 
     // Bouton Ajouter une ligne
     const btnAddLine = document.getElementById('btn-ia-add-line');
@@ -2502,9 +2485,7 @@ if (selectProjet) {
 
     // Boutons Re-prompt
     const btnReprompt = document.getElementById('btn-ia-reprompt');
-    const btnRepromptTop = document.getElementById('btn-ia-reprompt-top');
     if (btnReprompt) btnReprompt.addEventListener('click', () => this.rePromptIA());
-    if (btnRepromptTop) btnRepromptTop.addEventListener('click', () => this.rePromptIA());
 
     // Bouton Annuler
     const btnCancel = document.getElementById('btn-ia-cancel');
@@ -2516,6 +2497,27 @@ if (selectProjet) {
     const btnValidate = document.getElementById('btn-ia-validate');
     if (btnValidate) {
         btnValidate.addEventListener('click', () => this.validerDevisIA());
+    }
+
+    // Sélecteurs client/projet
+    const selectClient = document.getElementById('ia-select-client');
+    if (selectClient) {
+        selectClient.addEventListener('change', function() {
+            if (this.value === 'new') {
+                app.openCreateClientModalIA();
+                this.value = '';
+            }
+        });
+    }
+
+    const selectProjet = document.getElementById('ia-select-projet');
+    if (selectProjet) {
+        selectProjet.addEventListener('change', function() {
+            if (this.value === 'new') {
+                app.openCreateProjetModalIA();
+                this.value = '';
+            }
+        });
     }
 }
 
@@ -2529,9 +2531,8 @@ async chargerQuotaIA() {
         const data = await response.json();
 
         if (data.success) {
-            const { utilise, limite, restant } = data.quota;
+            const { utilise, limite } = data.quota;
             const texte = document.getElementById('ia-counter-text');
-            const fill = document.getElementById('ia-counter-fill');
 
             if (texte) {
                 if (limite >= 999999) {
@@ -2539,11 +2540,6 @@ async chargerQuotaIA() {
                 } else {
                     texte.innerHTML = `<strong>${utilise}</strong> / ${limite} générations`;
                 }
-            }
-
-            if (fill) {
-                const pourcentage = limite >= 999999 ? 0 : (utilise / limite) * 100;
-                fill.style.width = Math.min(pourcentage, 100) + '%';
             }
         }
     } catch (error) {
@@ -2565,7 +2561,6 @@ async chargerClientsProjetsIA() {
         const clients = this.safeArray(await clientsResponse.json());
         const projets = this.safeArray(await projetsResponse.json());
 
-        // Remplir le select client
         const selectClient = document.getElementById('ia-select-client');
         if (selectClient) {
             selectClient.innerHTML = `
@@ -2575,7 +2570,6 @@ async chargerClientsProjetsIA() {
             `;
         }
 
-        // Remplir le select projet
         const selectProjet = document.getElementById('ia-select-projet');
         if (selectProjet) {
             selectProjet.innerHTML = `
@@ -2590,117 +2584,190 @@ async chargerClientsProjetsIA() {
 }
 
 // ============================================================
-// GÉNÉRER LE DEVIS
+// AJOUTER UN MESSAGE DANS LE CHAT
 // ============================================================
 
-async genererDevisIA() {
-    const prompt = document.getElementById('ia-prompt')?.value.trim();
-    if (!prompt) {
-        Toast.warning('Veuillez décrire votre projet avant de générer.');
-        return;
+ajouterMessageIA(role, texte) {
+    const chat = document.getElementById('ia-chat');
+    if (!chat) return;
+
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    const message = document.createElement('div');
+    message.className = `ia-message ${role}`;
+
+    if (role === 'ai') {
+        message.innerHTML = `
+            <div class="ia-message-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div>
+                <div class="ia-message-bubble">${texte}</div>
+                <span class="ia-message-time">${time}</span>
+            </div>
+        `;
+    } else {
+        message.innerHTML = `
+            <div class="ia-message-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div>
+                <div class="ia-message-bubble">${texte}</div>
+                <span class="ia-message-time">${time}</span>
+            </div>
+        `;
     }
 
-    if (prompt.length < 10) {
-        Toast.warning('Description trop courte. Décrivez votre projet en quelques mots.');
-        return;
-    }
+    chat.appendChild(message);
+    chat.scrollTop = chat.scrollHeight;
+}
 
-    const btnGenerate = document.getElementById('btn-ia-generate');
-    const loading = document.getElementById('ia-loading');
-    const visualisation = document.getElementById('ia-visualisation');
+// ============================================================
+// TYPING INDICATOR
+// ============================================================
 
-    // Masquer la visualisation
-    if (visualisation) visualisation.classList.remove('visible');
+afficherTypingIA() {
+    const chat = document.getElementById('ia-chat');
+    if (!chat) return;
 
-    // Afficher le loading
-    if (loading) loading.classList.add('visible');
-    if (btnGenerate) {
-        btnGenerate.disabled = true;
-        btnGenerate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
-    }
+    const typing = document.createElement('div');
+    typing.className = 'ia-message ai';
+    typing.id = 'ia-typing-indicator';
+    typing.innerHTML = `
+        <div class="ia-message-avatar">
+            <i class="fas fa-robot"></i>
+        </div>
+        <div class="ia-typing">
+            <span class="ia-typing-dot"></span>
+            <span class="ia-typing-dot"></span>
+            <span class="ia-typing-dot"></span>
+        </div>
+    `;
+    chat.appendChild(typing);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+cacherTypingIA() {
+    const typing = document.getElementById('ia-typing-indicator');
+    if (typing) typing.remove();
+}
+
+// ============================================================
+// ENVOYER UN MESSAGE
+// ============================================================
+
+async envoyerMessageIA() {
+    if (this.iaEnCours) return;
+
+    const input = document.getElementById('ia-chat-input');
+    const sendBtn = document.getElementById('ia-chat-send');
+    const texte = input?.value.trim();
+
+    if (!texte) return;
+
+    // Ajouter le message user
+    this.ajouterMessageIA('user', this.escapeHtml(texte));
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Ajouter à l'historique
+    this.iaHistorique.push({ role: 'user', content: texte });
+
+    // Désactiver l'envoi
+    this.iaEnCours = true;
+    if (sendBtn) sendBtn.disabled = true;
+
+    // Afficher le typing
+    this.afficherTypingIA();
 
     try {
         const response = await apiRequest('/api/ai/generate-devis', {
             method: 'POST',
-            body: JSON.stringify({ description: prompt })
+            body: JSON.stringify({
+                description: texte,
+                historique: this.iaHistorique,
+                tour_count: this.iaTourCount
+            })
         });
 
         const data = await response.json();
 
-        // Cacher le loading
-        if (loading) loading.classList.remove('visible');
-        if (btnGenerate) {
-            btnGenerate.disabled = false;
-            btnGenerate.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Générer le devis';
-        }
+        // Cacher le typing
+        this.cacherTypingIA();
 
         if (!data.success) {
-            Toast.error(data.message || 'Erreur de génération');
+            this.ajouterMessageIA('ai', `❌ ${data.message || 'Erreur de génération'}`);
+            this.iaEnCours = false;
+            if (sendBtn) sendBtn.disabled = false;
             return;
         }
 
         // Mettre à jour le quota
         if (data.quota) {
-            const texte = document.getElementById('ia-counter-text');
-            const fill = document.getElementById('ia-counter-fill');
-            if (texte) {
+            const texteEl = document.getElementById('ia-counter-text');
+            if (texteEl) {
                 if (data.quota.limite >= 999999) {
-                    texte.innerHTML = `<strong>∞</strong> générations illimitées`;
+                    texteEl.innerHTML = `<strong>∞</strong> générations illimitées`;
                 } else {
-                    texte.innerHTML = `<strong>${data.quota.utilise}</strong> / ${data.quota.limite} générations`;
+                    texteEl.innerHTML = `<strong>${data.quota.utilise}</strong> / ${data.quota.limite} générations`;
                 }
             }
-            if (fill && data.quota.limite < 999999) {
-                const pct = (data.quota.utilise / data.quota.limite) * 100;
-                fill.style.width = Math.min(pct, 100) + '%';
-            }
         }
+
+        // Mettre à jour le tour
+        this.iaTourCount = data.tour_count || (this.iaTourCount + 1);
 
         // Gérer la réponse
         if (data.action === 'ask') {
-            // L'IA demande des précisions
             const questions = data.questions || [];
-            const questionsText = questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
+            const questionsHtml = questions.map((q, i) => `<strong>${i + 1}.</strong> ${this.escapeHtml(q)}`).join('<br>');
 
-            // Ajouter les questions au prompt
-            const promptEl = document.getElementById('ia-prompt');
-            if (promptEl) {
-                promptEl.value = prompt + '\n\n' + questionsText;
-                promptEl.focus();
+            this.ajouterMessageIA('ai', `
+                Très bien ! J'ai besoin de quelques précisions :<br><br>
+                ${questionsHtml}
+            `);
+
+            // Ajouter à l'historique
+            this.iaHistorique.push({
+                role: 'assistant',
+                content: questions.join('\n')
+            });
+        }
+        else if (data.action === 'generate') {
+            const lignes = data.lignes || [];
+
+            if (lignes.length === 0) {
+                this.ajouterMessageIA('ai', '❌ Aucune ligne générée. Réessayez avec une description plus détaillée.');
+            } else {
+                this.ajouterMessageIA('ai', `✅ Parfait ! J'ai généré ${lignes.length} lignes pour votre devis.`);
+
+                // Remplir le tableau
+                this.remplirTableauIA(lignes);
+
+                // Afficher la visualisation
+                const visualisation = document.getElementById('ia-visualisation');
+                if (visualisation) {
+                    visualisation.classList.add('visible');
+                    setTimeout(() => {
+                        visualisation.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                }
             }
 
-            Toast.info('L\'IA a besoin de plus de précisions. Répondez aux questions ci-dessous.');
-            return;
+            // Ajouter à l'historique
+            this.iaHistorique.push({
+                role: 'assistant',
+                content: `Devis généré avec ${lignes.length} lignes.`
+            });
         }
-
-        // Action "generate"
-        const lignes = data.lignes || [];
-        if (lignes.length === 0) {
-            Toast.error('Aucune ligne générée. Réessayez avec une description plus détaillée.');
-            return;
-        }
-
-        // Remplir le tableau
-        this.remplirTableauIA(lignes);
-
-        // Afficher la visualisation
-        if (visualisation) {
-            visualisation.classList.add('visible');
-            setTimeout(() => {
-                visualisation.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 200);
-        }
-
-        Toast.success(`✨ ${lignes.length} lignes générées avec succès !`);
 
     } catch (error) {
-        console.error('Erreur génération IA:', error);
-        if (loading) loading.classList.remove('visible');
-        if (btnGenerate) {
-            btnGenerate.disabled = false;
-            btnGenerate.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Générer le devis';
-        }
-        Toast.error('❌ Erreur de connexion');
+        console.error('Erreur envoi message IA:', error);
+        this.cacherTypingIA();
+        this.ajouterMessageIA('ai', '❌ Erreur de connexion. Réessayez.');
+    } finally {
+        this.iaEnCours = false;
+        if (sendBtn) sendBtn.disabled = false;
     }
 }
 
@@ -2736,12 +2803,10 @@ ajouterLigneIA(designation = '', quantite = 1, prix = 0) {
         <td><button class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td>
     `;
 
-    // Écouteurs pour recalculer
     tr.querySelectorAll('.qte, .prix').forEach(input => {
         input.addEventListener('input', () => this.calculerTotalIA());
     });
 
-    // Bouton supprimer
     tr.querySelector('.btn-delete').addEventListener('click', () => {
         tr.remove();
         this.calculerTotalIA();
@@ -2791,22 +2856,16 @@ calculerTotalIA() {
 rePromptIA() {
     const ok = confirm(
         '⚠️ Re-prompt\n\n' +
-        'Vous allez pouvoir ajuster votre description.\n' +
-        'Vos modifications actuelles seront conservées tant que vous ne validez pas la nouvelle génération.\n\n' +
+        'Vous allez pouvoir ajuster votre description dans le chat.\n' +
+        'Vos modifications actuelles seront conservées.\n\n' +
         'Continuer ?'
     );
 
     if (ok) {
-        const promptEl = document.getElementById('ia-prompt');
-        if (promptEl) {
-            promptEl.focus();
-            promptEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            promptEl.style.borderColor = 'var(--ai-start)';
-            promptEl.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.3)';
-            setTimeout(() => {
-                promptEl.style.borderColor = '';
-                promptEl.style.boxShadow = '';
-            }, 2000);
+        const input = document.getElementById('ia-chat-input');
+        if (input) {
+            input.focus();
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 }
@@ -2819,15 +2878,14 @@ annulerIA() {
     if (confirm('Annuler la génération ? Le devis ne sera pas créé.')) {
         const visualisation = document.getElementById('ia-visualisation');
         const tbody = document.getElementById('ia-table-body');
-        const promptEl = document.getElementById('ia-prompt');
 
         if (visualisation) visualisation.classList.remove('visible');
         if (tbody) tbody.innerHTML = '';
-        if (promptEl) {
-            promptEl.value = '';
-            promptEl.focus();
-        }
         this.calculerTotalIA();
+
+        // Réinitialiser l'historique
+        this.iaHistorique = [];
+        this.iaTourCount = 0;
     }
 }
 
@@ -2839,19 +2897,16 @@ async validerDevisIA() {
     const idClient = document.getElementById('ia-select-client')?.value;
     const idProjet = document.getElementById('ia-select-projet')?.value;
 
-    // Vérifier client
     if (!idClient) {
         Toast.warning('Veuillez sélectionner un client.');
         return;
     }
 
-    // Vérifier projet
     if (!idProjet) {
         Toast.warning('Veuillez sélectionner un projet.');
         return;
     }
 
-    // Gérer les cas "nouveau"
     if (idClient === 'new') {
         Toast.info('Créez d\'abord le client dans la page Clients, puis revenez.');
         return;
@@ -2881,7 +2936,7 @@ async validerDevisIA() {
         return;
     }
 
-    if (!confirm(`✅ Créer ce devis avec ${lignes.length} ligne(s) ?\n\nIl sera ajouté à votre liste de devis.`)) {
+    if (!confirm(`✅ Créer ce devis avec ${lignes.length} ligne(s) ?`)) {
         return;
     }
 
@@ -2915,18 +2970,38 @@ async validerDevisIA() {
             return;
         }
 
-        // Succès ! Afficher la notification
+        // Afficher la notification
         this.showSuccessToastIA(result.id_devis);
 
         // Réinitialiser la page
         const visualisation = document.getElementById('ia-visualisation');
-        const promptEl = document.getElementById('ia-prompt');
         if (visualisation) visualisation.classList.remove('visible');
         if (tbody) tbody.innerHTML = '';
-        if (promptEl) promptEl.value = '';
         this.calculerTotalIA();
 
-        // Remonter en haut
+        // Réinitialiser l'historique
+        this.iaHistorique = [];
+        this.iaTourCount = 0;
+
+        // Réinitialiser le chat
+        const chat = document.getElementById('ia-chat');
+        if (chat) {
+            chat.innerHTML = `
+                <div class="ia-message ai">
+                    <div class="ia-message-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <div class="ia-message-bubble">
+                            Devis créé avec succès ! 🎉<br><br>
+                            Voulez-vous générer un autre devis ?
+                        </div>
+                        <span class="ia-message-time">Maintenant</span>
+                    </div>
+                </div>
+            `;
+        }
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
@@ -2959,7 +3034,6 @@ showSuccessToastIA(devisId) {
             <div class="ia-toast-title">Devis créé avec succès !</div>
             <div class="ia-toast-message">
                 Votre devis <strong>#${devisId}</strong> a été enregistré.
-                Vous pouvez le consulter, le modifier ou le télécharger depuis la page Devis.
             </div>
             <div class="ia-toast-actions">
                 <button class="ia-toast-btn ia-toast-btn-primary" id="ia-toast-voir">
@@ -2978,23 +3052,19 @@ showSuccessToastIA(devisId) {
 
     container.appendChild(toast);
 
-    // Bouton "Voir le devis"
     toast.querySelector('#ia-toast-voir').addEventListener('click', () => {
         this.removeToastIA(toast);
         this.loadPage('devis');
     });
 
-    // Bouton "Fermer"
     toast.querySelector('#ia-toast-fermer').addEventListener('click', () => {
         this.removeToastIA(toast);
     });
 
-    // Bouton X
     toast.querySelector('#ia-toast-close').addEventListener('click', () => {
         this.removeToastIA(toast);
     });
 
-    // Auto-fermeture après 10s
     setTimeout(() => {
         if (toast.parentElement) {
             this.removeToastIA(toast);
@@ -3009,6 +3079,166 @@ removeToastIA(toast) {
             toast.remove();
         }
     }, 300);
+}
+
+// ============================================================
+// CRÉER UN CLIENT DEPUIS LA PAGE IA
+// ============================================================
+
+openCreateClientModalIA() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> Nouveau client</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="ia-client-form">
+                    <div class="form-group">
+                        <label>Nom complet *</label>
+                        <input type="text" id="ia-client-nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Téléphone *</label>
+                        <input type="tel" id="ia-client-telephone" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="ia-client-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea id="ia-client-adresse" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>IFU</label>
+                        <input type="text" id="ia-client-ifu" placeholder="13 caractères" maxlength="13">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Enregistrer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    const form = modal.querySelector('#ia-client-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const clientData = {
+            nom: document.getElementById('ia-client-nom').value.trim(),
+            telephone: document.getElementById('ia-client-telephone').value.trim(),
+            email: document.getElementById('ia-client-email').value.trim(),
+            adresse: document.getElementById('ia-client-adresse').value.trim(),
+            ifu: document.getElementById('ia-client-ifu').value.trim() || ''
+        };
+
+        try {
+            const response = await apiRequest('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(clientData)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                Toast.success('✅ Client créé avec succès !');
+                modal.remove();
+                await this.chargerClientsProjetsIA();
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+            }
+        } catch (error) {
+            console.error('Erreur création client:', error);
+            Toast.error('❌ Erreur de connexion');
+        }
+    });
+}
+
+// ============================================================
+// CRÉER UN PROJET DEPUIS LA PAGE IA
+// ============================================================
+
+openCreateProjetModalIA() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-hard-hat"></i> Nouveau projet</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="ia-projet-form">
+                    <div class="form-group">
+                        <label>Nom du projet *</label>
+                        <input type="text" id="ia-projet-nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="ia-projet-description" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Localisation</label>
+                        <input type="text" id="ia-projet-localisation">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    const form = modal.querySelector('#ia-projet-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const projetData = {
+            nom_projet: document.getElementById('ia-projet-nom').value.trim(),
+            description: document.getElementById('ia-projet-description').value.trim(),
+            localisation: document.getElementById('ia-projet-localisation').value.trim(),
+            statut: 'en_attente',
+            progression: 0
+        };
+
+        try {
+            const response = await apiRequest('/api/projets', {
+                method: 'POST',
+                body: JSON.stringify(projetData)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                Toast.success('✅ Projet créé avec succès !');
+                modal.remove();
+                await this.chargerClientsProjetsIA();
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+            }
+        } catch (error) {
+            console.error('Erreur création projet:', error);
+            Toast.error('❌ Erreur de connexion');
+        }
+    });
 }
     
     // Actions rapides
@@ -3964,175 +4194,12 @@ openCreateDevisModal() {
 // CRÉER UN CLIENT DEPUIS LA PAGE IA
 // ============================================================
 
-openCreateClientModalIA() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-user-plus"></i> Nouveau client</h2>
-                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
-            </div>
-            <div class="modal-body">
-                <form id="ia-client-form">
-                    <div class="form-group">
-                        <label>Nom complet *</label>
-                        <input type="text" id="ia-client-nom" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Téléphone *</label>
-                        <input type="tel" id="ia-client-telephone" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email *</label>
-                        <input type="email" id="ia-client-email" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Adresse</label>
-                        <textarea id="ia-client-adresse" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>IFU</label>
-                        <input type="text" id="ia-client-ifu" placeholder="13 caractères" maxlength="13">
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">Enregistrer</button>
-                        <button type="button" class="btn-secondary close-modal">Annuler</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const closeBtns = modal.querySelectorAll('.close-modal');
-    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-
-    const form = modal.querySelector('#ia-client-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const clientData = {
-            nom: document.getElementById('ia-client-nom').value.trim(),
-            telephone: document.getElementById('ia-client-telephone').value.trim(),
-            email: document.getElementById('ia-client-email').value.trim(),
-            adresse: document.getElementById('ia-client-adresse').value.trim(),
-            ifu: document.getElementById('ia-client-ifu').value.trim() || ''
-        };
-
-        try {
-            const response = await apiRequest('/api/clients', {
-                method: 'POST',
-                body: JSON.stringify(clientData)
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                Toast.success('✅ Client créé avec succès !');
-                modal.remove();
-                // Recharger la liste des clients
-                await this.chargerClientsProjetsIA();
-                // Sélectionner automatiquement le nouveau client (dernier)
-                setTimeout(() => {
-                    const selectClient = document.getElementById('ia-select-client');
-                    if (selectClient && selectClient.options.length > 2) {
-                        selectClient.selectedIndex = selectClient.options.length - 1;
-                    }
-                }, 300);
-            } else {
-                Toast.error(result.message || 'Erreur lors de la création');
-            }
-        } catch (error) {
-            console.error('Erreur création client:', error);
-            Toast.error('❌ Erreur de connexion');
-        }
-    });
-}
 
 // ============================================================
 // CRÉER UN PROJET DEPUIS LA PAGE IA
 // ============================================================
 
-openCreateProjetModalIA() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-hard-hat"></i> Nouveau projet</h2>
-                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
-            </div>
-            <div class="modal-body">
-                <form id="ia-projet-form">
-                    <div class="form-group">
-                        <label>Nom du projet *</label>
-                        <input type="text" id="ia-projet-nom" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="ia-projet-description" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Localisation</label>
-                        <input type="text" id="ia-projet-localisation">
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">Créer</button>
-                        <button type="button" class="btn-secondary close-modal">Annuler</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
 
-    document.body.appendChild(modal);
-
-    const closeBtns = modal.querySelectorAll('.close-modal');
-    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-
-    const form = modal.querySelector('#ia-projet-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const projetData = {
-            nom_projet: document.getElementById('ia-projet-nom').value.trim(),
-            description: document.getElementById('ia-projet-description').value.trim(),
-            localisation: document.getElementById('ia-projet-localisation').value.trim(),
-            statut: 'en_attente',
-            progression: 0
-        };
-
-        try {
-            const response = await apiRequest('/api/projets', {
-                method: 'POST',
-                body: JSON.stringify(projetData)
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                Toast.success('✅ Projet créé avec succès !');
-                modal.remove();
-                await this.chargerClientsProjetsIA();
-                setTimeout(() => {
-                    const selectProjet = document.getElementById('ia-select-projet');
-                    if (selectProjet && selectProjet.options.length > 2) {
-                        selectProjet.selectedIndex = selectProjet.options.length - 1;
-                    }
-                }, 300);
-            } else {
-                Toast.error(result.message || 'Erreur lors de la création');
-            }
-        } catch (error) {
-            console.error('Erreur création projet:', error);
-            Toast.error('❌ Erreur de connexion');
-        }
-    });
-}
 
 
 async renderAbonnementContent() {
