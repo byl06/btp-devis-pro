@@ -2358,15 +2358,25 @@ def preview_imported_header():
 # ASSISTANT IA — GÉNÉRATION DE DEVIS
 # ============================================================
 
+# ============================================================
+# ASSISTANT IA — GÉNÉRATION DE DEVIS (avec historique)
+# ============================================================
+
 @app.route('/api/ai/generate-devis', methods=['POST'])
 @jwt_required()
 def ai_generate_devis():
     """
-    Génère un devis à partir d'une description en langage naturel.
+    Génère un devis à partir d'une description ou d'un historique de conversation.
     
     Body JSON attendu :
     {
-        "description": "Je veux un devis pour une maison de 100m²..."
+        "description": "Je veux un devis pour une maison de 100m²...",
+        "historique": [
+            {"role": "user", "content": "Je veux un devis..."},
+            {"role": "assistant", "content": "Quel type de construction ?"},
+            {"role": "user", "content": "Maçonnerie en parpaings..."}
+        ],
+        "tour_count": 2
     }
     
     Réponse :
@@ -2376,11 +2386,8 @@ def ai_generate_devis():
         "lignes": [...],
         "questions": [...],
         "provider": "groq" | "mistral",
-        "quota": {
-            "utilise": 3,
-            "limite": 10,
-            "restant": 7
-        }
+        "quota": {...},
+        "tour_count": 3
     }
     """
     try:
@@ -2389,27 +2396,28 @@ def ai_generate_devis():
         
         data = request.json
         description = (data.get('description') or '').strip()
+        historique = data.get('historique', [])
+        tour_count = int(data.get('tour_count', 0))
         
         # ============================================================
         # 1. VALIDATION
         # ============================================================
         
-        if not description:
+        if not description and not historique:
             return jsonify({
                 'success': False,
                 'message': 'Veuillez décrire votre projet.'
             }), 400
         
-        if len(description) < 10:
-            return jsonify({
-                'success': False,
-                'message': 'Description trop courte. Décrivez votre projet en quelques mots.'
-            }), 400
+        # Si pas d'historique, on initialise avec la description
+        if not historique:
+            historique = [{"role": "user", "content": description}]
         
-        if len(description) > 2000:
+        # Vérifier la taille de l'historique
+        if len(historique) > 20:
             return jsonify({
                 'success': False,
-                'message': 'Description trop longue (max 2000 caractères).'
+                'message': 'Conversation trop longue. Veuillez recommencer.'
             }), 400
         
         # ============================================================
@@ -2426,7 +2434,6 @@ def ai_generate_devis():
             "Content-Type": "application/json"
         }
         
-        # Récupérer l'abonnement
         abo_response = requests.get(
             f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}&statut=eq.actif",
             headers=headers
@@ -2437,7 +2444,6 @@ def ai_generate_devis():
             abo = abo_response.json()[0]
             offre = abo.get('type_abonnement', 'essai')
         
-        # Admin = illimité
         if user_id == 1:
             offre = 'illimite'
         
@@ -2445,7 +2451,12 @@ def ai_generate_devis():
         # 3. VÉRIFIER LA LIMITE
         # ============================================================
         
-        from ai_service import verifier_limite_ia, generate_devis_with_ai, enregistrer_generation
+        from ai_service import (
+            verifier_limite_ia,
+            generate_devis_with_ai,
+            enregistrer_generation,
+            MAX_TOURS
+        )
         
         limite_info = verifier_limite_ia(user_id, offre)
         
@@ -2474,15 +2485,21 @@ def ai_generate_devis():
             catalogue = catalogue_response.json()
         
         print(f"📦 Catalogue: {len(catalogue)} produits")
+        print(f"💬 Historique: {len(historique)} messages")
+        print(f"🔄 Tour: {tour_count}/{MAX_TOURS}")
         
         # ============================================================
         # 5. APPELER L'IA
         # ============================================================
         
         print(f"🤖 Génération IA pour user {user_id} (offre: {offre})")
-        print(f"📝 Description: {description[:100]}...")
         
-        result = generate_devis_with_ai(description, catalogue)
+        result = generate_devis_with_ai(
+            description=description,
+            catalogue=catalogue,
+            historique=historique,
+            tour_count=tour_count
+        )
         
         # ============================================================
         # 6. GÉRER LE RÉSULTAT
@@ -2499,12 +2516,15 @@ def ai_generate_devis():
                 }
             }), 500
         
-        # Enregistrer la génération
-        enregistrer_generation(user_id, result.get('provider', 'unknown'))
+        # Enregistrer la génération (seulement si action == "generate")
+        if result['action'] == 'generate':
+            enregistrer_generation(user_id, result.get('provider', 'unknown'))
+            nouveau_utilise = limite_info['utilise'] + 1
+        else:
+            nouveau_utilise = limite_info['utilise']
         
-        # Mettre à jour le quota
-        nouveau_utilise = limite_info['utilise'] + 1
         nouveau_restant = max(0, limite_info['limite'] - nouveau_utilise)
+        nouveau_tour = tour_count + 1
         
         # ============================================================
         # 7. RETOURNER LA RÉPONSE
@@ -2516,6 +2536,7 @@ def ai_generate_devis():
                 'action': 'ask',
                 'questions': result.get('questions', []),
                 'provider': result.get('provider'),
+                'tour_count': nouveau_tour,
                 'quota': {
                     'utilise': nouveau_utilise,
                     'limite': limite_info['limite'],
@@ -2529,6 +2550,7 @@ def ai_generate_devis():
                 'action': 'generate',
                 'lignes': result.get('lignes', []),
                 'provider': result.get('provider'),
+                'tour_count': nouveau_tour,
                 'quota': {
                     'utilise': nouveau_utilise,
                     'limite': limite_info['limite'],

@@ -16,6 +16,9 @@ MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 GROQ_MODEL = "openai/gpt-oss-120b"
 MISTRAL_MODEL = "mistral-small-latest"
 
+# Nombre maximum d'échanges (user + assistant) avant de forcer la génération
+MAX_TOURS = 5
+
 # ============================================================
 # PROMPT SYSTÈME
 # ============================================================
@@ -48,27 +51,31 @@ POUR DEMANDER DES PRÉCISIONS :
 
 CONTEXTE MÉTIER :
 - Tu es au Bénin, les prix sont en FCFA.
-- Les matériaux courants : ciment, sable, gravier, fer à béton, tôle, carreaux, peinture, etc.
-- Pour une maison de 100m², il faut environ 50 sacs de ciment, 10m³ de sable, 100 barres de fer, etc.
+- Les matériaux courants : ciment, sable, gravier, fer à béton, tôle, carreaux, peinture, parpaings, planches, etc.
+- Pour une maison de 100m², il faut environ 2m³ de ciment, 10m³ de sable, 100 barres de fer, 1200 parpaings, etc.
 - Sois réaliste dans les quantités et les prix.
 
 CATALOGUE DE L'UTILISATEUR (utilise ces prix en priorité) :
 {catalogue}
 
 Si le catalogue est vide, utilise les prix moyens du marché béninois.
+
+IMPORTANT : Si l'utilisateur a déjà répondu à tes questions, tu dois maintenant GÉNÉRER le devis (action: "generate").
 """
 
 # ============================================================
 # FONCTION PRINCIPALE
 # ============================================================
 
-def generate_devis_with_ai(description, catalogue=None):
+def generate_devis_with_ai(description, catalogue=None, historique=None, tour_count=0):
     """
-    Génère un devis à partir d'une description en langage naturel.
+    Génère un devis à partir d'une description et d'un historique de conversation.
     
     Args:
-        description (str): Description du projet par l'utilisateur
+        description (str): Dernier message de l'utilisateur
         catalogue (list): Liste des produits de l'utilisateur (optionnel)
+        historique (list): Historique de la conversation [{"role": "user"/"assistant", "content": "..."}]
+        tour_count (int): Nombre de tours déjà effectués
     
     Returns:
         dict: {
@@ -85,7 +92,7 @@ def generate_devis_with_ai(description, catalogue=None):
     catalogue_str = "Aucun catalogue disponible."
     if catalogue and len(catalogue) > 0:
         catalogue_lines = []
-        for p in catalogue[:50]:  # Limiter à 50 produits
+        for p in catalogue[:50]:
             designation = p.get('designation', '')
             prix = p.get('prix_unitaire', 0)
             unite = p.get('unite', 'unité')
@@ -95,11 +102,25 @@ def generate_devis_with_ai(description, catalogue=None):
     # Construire le prompt système
     system_prompt = SYSTEM_PROMPT.replace("{catalogue}", catalogue_str)
     
-    # Messages
+    # Forcer la génération si on a dépassé MAX_TOURS
+    if tour_count >= MAX_TOURS:
+        system_prompt += "\n\n⚠️ Tu as atteint le nombre maximum d'échanges. Tu DOIS maintenant GÉNÉRER le devis avec les informations disponibles."
+    
+    # Construire les messages
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": description}
+        {"role": "system", "content": system_prompt}
     ]
+    
+    # Ajouter l'historique
+    if historique and len(historique) > 0:
+        for msg in historique:
+            messages.append({
+                "role": msg.get('role', 'user'),
+                "content": msg.get('content', '')
+            })
+    else:
+        # Pas d'historique → premier message
+        messages.append({"role": "user", "content": description})
     
     # ============================================================
     # TENTATIVE 1 : GROQ
@@ -253,7 +274,6 @@ def _call_mistral(messages):
 def _parse_ai_response(content):
     """Parse la réponse JSON de l'IA."""
     try:
-        # Nettoyer les backticks markdown
         content = content.strip()
         if content.startswith('```json'):
             content = content[7:]
@@ -263,10 +283,8 @@ def _parse_ai_response(content):
             content = content[:-3]
         content = content.strip()
         
-        # Parser le JSON
         parsed = json.loads(content)
         
-        # Valider la structure
         if 'action' not in parsed:
             print(f"⚠️ Réponse sans 'action': {parsed}")
             return None
@@ -276,7 +294,6 @@ def _parse_ai_response(content):
                 print(f"⚠️ Réponse 'generate' sans 'lignes'")
                 return None
             
-            # Valider chaque ligne
             for ligne in parsed['lignes']:
                 if 'designation' not in ligne or 'quantite' not in ligne or 'prix_unitaire' not in ligne:
                     print(f"⚠️ Ligne invalide: {ligne}")
@@ -306,7 +323,6 @@ def _parse_ai_response(content):
 # GESTION DES LIMITES
 # ============================================================
 
-# Limites par offre
 LIMITES_IA = {
     'artisan': 5,
     'starter': 10,
@@ -323,18 +339,7 @@ def get_limite_ia(offre):
 
 
 def verifier_limite_ia(user_id, offre):
-    """
-    Vérifie si l'utilisateur peut encore générer.
-    
-    Returns:
-        dict: {
-            "autorise": bool,
-            "utilise": int,
-            "limite": int,
-            "restant": int,
-            "message": str (si non autorisé)
-        }
-    """
+    """Vérifie si l'utilisateur peut encore générer."""
     import requests
     
     supabase_url = os.environ.get('SUPABASE_URL', '')
@@ -346,7 +351,6 @@ def verifier_limite_ia(user_id, offre):
         "Content-Type": "application/json"
     }
     
-    # Admin = illimité
     if user_id == 1:
         return {
             "autorise": True,
@@ -355,7 +359,6 @@ def verifier_limite_ia(user_id, offre):
             "restant": 999999
         }
     
-    # Compter les générations du jour
     today = datetime.now().strftime('%Y-%m-%d')
     
     try:
