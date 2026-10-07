@@ -2352,6 +2352,259 @@ def preview_imported_header():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# ASSISTANT IA — GÉNÉRATION DE DEVIS
+# ============================================================
+
+@app.route('/api/ai/generate-devis', methods=['POST'])
+@jwt_required()
+def ai_generate_devis():
+    """
+    Génère un devis à partir d'une description en langage naturel.
+    
+    Body JSON attendu :
+    {
+        "description": "Je veux un devis pour une maison de 100m²..."
+    }
+    
+    Réponse :
+    {
+        "success": true,
+        "action": "generate" | "ask",
+        "lignes": [...],
+        "questions": [...],
+        "provider": "groq" | "mistral",
+        "quota": {
+            "utilise": 3,
+            "limite": 10,
+            "restant": 7
+        }
+    }
+    """
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        data = request.json
+        description = (data.get('description') or '').strip()
+        
+        # ============================================================
+        # 1. VALIDATION
+        # ============================================================
+        
+        if not description:
+            return jsonify({
+                'success': False,
+                'message': 'Veuillez décrire votre projet.'
+            }), 400
+        
+        if len(description) < 10:
+            return jsonify({
+                'success': False,
+                'message': 'Description trop courte. Décrivez votre projet en quelques mots.'
+            }), 400
+        
+        if len(description) > 2000:
+            return jsonify({
+                'success': False,
+                'message': 'Description trop longue (max 2000 caractères).'
+            }), 400
+        
+        # ============================================================
+        # 2. RÉCUPÉRER L'OFFRE DE L'UTILISATEUR
+        # ============================================================
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer l'abonnement
+        abo_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}&statut=eq.actif",
+            headers=headers
+        )
+        
+        offre = 'essai'
+        if abo_response.status_code == 200 and abo_response.json():
+            abo = abo_response.json()[0]
+            offre = abo.get('type_abonnement', 'essai')
+        
+        # Admin = illimité
+        if user_id == 1:
+            offre = 'illimite'
+        
+        # ============================================================
+        # 3. VÉRIFIER LA LIMITE
+        # ============================================================
+        
+        from ai_service import verifier_limite_ia, generate_devis_with_ai, enregistrer_generation
+        
+        limite_info = verifier_limite_ia(user_id, offre)
+        
+        if not limite_info['autorise']:
+            return jsonify({
+                'success': False,
+                'message': limite_info['message'],
+                'quota': {
+                    'utilise': limite_info['utilise'],
+                    'limite': limite_info['limite'],
+                    'restant': 0
+                }
+            }), 429
+        
+        # ============================================================
+        # 4. RÉCUPÉRER LE CATALOGUE
+        # ============================================================
+        
+        catalogue_response = requests.get(
+            f"{supabase_url}/rest/v1/catalogue?id_user=eq.{user_id}&order=designation.asc",
+            headers=headers
+        )
+        
+        catalogue = []
+        if catalogue_response.status_code == 200:
+            catalogue = catalogue_response.json()
+        
+        print(f"📦 Catalogue: {len(catalogue)} produits")
+        
+        # ============================================================
+        # 5. APPELER L'IA
+        # ============================================================
+        
+        print(f"🤖 Génération IA pour user {user_id} (offre: {offre})")
+        print(f"📝 Description: {description[:100]}...")
+        
+        result = generate_devis_with_ai(description, catalogue)
+        
+        # ============================================================
+        # 6. GÉRER LE RÉSULTAT
+        # ============================================================
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'message': result.get('error', 'L\'assistant IA est temporairement indisponible.'),
+                'quota': {
+                    'utilise': limite_info['utilise'],
+                    'limite': limite_info['limite'],
+                    'restant': limite_info['restant']
+                }
+            }), 500
+        
+        # Enregistrer la génération
+        enregistrer_generation(user_id, result.get('provider', 'unknown'))
+        
+        # Mettre à jour le quota
+        nouveau_utilise = limite_info['utilise'] + 1
+        nouveau_restant = max(0, limite_info['limite'] - nouveau_utilise)
+        
+        # ============================================================
+        # 7. RETOURNER LA RÉPONSE
+        # ============================================================
+        
+        if result['action'] == 'ask':
+            return jsonify({
+                'success': True,
+                'action': 'ask',
+                'questions': result.get('questions', []),
+                'provider': result.get('provider'),
+                'quota': {
+                    'utilise': nouveau_utilise,
+                    'limite': limite_info['limite'],
+                    'restant': nouveau_restant
+                }
+            })
+        
+        else:  # generate
+            return jsonify({
+                'success': True,
+                'action': 'generate',
+                'lignes': result.get('lignes', []),
+                'provider': result.get('provider'),
+                'quota': {
+                    'utilise': nouveau_utilise,
+                    'limite': limite_info['limite'],
+                    'restant': nouveau_restant
+                }
+            })
+    
+    except Exception as e:
+        print(f"❌ Erreur ai_generate_devis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Erreur: {str(e)}'
+        }), 500
+
+
+# ============================================================
+# ASSISTANT IA — QUOTA
+# ============================================================
+
+@app.route('/api/ai/quota', methods=['GET'])
+@jwt_required()
+def ai_get_quota():
+    """
+    Retourne le quota IA de l'utilisateur.
+    """
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer l'abonnement
+        abo_response = requests.get(
+            f"{supabase_url}/rest/v1/abonnements?id_user=eq.{user_id}&statut=eq.actif",
+            headers=headers
+        )
+        
+        offre = 'essai'
+        if abo_response.status_code == 200 and abo_response.json():
+            abo = abo_response.json()[0]
+            offre = abo.get('type_abonnement', 'essai')
+        
+        if user_id == 1:
+            offre = 'illimite'
+        
+        from ai_service import verifier_limite_ia
+        
+        limite_info = verifier_limite_ia(user_id, offre)
+        
+        return jsonify({
+            'success': True,
+            'offre': offre,
+            'quota': {
+                'utilise': limite_info['utilise'],
+                'limite': limite_info['limite'],
+                'restant': limite_info['restant']
+            }
+        })
+    
+    except Exception as e:
+        print(f"❌ Erreur ai_get_quota: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 @app.route('/api/devis/<int:id_devis>', methods=['DELETE'])
 @jwt_required()
 def delete_devis(id_devis):
