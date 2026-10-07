@@ -414,6 +414,25 @@ body {
    BOUTONS IA
    ============================================================ */
 
+/* Boutons IA */
+.btn-ai,
+.btn-success,
+.btn-warning,
+.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
 .btn-ai {
     background: linear-gradient(135deg, var(--ai-start), var(--ai-end));
     color: white;
@@ -466,6 +485,7 @@ body {
 /* ============================================================
    FORMULAIRES IA
    ============================================================ */
+
 
 .ia-form-row {
     display: grid;

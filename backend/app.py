@@ -851,7 +851,7 @@ def create_devis():
             "id_client": data.get('id_client'),
             "id_user": user_id,
             "id_projet": data.get('id_projet'),
-            "show_signature": show_signature 
+            "show_signature": data.get('show_signature', True) 
         }
         
         print(f"🔍 Données devis à insérer: {devis_data}")

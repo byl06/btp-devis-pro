@@ -2468,6 +2468,31 @@ async initAssistantIA() {
     if (btnGenerate) {
         btnGenerate.addEventListener('click', () => this.genererDevisIA());
     }
+    // Gérer le select client
+const selectClient = document.getElementById('ia-select-client');
+if (selectClient) {
+    selectClient.addEventListener('change', function() {
+        if (this.value === 'new') {
+            // Ouvrir la modale de création client
+            app.openCreateClientModalIA();
+            // Réinitialiser le select
+            this.value = '';
+        }
+    });
+}
+
+// Gérer le select projet
+const selectProjet = document.getElementById('ia-select-projet');
+if (selectProjet) {
+    selectProjet.addEventListener('change', function() {
+        if (this.value === 'new') {
+            // Ouvrir la modale de création projet
+            app.openCreateProjetModalIA();
+            // Réinitialiser le select
+            this.value = '';
+        }
+    });
+}
 
     // Bouton Ajouter une ligne
     const btnAddLine = document.getElementById('btn-ia-add-line');
@@ -2873,7 +2898,8 @@ async validerDevisIA() {
                 id_client: parseInt(idClient),
                 id_projet: parseInt(idProjet),
                 id_user: this.currentUser.id,
-                lignes: lignes
+                lignes: lignes,
+                show_signature: true
             })
         });
 
@@ -3931,6 +3957,180 @@ openCreateDevisModal() {
         });
         
         calculateTotal();
+    });
+}
+
+// ============================================================
+// CRÉER UN CLIENT DEPUIS LA PAGE IA
+// ============================================================
+
+openCreateClientModalIA() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> Nouveau client</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="ia-client-form">
+                    <div class="form-group">
+                        <label>Nom complet *</label>
+                        <input type="text" id="ia-client-nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Téléphone *</label>
+                        <input type="tel" id="ia-client-telephone" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="ia-client-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse</label>
+                        <textarea id="ia-client-adresse" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>IFU</label>
+                        <input type="text" id="ia-client-ifu" placeholder="13 caractères" maxlength="13">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Enregistrer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    const form = modal.querySelector('#ia-client-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const clientData = {
+            nom: document.getElementById('ia-client-nom').value.trim(),
+            telephone: document.getElementById('ia-client-telephone').value.trim(),
+            email: document.getElementById('ia-client-email').value.trim(),
+            adresse: document.getElementById('ia-client-adresse').value.trim(),
+            ifu: document.getElementById('ia-client-ifu').value.trim() || ''
+        };
+
+        try {
+            const response = await apiRequest('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(clientData)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                Toast.success('✅ Client créé avec succès !');
+                modal.remove();
+                // Recharger la liste des clients
+                await this.chargerClientsProjetsIA();
+                // Sélectionner automatiquement le nouveau client (dernier)
+                setTimeout(() => {
+                    const selectClient = document.getElementById('ia-select-client');
+                    if (selectClient && selectClient.options.length > 2) {
+                        selectClient.selectedIndex = selectClient.options.length - 1;
+                    }
+                }, 300);
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+            }
+        } catch (error) {
+            console.error('Erreur création client:', error);
+            Toast.error('❌ Erreur de connexion');
+        }
+    });
+}
+
+// ============================================================
+// CRÉER UN PROJET DEPUIS LA PAGE IA
+// ============================================================
+
+openCreateProjetModalIA() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-hard-hat"></i> Nouveau projet</h2>
+                <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+            </div>
+            <div class="modal-body">
+                <form id="ia-projet-form">
+                    <div class="form-group">
+                        <label>Nom du projet *</label>
+                        <input type="text" id="ia-projet-nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="ia-projet-description" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Localisation</label>
+                        <input type="text" id="ia-projet-localisation">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtns = modal.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    const form = modal.querySelector('#ia-projet-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const projetData = {
+            nom_projet: document.getElementById('ia-projet-nom').value.trim(),
+            description: document.getElementById('ia-projet-description').value.trim(),
+            localisation: document.getElementById('ia-projet-localisation').value.trim(),
+            statut: 'en_attente',
+            progression: 0
+        };
+
+        try {
+            const response = await apiRequest('/api/projets', {
+                method: 'POST',
+                body: JSON.stringify(projetData)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                Toast.success('✅ Projet créé avec succès !');
+                modal.remove();
+                await this.chargerClientsProjetsIA();
+                setTimeout(() => {
+                    const selectProjet = document.getElementById('ia-select-projet');
+                    if (selectProjet && selectProjet.options.length > 2) {
+                        selectProjet.selectedIndex = selectProjet.options.length - 1;
+                    }
+                }, 300);
+            } else {
+                Toast.error(result.message || 'Erreur lors de la création');
+            }
+        } catch (error) {
+            console.error('Erreur création projet:', error);
+            Toast.error('❌ Erreur de connexion');
+        }
     });
 }
 
