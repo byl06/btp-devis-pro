@@ -349,6 +349,14 @@ async saveHeaderSettings() {
                     pageTitle.textContent = 'Factures';
                     contentArea.innerHTML = await this.renderFactures();
                     break;
+                case 'assistant-ia':
+    pageTitle.textContent = 'Assistant IA';
+    contentArea.innerHTML = await this.renderAssistantIA();
+    // Initialiser la page IA
+    setTimeout(() => {
+        this.initAssistantIA();
+    }, 100);
+    break;
                 case 'actualites':
     pageTitle.textContent = 'Actualités';
     contentArea.innerHTML = await this.renderActualites();
@@ -1165,6 +1173,7 @@ ouvrirResultat(type, id) {
         case 'facture':
             this.loadPage('factures');
             break;
+
         default:
             this.loadPage('dashboard');
     }
@@ -2266,6 +2275,714 @@ viewFactureNormalisee(id_facture) {
             Toast.error('❌ Erreur de connexion');
         }
     }
+}
+
+// ============================================================
+// ASSISTANT IA — RENDU DE LA PAGE
+// ============================================================
+
+async renderAssistantIA() {
+    return `
+        <div class="ia-header">
+            <div class="ia-header-left">
+                <div class="ia-icon-wrapper">
+                    <i class="fas fa-robot ia-icon"></i>
+                </div>
+                <div class="ia-header-title">
+                    <h1>
+                        Assistant IA
+                        <span class="ia-badge">
+                            <i class="fas fa-bolt"></i> BETA
+                        </span>
+                    </h1>
+                    <p>Générez vos devis en langage naturel — l'IA s'occupe du reste.</p>
+                </div>
+            </div>
+            <div class="ia-counter" id="ia-counter">
+                <i class="fas fa-bolt" style="color: var(--warning);"></i>
+                <span id="ia-counter-text">Chargement...</span>
+                <div class="ia-counter-bar">
+                    <div class="ia-counter-bar-fill" id="ia-counter-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ÉTAPE 1 : PROMPT -->
+        <div class="ia-card">
+            <div class="ia-card-inner">
+                <div class="ia-textarea-wrapper">
+                    <textarea
+                        class="ia-textarea"
+                        id="ia-prompt"
+                        placeholder="Ex : Je veux un devis pour une maison de 100m² à Cotonou, avec 3 chambres, 2 salles de bain, un toit en tôle et une cuisine équipée..."
+                    ></textarea>
+                </div>
+                <div class="ia-textarea-actions">
+                    <div class="ia-hint">
+                        <i class="fas fa-lightbulb"></i>
+                        Plus votre description est détaillée, plus le devis sera précis.
+                    </div>
+                    <div class="ia-buttons">
+                        <button class="btn btn-ai" id="btn-ia-generate">
+                            <i class="fas fa-wand-magic-sparkles"></i>
+                            Générer le devis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="ia-loading" id="ia-loading">
+            <div class="ia-loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <p id="ia-loading-text">L'IA analyse votre demande...</p>
+        </div>
+
+        <!-- ÉTAPE 2 : VISUALISATION -->
+        <div class="ia-visualisation" id="ia-visualisation">
+            <div class="ia-card">
+                <div class="ia-card-inner">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 600;">
+                            <i class="fas fa-file-invoice" style="color: var(--ai-start);"></i>
+                            Devis généré
+                        </div>
+                        <button class="btn btn-ghost" style="padding: 6px 14px; font-size: 0.75rem;" id="btn-ia-reprompt-top">
+                            <i class="fas fa-rotate"></i>
+                            Re-prompt
+                        </button>
+                    </div>
+
+                    <!-- Client / Projet -->
+                    <div class="ia-form-row">
+                        <div class="ia-form-group">
+                            <label><i class="fas fa-user"></i> Client</label>
+                            <select class="ia-select" id="ia-select-client">
+                                <option value="">Chargement...</option>
+                            </select>
+                        </div>
+                        <div class="ia-form-group">
+                            <label><i class="fas fa-hard-hat"></i> Projet</label>
+                            <select class="ia-select" id="ia-select-projet">
+                                <option value="">Chargement...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tableau des lignes -->
+                    <div class="ia-table-wrapper">
+                        <table class="ia-table">
+                            <thead>
+                                <tr>
+                                    <th>Désignation</th>
+                                    <th style="width: 90px;">Qté</th>
+                                    <th style="width: 140px;">Prix U. (FCFA)</th>
+                                    <th style="width: 140px;">Total (FCFA)</th>
+                                    <th style="width: 60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ia-table-body">
+                                <!-- Rempli par JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <button class="btn btn-ghost" style="width: 100%; margin-bottom: 1rem;" id="btn-ia-add-line">
+                        <i class="fas fa-plus"></i>
+                        Ajouter une ligne
+                    </button>
+
+                    <!-- Récapitulatif -->
+                    <div class="ia-summary">
+                        <div class="ia-summary-row">
+                            <span>Sous-total matériaux</span>
+                            <span id="ia-sous-total">0 FCFA</span>
+                        </div>
+                        <div class="ia-summary-row">
+                            <span>Main d'œuvre (20%)</span>
+                            <span id="ia-main-oeuvre">0 FCFA</span>
+                        </div>
+                        <div class="ia-summary-row total">
+                            <span>TOTAL TTC</span>
+                            <span id="ia-total">0 FCFA</span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="ia-final-actions">
+                        <div class="ia-final-actions-left">
+                            <button class="btn btn-warning" id="btn-ia-reprompt">
+                                <i class="fas fa-rotate"></i>
+                                Re-prompt
+                            </button>
+                        </div>
+                        <div class="ia-final-actions-right">
+                            <button class="btn btn-ghost" id="btn-ia-cancel">
+                                <i class="fas fa-xmark"></i>
+                                Annuler
+                            </button>
+                            <button class="btn btn-success" id="btn-ia-validate">
+                                <i class="fas fa-check"></i>
+                                Valider et créer le devis
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Astuce -->
+            <div class="ia-tip">
+                <i class="fas fa-circle-info"></i>
+                <div>
+                    <div class="ia-tip-title">Astuce</div>
+                    <div class="ia-tip-text">
+                        Vous pouvez modifier chaque ligne directement dans le tableau avant de valider.
+                        Si le résultat ne vous convient pas, cliquez sur <strong>Re-prompt</strong> pour ajuster la description.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conteneur des notifications -->
+        <div class="ia-toast-container" id="ia-toast-container"></div>
+    `;
+}
+
+// ============================================================
+// ASSISTANT IA — INITIALISATION
+// ============================================================
+
+async initAssistantIA() {
+    // Charger le quota
+    await this.chargerQuotaIA();
+
+    // Charger clients et projets
+    await this.chargerClientsProjetsIA();
+
+    // Bouton Générer
+    const btnGenerate = document.getElementById('btn-ia-generate');
+    if (btnGenerate) {
+        btnGenerate.addEventListener('click', () => this.genererDevisIA());
+    }
+
+    // Bouton Ajouter une ligne
+    const btnAddLine = document.getElementById('btn-ia-add-line');
+    if (btnAddLine) {
+        btnAddLine.addEventListener('click', () => this.ajouterLigneIA());
+    }
+
+    // Boutons Re-prompt
+    const btnReprompt = document.getElementById('btn-ia-reprompt');
+    const btnRepromptTop = document.getElementById('btn-ia-reprompt-top');
+    if (btnReprompt) btnReprompt.addEventListener('click', () => this.rePromptIA());
+    if (btnRepromptTop) btnRepromptTop.addEventListener('click', () => this.rePromptIA());
+
+    // Bouton Annuler
+    const btnCancel = document.getElementById('btn-ia-cancel');
+    if (btnCancel) {
+        btnCancel.addEventListener('click', () => this.annulerIA());
+    }
+
+    // Bouton Valider
+    const btnValidate = document.getElementById('btn-ia-validate');
+    if (btnValidate) {
+        btnValidate.addEventListener('click', () => this.validerDevisIA());
+    }
+}
+
+// ============================================================
+// CHARGER LE QUOTA
+// ============================================================
+
+async chargerQuotaIA() {
+    try {
+        const response = await apiRequest('/api/ai/quota');
+        const data = await response.json();
+
+        if (data.success) {
+            const { utilise, limite, restant } = data.quota;
+            const texte = document.getElementById('ia-counter-text');
+            const fill = document.getElementById('ia-counter-fill');
+
+            if (texte) {
+                if (limite >= 999999) {
+                    texte.innerHTML = `<strong>∞</strong> générations illimitées`;
+                } else {
+                    texte.innerHTML = `<strong>${utilise}</strong> / ${limite} générations`;
+                }
+            }
+
+            if (fill) {
+                const pourcentage = limite >= 999999 ? 0 : (utilise / limite) * 100;
+                fill.style.width = Math.min(pourcentage, 100) + '%';
+            }
+        }
+    } catch (error) {
+        console.error('Erreur chargement quota:', error);
+    }
+}
+
+// ============================================================
+// CHARGER CLIENTS ET PROJETS
+// ============================================================
+
+async chargerClientsProjetsIA() {
+    try {
+        const [clientsResponse, projetsResponse] = await Promise.all([
+            apiRequest('/api/clients'),
+            apiRequest('/api/projets')
+        ]);
+
+        const clients = this.safeArray(await clientsResponse.json());
+        const projets = this.safeArray(await projetsResponse.json());
+
+        // Remplir le select client
+        const selectClient = document.getElementById('ia-select-client');
+        if (selectClient) {
+            selectClient.innerHTML = `
+                <option value="">Sélectionner un client</option>
+                <option value="new">+ Créer un nouveau client</option>
+                ${clients.map(c => `<option value="${c.id_client}">${this.escapeHtml(c.nom)}</option>`).join('')}
+            `;
+        }
+
+        // Remplir le select projet
+        const selectProjet = document.getElementById('ia-select-projet');
+        if (selectProjet) {
+            selectProjet.innerHTML = `
+                <option value="">Sélectionner un projet</option>
+                <option value="new">+ Créer un nouveau projet</option>
+                ${projets.map(p => `<option value="${p.id_projet}">${this.escapeHtml(p.nom_projet)}</option>`).join('')}
+            `;
+        }
+    } catch (error) {
+        console.error('Erreur chargement clients/projets:', error);
+    }
+}
+
+// ============================================================
+// GÉNÉRER LE DEVIS
+// ============================================================
+
+async genererDevisIA() {
+    const prompt = document.getElementById('ia-prompt')?.value.trim();
+    if (!prompt) {
+        Toast.warning('Veuillez décrire votre projet avant de générer.');
+        return;
+    }
+
+    if (prompt.length < 10) {
+        Toast.warning('Description trop courte. Décrivez votre projet en quelques mots.');
+        return;
+    }
+
+    const btnGenerate = document.getElementById('btn-ia-generate');
+    const loading = document.getElementById('ia-loading');
+    const visualisation = document.getElementById('ia-visualisation');
+
+    // Masquer la visualisation
+    if (visualisation) visualisation.classList.remove('visible');
+
+    // Afficher le loading
+    if (loading) loading.classList.add('visible');
+    if (btnGenerate) {
+        btnGenerate.disabled = true;
+        btnGenerate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+    }
+
+    try {
+        const response = await apiRequest('/api/ai/generate-devis', {
+            method: 'POST',
+            body: JSON.stringify({ description: prompt })
+        });
+
+        const data = await response.json();
+
+        // Cacher le loading
+        if (loading) loading.classList.remove('visible');
+        if (btnGenerate) {
+            btnGenerate.disabled = false;
+            btnGenerate.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Générer le devis';
+        }
+
+        if (!data.success) {
+            Toast.error(data.message || 'Erreur de génération');
+            return;
+        }
+
+        // Mettre à jour le quota
+        if (data.quota) {
+            const texte = document.getElementById('ia-counter-text');
+            const fill = document.getElementById('ia-counter-fill');
+            if (texte) {
+                if (data.quota.limite >= 999999) {
+                    texte.innerHTML = `<strong>∞</strong> générations illimitées`;
+                } else {
+                    texte.innerHTML = `<strong>${data.quota.utilise}</strong> / ${data.quota.limite} générations`;
+                }
+            }
+            if (fill && data.quota.limite < 999999) {
+                const pct = (data.quota.utilise / data.quota.limite) * 100;
+                fill.style.width = Math.min(pct, 100) + '%';
+            }
+        }
+
+        // Gérer la réponse
+        if (data.action === 'ask') {
+            // L'IA demande des précisions
+            const questions = data.questions || [];
+            const questionsText = questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
+
+            // Ajouter les questions au prompt
+            const promptEl = document.getElementById('ia-prompt');
+            if (promptEl) {
+                promptEl.value = prompt + '\n\n' + questionsText;
+                promptEl.focus();
+            }
+
+            Toast.info('L\'IA a besoin de plus de précisions. Répondez aux questions ci-dessous.');
+            return;
+        }
+
+        // Action "generate"
+        const lignes = data.lignes || [];
+        if (lignes.length === 0) {
+            Toast.error('Aucune ligne générée. Réessayez avec une description plus détaillée.');
+            return;
+        }
+
+        // Remplir le tableau
+        this.remplirTableauIA(lignes);
+
+        // Afficher la visualisation
+        if (visualisation) {
+            visualisation.classList.add('visible');
+            setTimeout(() => {
+                visualisation.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 200);
+        }
+
+        Toast.success(`✨ ${lignes.length} lignes générées avec succès !`);
+
+    } catch (error) {
+        console.error('Erreur génération IA:', error);
+        if (loading) loading.classList.remove('visible');
+        if (btnGenerate) {
+            btnGenerate.disabled = false;
+            btnGenerate.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Générer le devis';
+        }
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// ============================================================
+// REMPLIR LE TABLEAU
+// ============================================================
+
+remplirTableauIA(lignes) {
+    const tbody = document.getElementById('ia-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    lignes.forEach(l => {
+        this.ajouterLigneIA(l.designation, l.quantite, l.prix_unitaire);
+    });
+    this.calculerTotalIA();
+}
+
+// ============================================================
+// AJOUTER UNE LIGNE
+// ============================================================
+
+ajouterLigneIA(designation = '', quantite = 1, prix = 0) {
+    const tbody = document.getElementById('ia-table-body');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input class="ia-input-inline designation" value="${this.escapeHtml(designation)}"></td>
+        <td><input class="ia-input-inline ia-input-number qte" type="number" value="${quantite}" min="0"></td>
+        <td><input class="ia-input-inline ia-input-number prix" type="number" value="${prix}" min="0"></td>
+        <td class="ia-total-cell total-cell">0</td>
+        <td><button class="btn-icon btn-delete"><i class="fas fa-trash"></i></button></td>
+    `;
+
+    // Écouteurs pour recalculer
+    tr.querySelectorAll('.qte, .prix').forEach(input => {
+        input.addEventListener('input', () => this.calculerTotalIA());
+    });
+
+    // Bouton supprimer
+    tr.querySelector('.btn-delete').addEventListener('click', () => {
+        tr.remove();
+        this.calculerTotalIA();
+    });
+
+    tbody.appendChild(tr);
+    this.calculerTotalIA();
+}
+
+// ============================================================
+// CALCULER LE TOTAL
+// ============================================================
+
+calculerTotalIA() {
+    const tbody = document.getElementById('ia-table-body');
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll('tr');
+    let sousTotal = 0;
+
+    rows.forEach(row => {
+        const qte = parseFloat(row.querySelector('.qte')?.value) || 0;
+        const prix = parseFloat(row.querySelector('.prix')?.value) || 0;
+        const total = qte * prix;
+        sousTotal += total;
+
+        const totalCell = row.querySelector('.total-cell');
+        if (totalCell) totalCell.textContent = Math.round(total).toLocaleString('fr-FR');
+    });
+
+    const mainOeuvre = sousTotal * 0.2;
+    const total = sousTotal + mainOeuvre;
+
+    const elSousTotal = document.getElementById('ia-sous-total');
+    const elMainOeuvre = document.getElementById('ia-main-oeuvre');
+    const elTotal = document.getElementById('ia-total');
+
+    if (elSousTotal) elSousTotal.textContent = Math.round(sousTotal).toLocaleString('fr-FR') + ' FCFA';
+    if (elMainOeuvre) elMainOeuvre.textContent = Math.round(mainOeuvre).toLocaleString('fr-FR') + ' FCFA';
+    if (elTotal) elTotal.textContent = Math.round(total).toLocaleString('fr-FR') + ' FCFA';
+}
+
+// ============================================================
+// RE-PROMPT
+// ============================================================
+
+rePromptIA() {
+    const ok = confirm(
+        '⚠️ Re-prompt\n\n' +
+        'Vous allez pouvoir ajuster votre description.\n' +
+        'Vos modifications actuelles seront conservées tant que vous ne validez pas la nouvelle génération.\n\n' +
+        'Continuer ?'
+    );
+
+    if (ok) {
+        const promptEl = document.getElementById('ia-prompt');
+        if (promptEl) {
+            promptEl.focus();
+            promptEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            promptEl.style.borderColor = 'var(--ai-start)';
+            promptEl.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.3)';
+            setTimeout(() => {
+                promptEl.style.borderColor = '';
+                promptEl.style.boxShadow = '';
+            }, 2000);
+        }
+    }
+}
+
+// ============================================================
+// ANNULER
+// ============================================================
+
+annulerIA() {
+    if (confirm('Annuler la génération ? Le devis ne sera pas créé.')) {
+        const visualisation = document.getElementById('ia-visualisation');
+        const tbody = document.getElementById('ia-table-body');
+        const promptEl = document.getElementById('ia-prompt');
+
+        if (visualisation) visualisation.classList.remove('visible');
+        if (tbody) tbody.innerHTML = '';
+        if (promptEl) {
+            promptEl.value = '';
+            promptEl.focus();
+        }
+        this.calculerTotalIA();
+    }
+}
+
+// ============================================================
+// VALIDER ET CRÉER LE DEVIS
+// ============================================================
+
+async validerDevisIA() {
+    const idClient = document.getElementById('ia-select-client')?.value;
+    const idProjet = document.getElementById('ia-select-projet')?.value;
+
+    // Vérifier client
+    if (!idClient) {
+        Toast.warning('Veuillez sélectionner un client.');
+        return;
+    }
+
+    // Vérifier projet
+    if (!idProjet) {
+        Toast.warning('Veuillez sélectionner un projet.');
+        return;
+    }
+
+    // Gérer les cas "nouveau"
+    if (idClient === 'new') {
+        Toast.info('Créez d\'abord le client dans la page Clients, puis revenez.');
+        return;
+    }
+    if (idProjet === 'new') {
+        Toast.info('Créez d\'abord le projet dans la page Projets, puis revenez.');
+        return;
+    }
+
+    // Récupérer les lignes
+    const tbody = document.getElementById('ia-table-body');
+    const rows = tbody?.querySelectorAll('tr') || [];
+    const lignes = [];
+
+    rows.forEach(row => {
+        const designation = row.querySelector('.designation')?.value.trim();
+        const quantite = parseFloat(row.querySelector('.qte')?.value) || 0;
+        const prix_unitaire = parseFloat(row.querySelector('.prix')?.value) || 0;
+
+        if (designation && quantite > 0 && prix_unitaire > 0) {
+            lignes.push({ designation, quantite, prix_unitaire });
+        }
+    });
+
+    if (lignes.length === 0) {
+        Toast.warning('Ajoutez au moins une ligne valide.');
+        return;
+    }
+
+    if (!confirm(`✅ Créer ce devis avec ${lignes.length} ligne(s) ?\n\nIl sera ajouté à votre liste de devis.`)) {
+        return;
+    }
+
+    const btnValidate = document.getElementById('btn-ia-validate');
+    if (btnValidate) {
+        btnValidate.disabled = true;
+        btnValidate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création...';
+    }
+
+    try {
+        const response = await apiRequest('/api/devis', {
+            method: 'POST',
+            body: JSON.stringify({
+                id_client: parseInt(idClient),
+                id_projet: parseInt(idProjet),
+                id_user: this.currentUser.id,
+                lignes: lignes
+            })
+        });
+
+        const result = await response.json();
+
+        if (btnValidate) {
+            btnValidate.disabled = false;
+            btnValidate.innerHTML = '<i class="fas fa-check"></i> Valider et créer le devis';
+        }
+
+        if (!result.success || !result.id_devis) {
+            Toast.error(result.message || 'Erreur lors de la création du devis');
+            return;
+        }
+
+        // Succès ! Afficher la notification
+        this.showSuccessToastIA(result.id_devis);
+
+        // Réinitialiser la page
+        const visualisation = document.getElementById('ia-visualisation');
+        const promptEl = document.getElementById('ia-prompt');
+        if (visualisation) visualisation.classList.remove('visible');
+        if (tbody) tbody.innerHTML = '';
+        if (promptEl) promptEl.value = '';
+        this.calculerTotalIA();
+
+        // Remonter en haut
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('Erreur création devis:', error);
+        if (btnValidate) {
+            btnValidate.disabled = false;
+            btnValidate.innerHTML = '<i class="fas fa-check"></i> Valider et créer le devis';
+        }
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// ============================================================
+// NOTIFICATION TOAST DE SUCCÈS
+// ============================================================
+
+showSuccessToastIA(devisId) {
+    const container = document.getElementById('ia-toast-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const toast = document.createElement('div');
+    toast.className = 'ia-toast';
+    toast.innerHTML = `
+        <div class="ia-toast-icon">
+            <i class="fas fa-check"></i>
+        </div>
+        <div class="ia-toast-content">
+            <div class="ia-toast-title">Devis créé avec succès !</div>
+            <div class="ia-toast-message">
+                Votre devis <strong>#${devisId}</strong> a été enregistré.
+                Vous pouvez le consulter, le modifier ou le télécharger depuis la page Devis.
+            </div>
+            <div class="ia-toast-actions">
+                <button class="ia-toast-btn ia-toast-btn-primary" id="ia-toast-voir">
+                    <i class="fas fa-eye"></i>
+                    Voir le devis
+                </button>
+                <button class="ia-toast-btn ia-toast-btn-ghost" id="ia-toast-fermer">
+                    Fermer
+                </button>
+            </div>
+        </div>
+        <button class="ia-toast-close" id="ia-toast-close">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    container.appendChild(toast);
+
+    // Bouton "Voir le devis"
+    toast.querySelector('#ia-toast-voir').addEventListener('click', () => {
+        this.removeToastIA(toast);
+        this.loadPage('devis');
+    });
+
+    // Bouton "Fermer"
+    toast.querySelector('#ia-toast-fermer').addEventListener('click', () => {
+        this.removeToastIA(toast);
+    });
+
+    // Bouton X
+    toast.querySelector('#ia-toast-close').addEventListener('click', () => {
+        this.removeToastIA(toast);
+    });
+
+    // Auto-fermeture après 10s
+    setTimeout(() => {
+        if (toast.parentElement) {
+            this.removeToastIA(toast);
+        }
+    }, 10000);
+}
+
+removeToastIA(toast) {
+    toast.style.animation = 'slideOutRight 0.3s ease forwards';
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 300);
 }
     
     // Actions rapides
