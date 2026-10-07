@@ -13,7 +13,7 @@ MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY', '')
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
-GROQ_MODEL = "llama-3.1-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 MISTRAL_MODEL = "mistral-small-latest"
 
 # ============================================================
