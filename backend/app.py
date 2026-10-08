@@ -2681,6 +2681,308 @@ def delete_devis(id_devis):
         print(f"❌ Erreur delete_devis: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# ============================================================
+# SUPPORT & AVIS
+# ============================================================
+
+@app.route('/api/contact', methods=['POST'])
+@jwt_required()
+def envoyer_contact():
+    """
+    Envoie un message à l'admin.
+    
+    Body JSON :
+    {
+        "sujet": "Question",
+        "message": "Bonjour, j'ai une question..."
+    }
+    """
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        data = request.json
+        sujet = sanitize_input(data.get('sujet', '')).strip()
+        message = sanitize_input(data.get('message', '')).strip()
+        
+        # Validation
+        if not sujet:
+            return jsonify({'success': False, 'message': 'Sujet requis'}), 400
+        
+        if not message or len(message) < 10:
+            return jsonify({'success': False, 'message': 'Message trop court (min 10 caractères)'}), 400
+        
+        if len(message) > 2000:
+            return jsonify({'success': False, 'message': 'Message trop long (max 2000 caractères)'}), 400
+        
+        # Sujets autorisés
+        sujets_autorises = ['Question', 'Bug', 'Fonctionnalité', 'Abonnement', 'Autre']
+        if sujet not in sujets_autorises:
+            sujet = 'Autre'
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Insérer le contact
+        contact_data = {
+            "id_user": user_id,
+            "sujet": sujet,
+            "message": message,
+            "statut": "nouveau",
+            "date_creation": datetime.now().isoformat()
+        }
+        
+        response = requests.post(
+            f"{supabase_url}/rest/v1/contacts",
+            headers=headers,
+            json=contact_data
+        )
+        
+        if response.status_code in [200, 201]:
+            # Créer une notification pour l'admin (user_id = 1)
+            try:
+                # Récupérer le nom de l'utilisateur
+                user_response = requests.get(
+                    f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}&select=nom,email",
+                    headers=headers
+                )
+                
+                user_nom = "Utilisateur"
+                user_email = ""
+                if user_response.status_code == 200 and user_response.json():
+                    user = user_response.json()[0]
+                    user_nom = user.get('nom', 'Utilisateur')
+                    user_email = user.get('email', '')
+                
+                notif_data = {
+                    "id_user": 1,
+                    "message": f"📩 Nouveau message de {user_nom} ({user_email}) - Sujet : {sujet}",
+                    "type": "contact",
+                    "date_creation": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/notifications",
+                    headers=headers,
+                    json=notif_data
+                )
+            except Exception as e:
+                print(f"⚠️ Erreur notification admin: {e}")
+            
+            log_action(user_id, 'contact', f"Message envoyé - Sujet: {sujet}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Message envoyé avec succès. Nous vous répondrons rapidement.'
+            })
+        else:
+            print(f"❌ Erreur insertion contact: {response.text}")
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+    
+    except Exception as e:
+        print(f"❌ Erreur envoyer_contact: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/avis', methods=['POST'])
+@jwt_required()
+def envoyer_avis():
+    """
+    Envoie un avis (note + commentaire).
+    
+    Body JSON :
+    {
+        "note": 5,
+        "commentaire": "Super application !"
+    }
+    """
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        data = request.json
+        note = data.get('note')
+        commentaire = sanitize_input(data.get('commentaire', '')).strip()
+        
+        # Validation
+        if not note or not isinstance(note, int) or note < 1 or note > 5:
+            return jsonify({'success': False, 'message': 'Note invalide (1 à 5)'}), 400
+        
+        if len(commentaire) > 1000:
+            return jsonify({'success': False, 'message': 'Commentaire trop long (max 1000 caractères)'}), 400
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Vérifier si l'utilisateur a déjà donné un avis
+        check_response = requests.get(
+            f"{supabase_url}/rest/v1/avis?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        avis_data = {
+            "id_user": user_id,
+            "note": note,
+            "commentaire": commentaire,
+            "statut": "nouveau",
+            "date_creation": datetime.now().isoformat()
+        }
+        
+        if check_response.status_code == 200 and check_response.json():
+            # Mettre à jour l'avis existant
+            response = requests.patch(
+                f"{supabase_url}/rest/v1/avis?id_user=eq.{user_id}",
+                headers=headers,
+                json=avis_data
+            )
+        else:
+            # Créer un nouvel avis
+            response = requests.post(
+                f"{supabase_url}/rest/v1/avis",
+                headers=headers,
+                json=avis_data
+            )
+        
+        if response.status_code in [200, 201, 204]:
+            # Notification admin
+            try:
+                user_response = requests.get(
+                    f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}&select=nom,email",
+                    headers=headers
+                )
+                
+                user_nom = "Utilisateur"
+                if user_response.status_code == 200 and user_response.json():
+                    user_nom = user_response.json()[0].get('nom', 'Utilisateur')
+                
+                etoiles = '⭐' * note
+                notif_data = {
+                    "id_user": 1,
+                    "message": f"⭐ Nouvel avis de {user_nom} : {note}/5 {etoiles}",
+                    "type": "avis",
+                    "date_creation": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/notifications",
+                    headers=headers,
+                    json=notif_data
+                )
+            except Exception as e:
+                print(f"⚠️ Erreur notification admin: {e}")
+            
+            log_action(user_id, 'avis', f"Avis envoyé - Note: {note}/5")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Merci pour votre avis ! 🙏'
+            })
+        else:
+            print(f"❌ Erreur insertion avis: {response.text}")
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+    
+    except Exception as e:
+        print(f"❌ Erreur envoyer_avis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/avis/mon-avis', methods=['GET'])
+@jwt_required()
+def get_mon_avis():
+    """Récupère l'avis de l'utilisateur connecté (s'il existe)."""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/avis?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        if response.status_code == 200 and response.json():
+            return jsonify({
+                'success': True,
+                'avis': response.json()[0]
+            })
+        
+        return jsonify({
+            'success': True,
+            'avis': None
+        })
+    
+    except Exception as e:
+        print(f"❌ Erreur get_mon_avis: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/contact/mes-messages', methods=['GET'])
+@jwt_required()
+def get_mes_messages():
+    """Récupère les messages de l'utilisateur connecté."""
+    try:
+        user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/contacts?id_user=eq.{user_id}&order=date_creation.desc",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'messages': response.json()
+            })
+        
+        return jsonify({
+            'success': True,
+            'messages': []
+        })
+    
+    except Exception as e:
+        print(f"❌ Erreur get_mes_messages: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # ==================== ROUTES FACTURES ====================
 @app.route('/api/facture/<int:id_devis>', methods=['POST'])
 @jwt_required()
