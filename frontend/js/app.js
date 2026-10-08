@@ -6762,6 +6762,478 @@ async verifierNouvellesActualites() {
     }
 }
 
+
+// ============================================================
+// ADMIN — MESSAGES
+// ============================================================
+
+async renderAdminMessages() {
+    try {
+        const response = await apiRequest('/api/admin/contacts');
+        const contacts = this.safeArray(await response.json());
+        
+        // Compter les nouveaux
+        const nouveaux = contacts.filter(c => c.statut === 'nouveau').length;
+        
+        if (contacts.length === 0) {
+            return `
+                <div class="glass-card" style="text-align:center; padding:3rem;">
+                    <i class="fas fa-envelope-open" style="font-size:48px; opacity:0.3; margin-bottom:1rem; display:block;"></i>
+                    <h3>Aucun message</h3>
+                    <p style="color:#94A3B8;">Les messages de vos utilisateurs apparaîtront ici.</p>
+                </div>
+            `;
+        }
+        
+        // Compter par statut
+        const stats = {
+            nouveau: contacts.filter(c => c.statut === 'nouveau').length,
+            lu: contacts.filter(c => c.statut === 'lu').length,
+            traite: contacts.filter(c => c.statut === 'traite').length
+        };
+        
+        return `
+            <div class="admin-messages">
+                <!-- Stats -->
+                <div class="cards-grid" style="margin-bottom:1.5rem;">
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #06B6D4;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Total</div>
+                        <div style="font-size:2rem; font-weight:700; color:white;">${contacts.length}</div>
+                    </div>
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #EF4444;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Nouveaux</div>
+                        <div style="font-size:2rem; font-weight:700; color:#EF4444;">${stats.nouveau}</div>
+                    </div>
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #F59E0B;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Lus</div>
+                        <div style="font-size:2rem; font-weight:700; color:#F59E0B;">${stats.lu}</div>
+                    </div>
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #10B981;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Traités</div>
+                        <div style="font-size:2rem; font-weight:700; color:#10B981;">${stats.traite}</div>
+                    </div>
+                </div>
+                
+                <!-- Filtres -->
+                <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+                    <button class="btn-secondary" onclick="app.filterAdminMessages('all')" style="padding:6px 14px; font-size:0.8rem;">Tous</button>
+                    <button class="btn-secondary" onclick="app.filterAdminMessages('nouveau')" style="padding:6px 14px; font-size:0.8rem; background:#EF4444; border-color:#EF4444;">Nouveaux</button>
+                    <button class="btn-secondary" onclick="app.filterAdminMessages('lu')" style="padding:6px 14px; font-size:0.8rem; background:#F59E0B; border-color:#F59E0B;">Lus</button>
+                    <button class="btn-secondary" onclick="app.filterAdminMessages('traite')" style="padding:6px 14px; font-size:0.8rem; background:#10B981; border-color:#10B981;">Traités</button>
+                </div>
+                
+                <!-- Liste des messages -->
+                <div id="admin-messages-list">
+                    ${contacts.map(c => this.renderAdminMessageItem(c)).join('')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Erreur renderAdminMessages:', error);
+        return '<div class="glass-card">❌ Erreur chargement des messages</div>';
+    }
+}
+
+renderAdminMessageItem(contact) {
+    const statutConfig = {
+        'nouveau': { label: 'Nouveau', color: '#EF4444', icon: 'fa-circle' },
+        'lu': { label: 'Lu', color: '#F59E0B', icon: 'fa-check' },
+        'traite': { label: 'Traité', color: '#10B981', icon: 'fa-check-double' }
+    };
+    
+    const config = statutConfig[contact.statut] || statutConfig.nouveau;
+    const date = new Date(contact.date_creation).toLocaleDateString('fr-FR', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+    
+    return `
+        <div class="admin-message-item" data-statut="${contact.statut}" style="
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-left: 4px solid ${config.color};
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                <div>
+                    <div style="font-weight:600; font-size:0.95rem;">
+                        ${this.escapeHtml(contact.user_nom)}
+                        <span style="color:#94A3B8; font-weight:normal; font-size:0.8rem;">
+                            (${this.escapeHtml(contact.user_email)})
+                        </span>
+                    </div>
+                    <div style="font-size:0.75rem; color:#94A3B8; margin-top:2px;">
+                        <i class="fas fa-tag"></i> ${this.escapeHtml(contact.sujet)}
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="
+                        background:${config.color}22;
+                        color:${config.color};
+                        padding:3px 10px;
+                        border-radius:12px;
+                        font-size:0.7rem;
+                        font-weight:600;
+                    ">
+                        <i class="fas ${config.icon}"></i> ${config.label}
+                    </span>
+                    <span style="font-size:0.7rem; color:#94A3B8; white-space:nowrap;">${date}</span>
+                </div>
+            </div>
+            
+            <div style="
+                background:rgba(0,0,0,0.2);
+                border-radius:8px;
+                padding:10px 12px;
+                font-size:0.85rem;
+                line-height:1.5;
+                color:#E2E8F0;
+                margin-bottom:0.75rem;
+            ">
+                ${this.escapeHtml(contact.message)}
+            </div>
+            
+            ${contact.reponse ? `
+                <div style="
+                    background:rgba(16,185,129,0.1);
+                    border:1px solid rgba(16,185,129,0.2);
+                    border-radius:8px;
+                    padding:10px 12px;
+                    font-size:0.8rem;
+                    line-height:1.5;
+                    margin-bottom:0.75rem;
+                ">
+                    <div style="font-weight:600; color:#10B981; margin-bottom:4px; font-size:0.75rem;">
+                        <i class="fas fa-reply"></i> Réponse envoyée :
+                    </div>
+                    ${this.escapeHtml(contact.reponse)}
+                </div>
+            ` : ''}
+            
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                ${contact.statut === 'nouveau' ? `
+                    <button class="btn-secondary" onclick="app.marquerMessageLu(${contact.id_contact})" style="padding:6px 14px; font-size:0.75rem; background:#F59E0B; border-color:#F59E0B;">
+                        <i class="fas fa-check"></i> Marquer lu
+                    </button>
+                ` : ''}
+                <button class="btn-primary" onclick="app.ouvrirReponseMessage(${contact.id_contact})" style="padding:6px 14px; font-size:0.75rem;">
+                    <i class="fas fa-reply"></i> ${contact.reponse ? 'Modifier la réponse' : 'Répondre'}
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================
+// ADMIN — AVIS
+// ============================================================
+
+async renderAdminAvis() {
+    try {
+        const response = await apiRequest('/api/admin/avis');
+        const avis = this.safeArray(await response.json());
+        
+        if (avis.length === 0) {
+            return `
+                <div class="glass-card" style="text-align:center; padding:3rem;">
+                    <i class="fas fa-star" style="font-size:48px; opacity:0.3; margin-bottom:1rem; display:block;"></i>
+                    <h3>Aucun avis</h3>
+                    <p style="color:#94A3B8;">Les avis de vos utilisateurs apparaîtront ici.</p>
+                </div>
+            `;
+        }
+        
+        // Statistiques
+        const noteMoyenne = avis.reduce((sum, a) => sum + (a.note || 0), 0) / avis.length;
+        const repartition = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        avis.forEach(a => {
+            if (a.note >= 1 && a.note <= 5) repartition[a.note]++;
+        });
+        
+        return `
+            <div class="admin-avis">
+                <!-- Stats -->
+                <div class="cards-grid" style="margin-bottom:1.5rem;">
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #F59E0B;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Note moyenne</div>
+                        <div style="font-size:2.5rem; font-weight:700; color:#F59E0B;">
+                            ${noteMoyenne.toFixed(1)}
+                            <span style="font-size:1rem; color:#94A3B8;">/5</span>
+                        </div>
+                        <div style="font-size:1.2rem; color:#F59E0B;">
+                            ${'⭐'.repeat(Math.round(noteMoyenne))}
+                        </div>
+                    </div>
+                    <div class="glass-card" style="text-align:center; border-left:4px solid #06B6D4;">
+                        <div style="font-size:0.8rem; color:#94A3B8;">Total avis</div>
+                        <div style="font-size:2.5rem; font-weight:700; color:#06B6D4;">${avis.length}</div>
+                    </div>
+                </div>
+                
+                <!-- Répartition -->
+                <div class="glass-card" style="margin-bottom:1.5rem;">
+                    <h4 style="margin-bottom:1rem; font-weight:600;">
+                        <i class="fas fa-chart-bar" style="color:#06B6D4;"></i> Répartition des notes
+                    </h4>
+                    ${[5, 4, 3, 2, 1].map(note => {
+                        const count = repartition[note];
+                        const pct = avis.length > 0 ? (count / avis.length) * 100 : 0;
+                        return `
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                                <div style="width:60px; font-size:0.85rem; color:#F59E0B;">
+                                    ${note} ⭐
+                                </div>
+                                <div style="flex:1; background:rgba(255,255,255,0.05); border-radius:8px; height:20px; overflow:hidden;">
+                                    <div style="width:${pct}%; height:100%; background:linear-gradient(90deg, #F59E0B, #D97706); border-radius:8px; transition:width 0.5s;"></div>
+                                </div>
+                                <div style="width:40px; text-align:right; font-size:0.8rem; color:#94A3B8;">
+                                    ${count}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                
+                <!-- Filtres -->
+                <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+                    <button class="btn-secondary" onclick="app.filterAdminAvis(0)" style="padding:6px 14px; font-size:0.8rem;">Tous</button>
+                    ${[5, 4, 3, 2, 1].map(n => `
+                        <button class="btn-secondary" onclick="app.filterAdminAvis(${n})" style="padding:6px 14px; font-size:0.8rem; background:#F59E0B; border-color:#F59E0B;">
+                            ${n} ⭐
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <!-- Liste des avis -->
+                <div id="admin-avis-list">
+                    ${avis.map(a => this.renderAdminAvisItem(a)).join('')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Erreur renderAdminAvis:', error);
+        return '<div class="glass-card">❌ Erreur chargement des avis</div>';
+    }
+}
+
+renderAdminAvisItem(avis) {
+    const date = new Date(avis.date_creation).toLocaleDateString('fr-FR', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+    
+    const etoiles = '⭐'.repeat(avis.note);
+    const noteColor = avis.note >= 4 ? '#10B981' : avis.note >= 3 ? '#F59E0B' : '#EF4444';
+    
+    return `
+        <div class="admin-avis-item" data-note="${avis.note}" style="
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-left: 4px solid ${noteColor};
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                <div>
+                    <div style="font-weight:600; font-size:0.95rem;">
+                        ${this.escapeHtml(avis.user_nom)}
+                        <span style="color:#94A3B8; font-weight:normal; font-size:0.8rem;">
+                            (${this.escapeHtml(avis.user_email)})
+                        </span>
+                    </div>
+                    <div style="font-size:1rem; margin-top:4px; color:${noteColor};">
+                        ${etoiles}
+                        <span style="font-size:0.85rem; color:#94A3B8; margin-left:4px;">
+                            ${avis.note}/5
+                        </span>
+                    </div>
+                </div>
+                <div style="font-size:0.7rem; color:#94A3B8; white-space:nowrap;">${date}</div>
+            </div>
+            
+            ${avis.commentaire ? `
+                <div style="
+                    background:rgba(0,0,0,0.2);
+                    border-radius:8px;
+                    padding:10px 12px;
+                    font-size:0.85rem;
+                    line-height:1.5;
+                    color:#E2E8F0;
+                ">
+                    ${this.escapeHtml(avis.commentaire)}
+                </div>
+            ` : `
+                <div style="font-size:0.8rem; color:#94A3B8; font-style:italic;">
+                    Aucun commentaire
+                </div>
+            `}
+        </div>
+    `;
+}
+
+// ============================================================
+// ADMIN — ACTIONS MESSAGES
+// ============================================================
+
+async marquerMessageLu(id_contact) {
+    try {
+        const response = await apiRequest(`/api/admin/contact/${id_contact}/statut`, {
+            method: 'PUT',
+            body: JSON.stringify({ statut: 'lu' })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            Toast.success('✅ Message marqué comme lu');
+            this.loadPage('admin');
+        } else {
+            Toast.error(result.message || 'Erreur');
+        }
+    } catch (error) {
+        console.error('Erreur marquerMessageLu:', error);
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+ouvrirReponseMessage(id_contact) {
+    // Trouver le message dans la liste
+    const items = document.querySelectorAll('.admin-message-item');
+    let messageData = null;
+    
+    // Récupérer les données depuis le DOM ou via une requête
+    // Pour simplifier, on va chercher via l'API
+    apiRequest('/api/admin/contacts')
+        .then(r => r.json())
+        .then(contacts => {
+            const contact = contacts.find(c => c.id_contact === id_contact);
+            if (!contact) {
+                Toast.error('Message non trouvé');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:600px;">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-reply"></i> Répondre au message</h2>
+                        <i class="fas fa-times close-modal" style="cursor:pointer;"></i>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Message original -->
+                        <div style="
+                            background:rgba(0,0,0,0.2);
+                            border-radius:8px;
+                            padding:12px;
+                            margin-bottom:1rem;
+                        ">
+                            <div style="font-size:0.75rem; color:#94A3B8; margin-bottom:4px;">
+                                Message original de ${this.escapeHtml(contact.user_nom)} :
+                            </div>
+                            <div style="font-size:0.85rem; line-height:1.5;">
+                                ${this.escapeHtml(contact.message)}
+                            </div>
+                        </div>
+                        
+                        <form id="admin-reponse-form">
+                            <div class="form-group">
+                                <label>Votre réponse *</label>
+                                <textarea 
+                                    id="admin-reponse-text" 
+                                    rows="5" 
+                                    required 
+                                    placeholder="Écrivez votre réponse..."
+                                    style="width:100%; padding:10px; border-radius:8px; background:#0F172A; border:1px solid #334155; color:white; font-family:inherit;"
+                                >${contact.reponse || ''}</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fas fa-paper-plane"></i>
+                                    Envoyer la réponse
+                                </button>
+                                <button type="button" class="btn-secondary close-modal">Annuler</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const closeBtns = modal.querySelectorAll('.close-modal');
+            closeBtns.forEach(btn => btn.addEventListener('click', () => modal.remove()));
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+            
+            const form = modal.querySelector('#admin-reponse-form');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const reponse = document.getElementById('admin-reponse-text').value.trim();
+                if (reponse.length < 5) {
+                    Toast.warning('Réponse trop courte');
+                    return;
+                }
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi...';
+                
+                try {
+                    const resp = await apiRequest(`/api/admin/contact/${id_contact}/repondre`, {
+                        method: 'POST',
+                        body: JSON.stringify({ reponse })
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        Toast.success('✅ Réponse envoyée !');
+                        modal.remove();
+                        this.loadPage('admin');
+                    } else {
+                        Toast.error(data.message || 'Erreur');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer la réponse';
+                    }
+                } catch (error) {
+                    console.error('Erreur réponse:', error);
+                    Toast.error('❌ Erreur de connexion');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer la réponse';
+                }
+            });
+        });
+}
+
+// ============================================================
+// ADMIN — FILTRES
+// ============================================================
+
+filterAdminMessages(statut) {
+    const items = document.querySelectorAll('.admin-message-item');
+    items.forEach(item => {
+        if (statut === 'all' || item.dataset.statut === statut) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+filterAdminAvis(note) {
+    const items = document.querySelectorAll('.admin-avis-item');
+    items.forEach(item => {
+        if (note === 0 || parseInt(item.dataset.note) === note) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
 // ============================================================
 // METTRE À JOUR LE BADGE
 // ============================================================
@@ -7241,17 +7713,30 @@ async renderAdmin() {
                          style="padding:12px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'stats' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'stats' ? 'white' : '#94A3B8'}; transition:all 0.3s; font-weight:500; display:flex; align-items:center; gap:8px;">
                         <i class="fas fa-chart-line"></i> Statistiques
                     </div>
+                    <div class="tab-admin ${activeTab === 'messages' ? 'active' : ''}" 
+     onclick="app.switchAdminTab('messages')" 
+     style="padding:12px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'messages' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'messages' ? 'white' : '#94A3B8'}; transition:all 0.3s; font-weight:500; display:flex; align-items:center; gap:8px;">
+    <i class="fas fa-envelope"></i> Messages
+    <span id="admin-messages-badge" style="display:none; background:#EF4444; color:white; font-size:0.65rem; padding:2px 6px; border-radius:10px;"></span>
+</div>
+<div class="tab-admin ${activeTab === 'avis' ? 'active' : ''}" 
+     onclick="app.switchAdminTab('avis')" 
+     style="padding:12px 20px; cursor:pointer; border-bottom:3px solid ${activeTab === 'avis' ? '#06B6D4' : 'transparent'}; color:${activeTab === 'avis' ? 'white' : '#94A3B8'}; transition:all 0.3s; font-weight:500; display:flex; align-items:center; gap:8px;">
+    <i class="fas fa-star"></i> Avis
+</div>
                 </div>
 
                 <!-- CONTENU -->
                 <div id="admin-content">
-                    ${activeTab === 'overview' ? this.renderAdminOverview(abonnements, totalUsers, actifs, expiresSoon, suspendus) :
-                      activeTab === 'users' ? this.renderAdminUsers(abonnements) :
-                      activeTab === 'subscriptions' ? this.renderAdminSubscriptions(abonnements) :
-                      activeTab === 'payments' ? this.renderAdminPayments() :
-                      activeTab === 'stats' ? this.renderAdminStats(abonnements) :
-                      this.renderAdminOverview(abonnements, totalUsers, actifs, expiresSoon, suspendus)}
-                </div>
+    ${activeTab === 'overview' ? this.renderAdminOverview(abonnements, totalUsers, actifs, expiresSoon, suspendus) :
+      activeTab === 'users' ? this.renderAdminUsers(abonnements) :
+      activeTab === 'subscriptions' ? this.renderAdminSubscriptions(abonnements) :
+      activeTab === 'payments' ? this.renderAdminPayments() :
+      activeTab === 'stats' ? this.renderAdminStats(abonnements) :
+      activeTab === 'messages' ? await this.renderAdminMessages() :
+      activeTab === 'avis' ? await this.renderAdminAvis() :
+      this.renderAdminOverview(abonnements, totalUsers, actifs, expiresSoon, suspendus)}
+</div>
             </div>
         `;
     } catch (error) {
