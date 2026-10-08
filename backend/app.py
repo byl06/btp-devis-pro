@@ -2983,6 +2983,351 @@ def get_mes_messages():
         print(f"❌ Erreur get_mes_messages: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# ============================================================
+# ADMIN — MESSAGES (CONTACTS)
+# ============================================================
+
+@app.route('/api/admin/contacts', methods=['GET'])
+@jwt_required()
+def admin_get_contacts():
+    """Récupère tous les messages de contact (admin uniquement)."""
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer tous les contacts
+        response = requests.get(
+            f"{supabase_url}/rest/v1/contacts?order=date_creation.desc",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            return jsonify([]), 500
+        
+        contacts = response.json()
+        
+        # Enrichir avec les infos utilisateur
+        result = []
+        for contact in contacts:
+            user_id = contact.get('id_user')
+            user_nom = "Utilisateur"
+            user_email = ""
+            user_entreprise = ""
+            
+            if user_id:
+                user_response = requests.get(
+                    f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}&select=nom,email,entreprise",
+                    headers=headers
+                )
+                if user_response.status_code == 200 and user_response.json():
+                    user = user_response.json()[0]
+                    user_nom = user.get('nom', 'Utilisateur')
+                    user_email = user.get('email', '')
+                    user_entreprise = user.get('entreprise', '')
+            
+            result.append({
+                'id_contact': contact.get('id_contact'),
+                'id_user': user_id,
+                'user_nom': user_nom,
+                'user_email': user_email,
+                'user_entreprise': user_entreprise,
+                'sujet': contact.get('sujet'),
+                'message': contact.get('message'),
+                'statut': contact.get('statut', 'nouveau'),
+                'reponse': contact.get('reponse'),
+                'date_creation': contact.get('date_creation'),
+                'date_reponse': contact.get('date_reponse')
+            })
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"❌ Erreur admin_get_contacts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/contact/<int:id_contact>/repondre', methods=['POST'])
+@jwt_required()
+def admin_repondre_contact(id_contact):
+    """Répond à un message de contact (admin uniquement)."""
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        data = request.json
+        reponse = sanitize_input(data.get('reponse', '')).strip()
+        
+        if not reponse or len(reponse) < 5:
+            return jsonify({'success': False, 'message': 'Réponse trop courte'}), 400
+        
+        import requests
+        from datetime import datetime
+        
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Récupérer le contact
+        contact_response = requests.get(
+            f"{supabase_url}/rest/v1/contacts?id_contact=eq.{id_contact}",
+            headers=headers
+        )
+        
+        if contact_response.status_code != 200 or not contact_response.json():
+            return jsonify({'success': False, 'message': 'Message non trouvé'}), 404
+        
+        contact = contact_response.json()[0]
+        id_user = contact.get('id_user')
+        
+        # Mettre à jour le contact
+        update_data = {
+            "reponse": reponse,
+            "statut": "traite",
+            "date_reponse": datetime.now().isoformat()
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/contacts?id_contact=eq.{id_contact}",
+            headers=headers,
+            json=update_data
+        )
+        
+        if response.status_code in [200, 204]:
+            # Notifier l'utilisateur
+            try:
+                notification_data = {
+                    "id_user": id_user,
+                    "message": f"💬 L'équipe a répondu à votre message : {reponse[:100]}{'...' if len(reponse) > 100 else ''}",
+                    "type": "reponse_contact",
+                    "date_creation": datetime.now().isoformat()
+                }
+                requests.post(
+                    f"{supabase_url}/rest/v1/notifications",
+                    headers=headers,
+                    json=notification_data
+                )
+            except Exception as e:
+                print(f"⚠️ Erreur notification: {e}")
+            
+            return jsonify({'success': True, 'message': 'Réponse envoyée'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+    
+    except Exception as e:
+        print(f"❌ Erreur admin_repondre_contact: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/contact/<int:id_contact>/statut', methods=['PUT'])
+@jwt_required()
+def admin_changer_statut_contact(id_contact):
+    """Change le statut d'un message (admin uniquement)."""
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        data = request.json
+        statut = data.get('statut', 'lu')
+        
+        statuts_autorises = ['nouveau', 'lu', 'traite']
+        if statut not in statuts_autorises:
+            return jsonify({'success': False, 'message': 'Statut invalide'}), 400
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.patch(
+            f"{supabase_url}/rest/v1/contacts?id_contact=eq.{id_contact}",
+            headers=headers,
+            json={"statut": statut}
+        )
+        
+        if response.status_code in [200, 204]:
+            return jsonify({'success': True, 'message': 'Statut mis à jour'})
+        else:
+            return jsonify({'success': False, 'message': f'Erreur: {response.text}'}), 500
+    
+    except Exception as e:
+        print(f"❌ Erreur admin_changer_statut_contact: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# ADMIN — AVIS
+# ============================================================
+
+@app.route('/api/admin/avis', methods=['GET'])
+@jwt_required()
+def admin_get_avis():
+    """Récupère tous les avis (admin uniquement)."""
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            f"{supabase_url}/rest/v1/avis?order=date_creation.desc",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            return jsonify([]), 500
+        
+        avis_list = response.json()
+        
+        # Enrichir avec les infos utilisateur
+        result = []
+        for avis in avis_list:
+            user_id = avis.get('id_user')
+            user_nom = "Utilisateur"
+            user_email = ""
+            
+            if user_id:
+                user_response = requests.get(
+                    f"{supabase_url}/rest/v1/utilisateur?id_user=eq.{user_id}&select=nom,email",
+                    headers=headers
+                )
+                if user_response.status_code == 200 and user_response.json():
+                    user = user_response.json()[0]
+                    user_nom = user.get('nom', 'Utilisateur')
+                    user_email = user.get('email', '')
+            
+            result.append({
+                'id_avis': avis.get('id_avis'),
+                'id_user': user_id,
+                'user_nom': user_nom,
+                'user_email': user_email,
+                'note': avis.get('note'),
+                'commentaire': avis.get('commentaire'),
+                'statut': avis.get('statut', 'nouveau'),
+                'date_creation': avis.get('date_creation')
+            })
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"❌ Erreur admin_get_avis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/stats-support', methods=['GET'])
+@jwt_required()
+def admin_stats_support():
+    """Récupère les statistiques de support (admin uniquement)."""
+    try:
+        admin_id = get_jwt_identity()
+        admin_id = int(admin_id)
+        
+        if admin_id != 1:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
+        import requests
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        # Stats contacts
+        contacts_response = requests.get(
+            f"{supabase_url}/rest/v1/contacts?select=statut",
+            headers=headers
+        )
+        contacts = contacts_response.json() if contacts_response.status_code == 200 else []
+        
+        # Stats avis
+        avis_response = requests.get(
+            f"{supabase_url}/rest/v1/avis?select=note",
+            headers=headers
+        )
+        avis = avis_response.json() if avis_response.status_code == 200 else []
+        
+        # Calculs
+        total_contacts = len(contacts)
+        contacts_nouveaux = len([c for c in contacts if c.get('statut') == 'nouveau'])
+        contacts_lus = len([c for c in contacts if c.get('statut') == 'lu'])
+        contacts_traites = len([c for c in contacts if c.get('statut') == 'traite'])
+        
+        total_avis = len(avis)
+        note_moyenne = 0
+        if total_avis > 0:
+            note_moyenne = sum(a.get('note', 0) for a in avis) / total_avis
+        
+        # Répartition des notes
+        repartition = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for a in avis:
+            note = a.get('note', 0)
+            if note in repartition:
+                repartition[note] += 1
+        
+        return jsonify({
+            'contacts': {
+                'total': total_contacts,
+                'nouveaux': contacts_nouveaux,
+                'lus': contacts_lus,
+                'traites': contacts_traites
+            },
+            'avis': {
+                'total': total_avis,
+                'note_moyenne': round(note_moyenne, 2),
+                'repartition': repartition
+            }
+        })
+    
+    except Exception as e:
+        print(f"❌ Erreur admin_stats_support: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== ROUTES FACTURES ====================
 @app.route('/api/facture/<int:id_devis>', methods=['POST'])
 @jwt_required()
