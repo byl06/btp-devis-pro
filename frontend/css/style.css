@@ -3496,3 +3496,112 @@ h4 {
         max-width: none;
     }
 }
+/* ============================================================
+   ADMIN — MESSAGES
+   ============================================================ */
+
+.admin-messages {
+    animation: fadeIn 0.3s ease;
+}
+
+.admin-message-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-message-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.admin-message-item .btn-secondary,
+.admin-message-item .btn-primary {
+    transition: all 0.2s ease;
+}
+
+.admin-message-item .btn-secondary:hover,
+.admin-message-item .btn-primary:hover {
+    transform: translateY(-1px);
+}
+
+/* ============================================================
+   ADMIN — AVIS
+   ============================================================ */
+
+.admin-avis {
+    animation: fadeIn 0.3s ease;
+}
+
+.admin-avis-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-avis-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Barre de répartition */
+.admin-avis .glass-card div[style*="overflow:hidden"] {
+    transition: width 0.5s ease;
+}
+
+/* ============================================================
+   BADGE MESSAGES (dans l'onglet)
+   ============================================================ */
+
+#admin-messages-badge {
+    animation: pulseBadge 2s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .admin-message-item > div:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-message-item > div:first-child > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .admin-avis-item > div:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-message-item .btn-secondary,
+    .admin-message-item .btn-primary {
+        flex: 1;
+        justify-content: center;
+    }
+}
