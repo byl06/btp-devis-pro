@@ -1762,6 +1762,470 @@ h4 {
 }
 
 /* ============================================================
+   SUPPORT & AVIS
+   ============================================================ */
+
+/* Header Support */
+.support-header {
+    margin-bottom: 2rem;
+}
+
+.support-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff 30%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+}
+
+.support-header p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================
+   CARTES SUPPORT
+   ============================================================ */
+
+.support-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.support-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.support-card:hover {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.support-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+}
+
+.support-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.support-card-icon.contact {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(6, 182, 212, 0.1));
+    color: var(--accent);
+}
+
+.support-card-icon.avis {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
+    color: var(--warning);
+}
+
+.support-card-icon.direct {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    color: var(--success);
+}
+
+.support-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.support-card-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================
+   FORMULAIRES SUPPORT
+   ============================================================ */
+
+.support-form-group {
+    margin-bottom: 1rem;
+}
+
+.support-form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.support-select,
+.support-input,
+.support-textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-dark);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.85rem;
+    font-family: inherit;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.support-textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.support-select:focus,
+.support-input:focus,
+.support-textarea:focus {
+    outline: none;
+    border-color: var(--ai-start);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.support-select option {
+    background: #1E293B;
+    color: white;
+}
+
+.support-input::placeholder,
+.support-textarea::placeholder {
+    color: #64748B;
+}
+
+/* ============================================================
+   ÉTOILES DE NOTATION
+   ============================================================ */
+
+.support-stars {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.support-star {
+    font-size: 2rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.support-star:hover,
+.support-star.active {
+    color: var(--warning);
+    transform: scale(1.1);
+    text-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+}
+
+.support-star-label {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    min-height: 20px;
+}
+
+/* ============================================================
+   BOUTON SUPPORT
+   ============================================================ */
+
+.support-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.support-btn-contact {
+    background: linear-gradient(135deg, #0891B2, var(--accent));
+    color: white;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+}
+
+.support-btn-contact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.5);
+}
+
+.support-btn-avis {
+    background: linear-gradient(135deg, #D97706, var(--warning));
+    color: white;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.support-btn-avis:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.5);
+}
+
+.support-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ============================================================
+   CONTACT DIRECT
+   ============================================================ */
+
+.support-direct {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.support-direct-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.support-direct-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--ai-start);
+}
+
+.support-direct-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.support-direct-icon.email {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--accent);
+}
+
+.support-direct-icon.whatsapp {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.support-direct-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.support-direct-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.support-direct-value {
+    font-size: 0.85rem;
+    color: white;
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.support-direct-link {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.support-direct-link.wa {
+    background: linear-gradient(135deg, #059669, var(--success));
+    color: white;
+}
+
+.support-direct-link.wa:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+/* ============================================================
+   HISTORIQUE DES MESSAGES
+   ============================================================ */
+
+.support-historique {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.support-historique-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.support-historique-title i {
+    color: var(--accent);
+}
+
+.support-historique-item {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.support-historique-item:last-child {
+    margin-bottom: 0;
+}
+
+.support-historique-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.support-historique-sujet {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.support-historique-message {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.support-historique-date {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.support-historique-statut {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.support-historique-statut.nouveau {
+    background: rgba(6, 182, 212, 0.2);
+    color: var(--accent);
+}
+
+.support-historique-statut.lu {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+}
+
+.support-historique-statut.traite {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+/* ============================================================
+   RÉPONSE ADMIN
+   ============================================================ */
+
+.support-reponse {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(6, 182, 212, 0.05));
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.support-reponse-label {
+    font-weight: 600;
+    color: var(--success);
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .support-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .support-star {
+        font-size: 1.8rem;
+    }
+
+    .support-direct-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .support-direct-link {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .support-historique-item {
+        flex-direction: column;
+    }
+}
+
+/* ============================================================
    16. LANGUES
    ============================================================ */
 

@@ -357,10 +357,18 @@ async saveHeaderSettings() {
         this.initAssistantIA();
     }, 100);
     break;
+    case 'support':
+    pageTitle.textContent = 'Support & Avis';
+    contentArea.innerHTML = await this.renderSupport();
+    setTimeout(() => {
+        this.initSupport();
+    }, 100);
+    break;
                 case 'actualites':
     pageTitle.textContent = 'Actualités';
     contentArea.innerHTML = await this.renderActualites();
     break;
+
 
                 case 'admin':
     pageTitle.textContent = 'Administration';
@@ -4315,6 +4323,529 @@ async renderAbonnementContent() {
         if (container) {
             container.innerHTML = `<div style="text-align:center; padding:30px; color:#EF4444;">❌ Erreur chargement de l'abonnement</div>`;
         }
+    }
+}
+
+
+// ============================================================
+// SUPPORT & AVIS — RENDU DE LA PAGE
+// ============================================================
+
+async renderSupport() {
+    return `
+        <!-- Header -->
+        <div class="support-header">
+            <h1><i class="fas fa-headset" style="color: var(--accent);"></i> Support & Avis</h1>
+            <p>Contactez-nous ou partagez votre avis — nous vous répondrons rapidement.</p>
+        </div>
+
+        <!-- Grille : Contact + Avis -->
+        <div class="support-grid">
+
+            <!-- ============================================ -->
+            <!-- FORMULAIRE DE CONTACT                        -->
+            <!-- ============================================ -->
+            <div class="support-card">
+                <div class="support-card-header">
+                    <div class="support-card-icon contact">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div>
+                        <div class="support-card-title">Nous contacter</div>
+                        <div class="support-card-subtitle">Une question ? Un bug ? Écrivez-nous.</div>
+                    </div>
+                </div>
+
+                <form id="support-contact-form">
+                    <div class="support-form-group">
+                        <label>Sujet *</label>
+                        <select class="support-select" id="support-sujet" required>
+                            <option value="">Choisir un sujet</option>
+                            <option value="Question">Question</option>
+                            <option value="Bug">Bug / Problème</option>
+                            <option value="Fonctionnalité">Demande de fonctionnalité</option>
+                            <option value="Abonnement">Abonnement</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                    </div>
+
+                    <div class="support-form-group">
+                        <label>Message *</label>
+                        <textarea
+                            class="support-textarea"
+                            id="support-message"
+                            placeholder="Décrivez votre demande..."
+                            maxlength="2000"
+                            required
+                        ></textarea>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 4px;">
+                            <span id="support-message-count">0</span> / 2000
+                        </div>
+                    </div>
+
+                    <button type="submit" class="support-btn support-btn-contact" id="support-btn-contact">
+                        <i class="fas fa-paper-plane"></i>
+                        Envoyer le message
+                    </button>
+                </form>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- FORMULAIRE D'AVIS                            -->
+            <!-- ============================================ -->
+            <div class="support-card">
+                <div class="support-card-header">
+                    <div class="support-card-icon avis">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div>
+                        <div class="support-card-title">Votre avis</div>
+                        <div class="support-card-subtitle">Aidez-nous à améliorer l'application.</div>
+                    </div>
+                </div>
+
+                <form id="support-avis-form">
+                    <div class="support-form-group">
+                        <label>Note *</label>
+                        <div class="support-stars" id="support-stars">
+                            <i class="fas fa-star support-star" data-note="1"></i>
+                            <i class="fas fa-star support-star" data-note="2"></i>
+                            <i class="fas fa-star support-star" data-note="3"></i>
+                            <i class="fas fa-star support-star" data-note="4"></i>
+                            <i class="fas fa-star support-star" data-note="5"></i>
+                        </div>
+                        <div class="support-star-label" id="support-star-label">
+                            Cliquez sur les étoiles pour noter
+                        </div>
+                    </div>
+
+                    <div class="support-form-group">
+                        <label>Commentaire (optionnel)</label>
+                        <textarea
+                            class="support-textarea"
+                            id="support-commentaire"
+                            placeholder="Partagez votre expérience..."
+                            maxlength="1000"
+                        ></textarea>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 4px;">
+                            <span id="support-commentaire-count">0</span> / 1000
+                        </div>
+                    </div>
+
+                    <button type="submit" class="support-btn support-btn-avis" id="support-btn-avis">
+                        <i class="fas fa-paper-plane"></i>
+                        Envoyer mon avis
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- ============================================ -->
+        <!-- CONTACT DIRECT                               -->
+        <!-- ============================================ -->
+        <div class="support-card" style="margin-top: 1.5rem;">
+            <div class="support-card-header">
+                <div class="support-card-icon direct">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div>
+                    <div class="support-card-title">Contact direct</div>
+                    <div class="support-card-subtitle">Besoin d'une réponse rapide ?</div>
+                </div>
+            </div>
+
+            <div class="support-direct">
+                <div class="support-direct-item">
+                    <div class="support-direct-icon email">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="support-direct-info">
+                        <div class="support-direct-label">Email</div>
+                        <div class="support-direct-value">devisbtp496@gmail.com</div>
+                    </div>
+                    <a href="mailto:devisbtp496@gmail.com" class="support-direct-link wa" style="background: linear-gradient(135deg, #0891B2, #06B6D4);">
+                        <i class="fas fa-envelope"></i>
+                        Écrire
+                    </a>
+                </div>
+
+                <div class="support-direct-item">
+                    <div class="support-direct-icon whatsapp">
+                        <i class="fab fa-whatsapp"></i>
+                    </div>
+                    <div class="support-direct-info">
+                        <div class="support-direct-label">WhatsApp</div>
+                        <div class="support-direct-value">+229 01 43 73 37 06</div>
+                    </div>
+                    <a href="https://wa.me/2290143733706" target="_blank" class="support-direct-link wa">
+                        <i class="fab fa-whatsapp"></i>
+                        Discuter
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- HISTORIQUE DES MESSAGES                      -->
+        <!-- ============================================ -->
+        <div class="support-historique" id="support-historique" style="display: none;">
+            <div class="support-historique-title">
+                <i class="fas fa-history"></i>
+                Mes messages
+            </div>
+            <div id="support-historique-list"></div>
+        </div>
+    `;
+}
+
+// ============================================================
+// SUPPORT & AVIS — INITIALISATION
+// ============================================================
+
+async initSupport() {
+    // État des étoiles
+    this.supportNote = 0;
+
+    // Formulaire de contact
+    const contactForm = document.getElementById('support-contact-form');
+    if (contactForm) {
+        contactForm.addEventListener('submit', (e) => this.envoyerContact(e));
+    }
+
+    // Compteur de caractères (message)
+    const messageInput = document.getElementById('support-message');
+    const messageCount = document.getElementById('support-message-count');
+    if (messageInput && messageCount) {
+        messageInput.addEventListener('input', function() {
+            messageCount.textContent = this.value.length;
+        });
+    }
+
+    // Formulaire d'avis
+    const avisForm = document.getElementById('support-avis-form');
+    if (avisForm) {
+        avisForm.addEventListener('submit', (e) => this.envoyerAvis(e));
+    }
+
+    // Compteur de caractères (commentaire)
+    const commentaireInput = document.getElementById('support-commentaire');
+    const commentaireCount = document.getElementById('support-commentaire-count');
+    if (commentaireInput && commentaireCount) {
+        commentaireInput.addEventListener('input', function() {
+            commentaireCount.textContent = this.value.length;
+        });
+    }
+
+    // Étoiles
+    this.initSupportStars();
+
+    // Charger l'avis existant
+    await this.chargerMonAvis();
+
+    // Charger l'historique des messages
+    await this.chargerMesMessages();
+}
+
+// ============================================================
+// ÉTOILES DE NOTATION
+// ============================================================
+
+initSupportStars() {
+    const stars = document.querySelectorAll('.support-star');
+    const label = document.getElementById('support-star-label');
+
+    const labels = {
+        0: 'Cliquez sur les étoiles pour noter',
+        1: '😞 Très déçu',
+        2: '😐 Pas satisfait',
+        3: '🙂 Correct',
+        4: '😊 Très bien',
+        5: '🤩 Excellent !'
+    };
+
+    stars.forEach(star => {
+        star.addEventListener('click', () => {
+            const note = parseInt(star.dataset.note);
+            this.supportNote = note;
+
+            stars.forEach(s => {
+                const n = parseInt(s.dataset.note);
+                if (n <= note) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+
+            if (label) label.textContent = labels[note];
+        });
+
+        star.addEventListener('mouseenter', () => {
+            const note = parseInt(star.dataset.note);
+            stars.forEach(s => {
+                const n = parseInt(s.dataset.note);
+                if (n <= note) {
+                    s.style.color = 'var(--warning)';
+                } else {
+                    s.style.color = '#475569';
+                }
+            });
+        });
+    });
+
+    // Réinitialiser au mouseleave
+    const starsContainer = document.getElementById('support-stars');
+    if (starsContainer) {
+        starsContainer.addEventListener('mouseleave', () => {
+            stars.forEach(s => {
+                const n = parseInt(s.dataset.note);
+                if (n <= this.supportNote) {
+                    s.style.color = 'var(--warning)';
+                    s.classList.add('active');
+                } else {
+                    s.style.color = '#475569';
+                    s.classList.remove('active');
+                }
+            });
+        });
+    }
+}
+
+// ============================================================
+// ENVOYER UN CONTACT
+// ============================================================
+
+async envoyerContact(e) {
+    e.preventDefault();
+
+    const sujet = document.getElementById('support-sujet')?.value;
+    const message = document.getElementById('support-message')?.value.trim();
+    const btn = document.getElementById('support-btn-contact');
+
+    if (!sujet) {
+        Toast.warning('Veuillez choisir un sujet.');
+        return;
+    }
+
+    if (!message || message.length < 10) {
+        Toast.warning('Votre message doit contenir au moins 10 caractères.');
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi...';
+    }
+
+    try {
+        const response = await apiRequest('/api/contact', {
+            method: 'POST',
+            body: JSON.stringify({ sujet, message })
+        });
+
+        const result = await response.json();
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer le message';
+        }
+
+        if (result.success) {
+            Toast.success('✅ Message envoyé ! Nous vous répondrons rapidement.');
+
+            // Réinitialiser le formulaire
+            document.getElementById('support-contact-form').reset();
+            const count = document.getElementById('support-message-count');
+            if (count) count.textContent = '0';
+
+            // Recharger l'historique
+            await this.chargerMesMessages();
+        } else {
+            Toast.error(result.message || 'Erreur lors de l\'envoi');
+        }
+    } catch (error) {
+        console.error('Erreur envoi contact:', error);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer le message';
+        }
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// ============================================================
+// ENVOYER UN AVIS
+// ============================================================
+
+async envoyerAvis(e) {
+    e.preventDefault();
+
+    const note = this.supportNote;
+    const commentaire = document.getElementById('support-commentaire')?.value.trim();
+    const btn = document.getElementById('support-btn-avis');
+
+    if (!note || note < 1 || note > 5) {
+        Toast.warning('Veuillez sélectionner une note (1 à 5 étoiles).');
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi...';
+    }
+
+    try {
+        const response = await apiRequest('/api/avis', {
+            method: 'POST',
+            body: JSON.stringify({ note, commentaire })
+        });
+
+        const result = await response.json();
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer mon avis';
+        }
+
+        if (result.success) {
+            Toast.success('✅ Merci pour votre avis ! 🙏');
+
+            // Réinitialiser le formulaire
+            document.getElementById('support-avis-form').reset();
+            this.supportNote = 0;
+            document.querySelectorAll('.support-star').forEach(s => s.classList.remove('active'));
+            const label = document.getElementById('support-star-label');
+            if (label) label.textContent = 'Cliquez sur les étoiles pour noter';
+            const count = document.getElementById('support-commentaire-count');
+            if (count) count.textContent = '0';
+        } else {
+            Toast.error(result.message || 'Erreur lors de l\'envoi');
+        }
+    } catch (error) {
+        console.error('Erreur envoi avis:', error);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer mon avis';
+        }
+        Toast.error('❌ Erreur de connexion');
+    }
+}
+
+// ============================================================
+// CHARGER MON AVIS
+// ============================================================
+
+async chargerMonAvis() {
+    try {
+        const response = await apiRequest('/api/avis/mon-avis');
+        const data = await response.json();
+
+        if (data.success && data.avis) {
+            const note = data.avis.note;
+            const commentaire = data.avis.commentaire || '';
+
+            // Mettre à jour les étoiles
+            this.supportNote = note;
+            document.querySelectorAll('.support-star').forEach(s => {
+                const n = parseInt(s.dataset.note);
+                if (n <= note) {
+                    s.classList.add('active');
+                    s.style.color = 'var(--warning)';
+                }
+            });
+
+            // Mettre à jour le label
+            const labels = {
+                1: '😞 Très déçu',
+                2: '😐 Pas satisfait',
+                3: '🙂 Correct',
+                4: '😊 Très bien',
+                5: '🤩 Excellent !'
+            };
+            const label = document.getElementById('support-star-label');
+            if (label) label.textContent = labels[note] || '';
+
+            // Remplir le commentaire
+            const commentaireInput = document.getElementById('support-commentaire');
+            if (commentaireInput && commentaire) {
+                commentaireInput.value = commentaire;
+                const count = document.getElementById('support-commentaire-count');
+                if (count) count.textContent = commentaire.length;
+            }
+        }
+    } catch (error) {
+        console.error('Erreur chargement avis:', error);
+    }
+}
+
+// ============================================================
+// CHARGER MES MESSAGES
+// ============================================================
+
+async chargerMesMessages() {
+    try {
+        const response = await apiRequest('/api/contact/mes-messages');
+        const data = await response.json();
+
+        const container = document.getElementById('support-historique');
+        const list = document.getElementById('support-historique-list');
+
+        if (!container || !list) return;
+
+        if (!data.success || !data.messages || data.messages.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        const statutLabels = {
+            'nouveau': 'Nouveau',
+            'lu': 'Lu',
+            'traite': 'Traité'
+        };
+
+        list.innerHTML = data.messages.map(msg => {
+            const date = new Date(msg.date_creation).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const statut = msg.statut || 'nouveau';
+
+            return `
+                <div class="support-historique-item">
+                    <div class="support-historique-content">
+                        <div class="support-historique-sujet">
+                            ${this.escapeHtml(msg.sujet)}
+                            <span class="support-historique-statut ${statut}">
+                                ${statutLabels[statut] || statut}
+                            </span>
+                        </div>
+                        <div class="support-historique-message">
+                            ${this.escapeHtml(msg.message)}
+                        </div>
+                        ${msg.reponse ? `
+                            <div class="support-reponse">
+                                <div class="support-reponse-label">
+                                    <i class="fas fa-reply"></i>
+                                    Réponse de l'équipe :
+                                </div>
+                                ${this.escapeHtml(msg.reponse)}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="support-historique-date">${date}</div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Erreur chargement messages:', error);
     }
 }
 
