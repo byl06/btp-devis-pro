@@ -247,6 +247,18 @@ setupEventListeners() {
             await this.saveDevisSettings();
         }
     });
+
+    // Gérer l'affichage conditionnel du mode main d'œuvre
+document.addEventListener('change', (e) => {
+    if (e.target.id === 'mode-main-oeuvre') {
+        const mode = e.target.value;
+        const tauxGroup = document.getElementById('taux-main-oeuvre-group');
+        const montantGroup = document.getElementById('montant-main-oeuvre-group');
+        
+        if (tauxGroup) tauxGroup.style.display = mode === 'pourcentage' ? 'block' : 'none';
+        if (montantGroup) montantGroup.style.display = mode === 'montant' ? 'block' : 'none';
+    }
+});
     
     // ===== FILTRES POUR LA PAGE DEVIS =====
     document.addEventListener('input', (e) => {
@@ -263,12 +275,19 @@ setupEventListeners() {
         }
     });
 }
-
 async saveDevisSettings() {
-    const showSignature = document.getElementById('show-signature').checked;
+    const showSignature = document.getElementById('show-signature')?.checked ?? true;
+    const modeMainOeuvre = document.getElementById('mode-main-oeuvre')?.value || 'pourcentage';
+    const tauxMainOeuvre = parseInt(document.getElementById('taux-main-oeuvre')?.value) || 20;
+    const montantMainOeuvre = parseFloat(document.getElementById('montant-main-oeuvre')?.value) || 0;
+    const afficherMainOeuvre = document.getElementById('afficher-main-oeuvre')?.checked ?? true;
     
     const data = {
-        show_signature: showSignature
+        show_signature: showSignature,
+        mode_main_oeuvre: modeMainOeuvre,
+        taux_main_oeuvre: tauxMainOeuvre,
+        montant_main_oeuvre_defaut: montantMainOeuvre,
+        afficher_main_oeuvre: afficherMainOeuvre
     };
     
     try {
@@ -283,15 +302,19 @@ async saveDevisSettings() {
             // Mettre à jour les settings en cache
             if (this.currentSettings) {
                 this.currentSettings.show_signature = showSignature;
+                this.currentSettings.mode_main_oeuvre = modeMainOeuvre;
+                this.currentSettings.taux_main_oeuvre = tauxMainOeuvre;
+                this.currentSettings.montant_main_oeuvre_defaut = montantMainOeuvre;
+                this.currentSettings.afficher_main_oeuvre = afficherMainOeuvre;
             }
         } else {
             Toast.error(result.message || '❌ Erreur');
         }
     } catch (error) {
+        console.error('Erreur saveDevisSettings:', error);
         Toast.error('❌ Erreur de connexion');
     }
 }
-
 async saveHeaderSettings() {
     const data = {
         slogan: document.getElementById('header-slogan')?.value || '',
@@ -6157,38 +6180,86 @@ renderParametreContent(tab, settings) {
             </div>
         `,
         devis: `
-            <div class="glass-card" style="border:1px solid rgba(16,185,129,0.3);">
-                <h3><i class="fas fa-file-invoice" style="color:#10B981;"></i> Paramètres des devis</h3>
-                <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1.5rem;">
-                    Configurez l'apparence de vos devis PDF.
-                </p>
+    <div class="glass-card" style="border:1px solid rgba(16,185,129,0.3);">
+        <h3><i class="fas fa-file-invoice" style="color:#10B981;"></i> Paramètres des devis</h3>
+        <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:1.5rem;">
+            Configurez l'apparence et les calculs de vos devis.
+        </p>
+        
+        <form id="devis-settings-form">
+            <!-- ===== MAIN D'ŒUVRE ===== -->
+            <div style="background:rgba(139,92,246,0.05); border:1px solid rgba(139,92,246,0.2); border-radius:10px; padding:1rem; margin-bottom:1rem;">
+                <h4 style="font-size:0.9rem; font-weight:600; color:#A78BFA; margin-bottom:0.75rem;">
+                    <i class="fas fa-calculator"></i> Main d'œuvre
+                </h4>
                 
-                <form id="devis-settings-form">
-                    <!-- Zone de signature -->
-                    <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:1rem; margin-bottom:1rem;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <input type="checkbox" 
-                                   id="show-signature" 
-                                   ${settings.show_signature !== false ? 'checked' : ''} 
-                                   style="width:20px; height:20px; cursor:pointer; accent-color:#10B981;">
-                            <div style="flex:1;">
-                                <label for="show-signature" style="cursor:pointer; font-weight:600; color:white; display:block;">
-                                    Ajouter une zone de signature sur les devis
-                                </label>
-                                <p style="font-size:0.75rem; color:#64748B; margin-top:4px;">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Affiche "Bon pour accord" + zone de signature manuscrite sur vos devis PDF
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #10B981, #059669);">
-                        <i class="fas fa-save"></i> Enregistrer
-                    </button>
-                </form>
+                <div class="form-group">
+                    <label style="font-size:0.85rem; color:#94A3B8; margin-bottom:6px; display:block;">Mode de calcul</label>
+                    <select id="mode-main-oeuvre" class="form-control" style="width:100%; padding:10px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white;">
+                        <option value="pourcentage" ${settings.mode_main_oeuvre === 'pourcentage' || !settings.mode_main_oeuvre ? 'selected' : ''}>
+                            📊 Pourcentage du sous-total matériaux
+                        </option>
+                        <option value="montant" ${settings.mode_main_oeuvre === 'montant' ? 'selected' : ''}>
+                            💰 Montant fixe
+                        </option>
+                        <option value="aucune" ${settings.mode_main_oeuvre === 'aucune' ? 'selected' : ''}>
+                            ❌ Aucune main d'œuvre
+                        </option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="taux-main-oeuvre-group" style="display:${settings.mode_main_oeuvre === 'pourcentage' || !settings.mode_main_oeuvre ? 'block' : 'none'}; margin-top:10px;">
+                    <label style="font-size:0.85rem; color:#94A3B8; margin-bottom:6px; display:block;">Taux de main d'œuvre (%)</label>
+                    <input type="number" id="taux-main-oeuvre" value="${settings.taux_main_oeuvre || 20}" min="0" max="100" class="form-control" style="width:100%; padding:10px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white;">
+                    <p style="font-size:0.7rem; color:#64748B; margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> Par défaut : 20%
+                    </p>
+                </div>
+                
+                <div class="form-group" id="montant-main-oeuvre-group" style="display:${settings.mode_main_oeuvre === 'montant' ? 'block' : 'none'}; margin-top:10px;">
+                    <label style="font-size:0.85rem; color:#94A3B8; margin-bottom:6px; display:block;">Montant fixe (FCFA)</label>
+                    <input type="number" id="montant-main-oeuvre" value="${settings.montant_main_oeuvre_defaut || 0}" min="0" class="form-control" style="width:100%; padding:10px; background:#0F172A; border:1px solid #334155; border-radius:8px; color:white;">
+                    <p style="font-size:0.7rem; color:#64748B; margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> Ce montant sera ajouté au sous-total matériaux.
+                    </p>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:12px; margin-top:12px; padding:10px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
+                    <input type="checkbox" 
+                           id="afficher-main-oeuvre" 
+                           ${settings.afficher_main_oeuvre !== false ? 'checked' : ''} 
+                           style="width:18px; height:18px; cursor:pointer; accent-color:#10B981;">
+                    <label for="afficher-main-oeuvre" style="cursor:pointer; font-size:0.85rem; color:white; margin:0;">
+                        Afficher la main d'œuvre sur le PDF
+                    </label>
+                </div>
             </div>
-        `,
+            
+            <!-- ===== SIGNATURE ===== -->
+            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <input type="checkbox" 
+                           id="show-signature" 
+                           ${settings.show_signature !== false ? 'checked' : ''} 
+                           style="width:20px; height:20px; cursor:pointer; accent-color:#10B981;">
+                    <div style="flex:1;">
+                        <label for="show-signature" style="cursor:pointer; font-weight:600; color:white; display:block;">
+                            Ajouter une zone de signature sur les devis
+                        </label>
+                        <p style="font-size:0.75rem; color:#64748B; margin-top:4px;">
+                            <i class="fas fa-info-circle"></i> 
+                            Affiche "Bon pour accord" + zone de signature manuscrite sur vos devis PDF
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #10B981, #059669);">
+                <i class="fas fa-save"></i> Enregistrer
+            </button>
+        </form>
+    </div>
+`,
         
         fiscal: `
     <!-- ===== ONGLET FISCAL ===== -->
