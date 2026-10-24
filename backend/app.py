@@ -3445,7 +3445,11 @@ def update_settings():
             "regime_tva": sanitize_input(data.get('regime_tva', 'non assujetti')),
             "numero_contribuable": sanitize_input(data.get('numero_contribuable', '')),
             "adresse_fiscale": sanitize_input(data.get('adresse_fiscale', '')),
-            "show_signature": data.get('show_signature', True)
+            "show_signature": data.get('show_signature', True),
+            "mode_main_oeuvre": data.get('mode_main_oeuvre', 'pourcentage'),
+            "taux_main_oeuvre": int(data.get('taux_main_oeuvre', 20)),
+            "montant_main_oeuvre_defaut": float(data.get('montant_main_oeuvre_defaut', 0)),
+            "afficher_main_oeuvre": data.get('afficher_main_oeuvre', True)
         }
         
         print(f"🔍 Mise à jour settings: {update_data}")
