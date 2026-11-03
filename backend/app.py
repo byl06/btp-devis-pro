@@ -1218,34 +1218,73 @@ def payer_acompte(id_devis):
 def backup_database():
     try:
         user_id = get_jwt_identity()
+        user_id = int(user_id)
+        
+        import requests
         from datetime import datetime
         
-        # Récupérer TOUS les clients (sans condition)
-        clients = client_model.db.fetch_all("SELECT * FROM CLIENT")
+        supabase_url = os.environ.get('SUPABASE_URL', '')
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
         
-        # Récupérer TOUS les projets
-        projets = projet_model.db.fetch_all("SELECT * FROM PROJET")
+        headers = {
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
         
-        # Récupérer les devis de l'utilisateur avec leurs lignes
-        devis = devis_model.get_by_user(user_id)
-        for devis_item in devis:
-            lignes = devis_model.db.fetch_all("SELECT * FROM LIGNE_DEVIS WHERE id_devis = %s", (devis_item['id_devis'],))
-            devis_item['lignes'] = lignes
+        # 🔥 1. Récupérer UNIQUEMENT les clients de l'utilisateur
+        clients_response = requests.get(
+            f"{supabase_url}/rest/v1/client?id_user=eq.{user_id}",
+            headers=headers
+        )
+        clients = clients_response.json() if clients_response.status_code == 200 else []
         
-        # Récupérer les settings
-        settings = utilisateur_model.db.fetch_one("SELECT * FROM SETTINGS WHERE id_user = %s", (user_id,))
+        # 🔥 2. Récupérer UNIQUEMENT les projets de l'utilisateur
+        projets_response = requests.get(
+            f"{supabase_url}/rest/v1/projet?id_user=eq.{user_id}",
+            headers=headers
+        )
+        projets = projets_response.json() if projets_response.status_code == 200 else []
+        
+        # 🔥 3. Récupérer les devis de l'utilisateur
+        devis_response = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&order=id_devis.desc",
+            headers=headers
+        )
+        devis_list = devis_response.json() if devis_response.status_code == 200 else []
+        
+        # 🔥 4. Pour chaque devis, récupérer ses lignes
+        for devis in devis_list:
+            id_devis = devis.get('id_devis')
+            if id_devis:
+                lignes_response = requests.get(
+                    f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
+                    headers=headers
+                )
+                devis['lignes'] = lignes_response.json() if lignes_response.status_code == 200 else []
+        
+        # 🔥 5. Récupérer les settings de l'utilisateur
+        settings_response = requests.get(
+            f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
+            headers=headers
+        )
+        settings = settings_response.json()[0] if settings_response.status_code == 200 and settings_response.json() else None
         
         data = {
             'user_id': user_id,
             'export_date': datetime.now().isoformat(),
             'clients': clients,
             'projets': projets,
-            'devis': devis,
+            'devis': devis_list,
             'settings': settings
         }
         
         return jsonify(data)
+    
     except Exception as e:
+        print(f"❌ Erreur backup: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -1261,10 +1300,19 @@ def restore_database():
         user_id = int(user_id)
         backup_data = request.json
         
+        # 🔥 VALIDATION
+        if not backup_data or not isinstance(backup_data, dict):
+            return jsonify({'success': False, 'error': 'Données de sauvegarde invalides'}), 400
+        
+        if 'clients' not in backup_data:
+            return jsonify({'success': False, 'error': 'Fichier de sauvegarde incomplet (clients manquants)'}), 400
+        
         print("=" * 60)
-        print("🔵 RESTAURATION EN COURS...")
+        print(f"🔵 RESTAURATION EN COURS pour user {user_id}...")
         
         import requests
+        from datetime import datetime
+        
         supabase_url = os.environ.get('SUPABASE_URL', '')
         supabase_key = os.environ.get('SUPABASE_KEY', '')
         
@@ -1274,43 +1322,51 @@ def restore_database():
             "Content-Type": "application/json"
         }
         
-        # 🔥 VIDER LES TABLES
-                # 🔥 VIDER LES TABLES (UNIQUEMENT LES DONNÉES DE L'UTILISATEUR)
+        # ============================================================
+        # 🔥 ÉTAPE 1 : SUPPRIMER UNIQUEMENT LES DONNÉES DE L'UTILISATEUR
+        # ============================================================
         
-        # 1. Récupérer les devis de l'utilisateur
-        devis_user = requests.get(
+        # Récupérer les devis de l'utilisateur
+        devis_user_response = requests.get(
             f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&select=id_devis",
             headers=headers
         )
-        ids_devis = [d.get('id_devis') for d in devis_user.json()] if devis_user.status_code == 200 else []
+        ids_devis = [d.get('id_devis') for d in devis_user_response.json()] if devis_user_response.status_code == 200 else []
         
-        # 2. Supprimer les lignes de devis de l'utilisateur
+        # Supprimer les lignes de devis
         for id_devis in ids_devis:
             requests.delete(
                 f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
                 headers=headers
             )
         
-        # 3. Supprimer les factures de l'utilisateur (via les devis)
+        # Supprimer les factures (via les devis)
         for id_devis in ids_devis:
             requests.delete(
                 f"{supabase_url}/rest/v1/facture?id_devis=eq.{id_devis}",
                 headers=headers
             )
         
-        # 4. Supprimer les devis de l'utilisateur
+        # Supprimer les situations (via les devis)
+        for id_devis in ids_devis:
+            requests.delete(
+                f"{supabase_url}/rest/v1/situation_devis?id_devis=eq.{id_devis}",
+                headers=headers
+            )
+        
+        # Supprimer les devis
         requests.delete(
             f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}",
             headers=headers
         )
         
-        # 5. Supprimer les clients de l'utilisateur
+        # Supprimer les clients
         requests.delete(
             f"{supabase_url}/rest/v1/client?id_user=eq.{user_id}",
             headers=headers
         )
         
-        # 6. Supprimer les projets de l'utilisateur
+        # Supprimer les projets
         requests.delete(
             f"{supabase_url}/rest/v1/projet?id_user=eq.{user_id}",
             headers=headers
@@ -1318,107 +1374,97 @@ def restore_database():
         
         print(f"   🗑️ Données de l'utilisateur {user_id} supprimées")
         
-        # 🔥 INSÉRER LES CLIENTS
+        # ============================================================
+        # 🔥 ÉTAPE 2 : RÉINSÉRER LES DONNÉES
+        # ============================================================
+        
+        # 2.1. Clients
         for client in backup_data.get('clients', []):
             client_data = {
                 "nom": client.get('nom'),
                 "telephone": client.get('telephone'),
                 "email": client.get('email'),
                 "adresse": client.get('adresse'),
+                "ifu": client.get('ifu', ''),
                 "id_user": user_id
             }
-            response = requests.post(
+            requests.post(
                 f"{supabase_url}/rest/v1/client",
                 headers=headers,
                 json=client_data
             )
-            if response.status_code in [200, 201]:
-                print(f"   ✅ Client inséré: {client.get('nom')}")
-            else:
-                print(f"   ❌ Erreur client: {response.text}")
+        print(f"   ✅ {len(backup_data.get('clients', []))} clients restaurés")
         
-        # 🔥 INSÉRER LES PROJETS
+        # 2.2. Projets
         for projet in backup_data.get('projets', []):
             projet_data = {
                 "nom_projet": projet.get('nom_projet'),
                 "description": projet.get('description'),
                 "localisation": projet.get('localisation'),
+                "statut": projet.get('statut', 'en_attente'),
+                "progression": projet.get('progression', 0),
                 "id_user": user_id
             }
-            response = requests.post(
+            requests.post(
                 f"{supabase_url}/rest/v1/projet",
                 headers=headers,
                 json=projet_data
             )
-            if response.status_code in [200, 201]:
-                print(f"   ✅ Projet inséré: {projet.get('nom_projet')}")
-            else:
-                print(f"   ❌ Erreur projet: {response.text}")
+        print(f"   ✅ {len(backup_data.get('projets', []))} projets restaurés")
         
-        # 🔥 INSÉRER LES DEVIS (avec gestion du cas sans devis)
-        print("📥 Insertion des devis...")
-        devis_list = backup_data.get('devis', [])
-        if devis_list:
-            for devis_item in devis_list:
-                try:
-                    devis_data = {
-                        "date_creation": devis_item.get('date_creation'),
-                        "total": devis_item.get('total'),
-                        "statut": devis_item.get('statut', 'brouillon'),
-                        "id_client": devis_item.get('id_client'),
-                        "id_user": user_id,
-                        "id_projet": devis_item.get('id_projet')
-                    }
-                    
-                    response = requests.post(
-                        f"{supabase_url}/rest/v1/devis",
-                        headers=headers,
-                        json=devis_data
-                    )
-                    
-                    if response.status_code in [200, 201]:
-                        result = response.json()
-                        if isinstance(result, list) and len(result) > 0:
-                            id_devis = result[0].get('id_devis')
-                        elif isinstance(result, dict):
-                            id_devis = result.get('id_devis')
-                        else:
-                            id_devis = None
-                        
-                        print(f"   ✅ Devis inséré (ID: {id_devis})")
-                        
-                        # Insérer les lignes
-                        for ligne in devis_item.get('lignes', []):
-                            ligne_data = {
-                                "designation": ligne.get('designation'),
-                                "quantite": ligne.get('quantite'),
-                                "prix_unitaire": ligne.get('prix_unitaire'),
-                                "total_ligne": ligne.get('total_ligne'),
-                                "id_devis": id_devis
-                            }
-                            requests.post(
-                                f"{supabase_url}/rest/v1/ligne_devis",
-                                headers=headers,
-                                json=ligne_data
-                            )
-                    else:
-                        print(f"   ❌ Erreur devis: {response.text}")
-                except Exception as e:
-                    print(f"   ❌ Exception devis: {e}")
-        else:
-            print("   ℹ️ Aucun devis à restaurer")
+        # 2.3. Devis et lignes
+        for devis_item in backup_data.get('devis', []):
+            devis_data = {
+                "date_creation": devis_item.get('date_creation'),
+                "total": devis_item.get('total'),
+                "statut": devis_item.get('statut', 'brouillon'),
+                "id_client": devis_item.get('id_client'),
+                "id_user": user_id,
+                "id_projet": devis_item.get('id_projet'),
+                "show_signature": devis_item.get('show_signature', True)
+            }
+            
+            devis_response = requests.post(
+                f"{supabase_url}/rest/v1/devis",
+                headers={**headers, "Prefer": "return=representation"},
+                json=devis_data
+            )
+            
+            if devis_response.status_code in [200, 201]:
+                result = devis_response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    id_devis = result[0].get('id_devis')
+                elif isinstance(result, dict):
+                    id_devis = result.get('id_devis')
+                else:
+                    id_devis = None
+                
+                # Insérer les lignes
+                if id_devis:
+                    for ligne in devis_item.get('lignes', []):
+                        ligne_data = {
+                            "designation": ligne.get('designation'),
+                            "quantite": ligne.get('quantite'),
+                            "prix_unitaire": ligne.get('prix_unitaire'),
+                            "total_ligne": ligne.get('total_ligne'),
+                            "id_devis": id_devis
+                        }
+                        requests.post(
+                            f"{supabase_url}/rest/v1/ligne_devis",
+                            headers=headers,
+                            json=ligne_data
+                        )
+        print(f"   ✅ {len(backup_data.get('devis', []))} devis restaurés")
         
-        # 🔥 RESTAURER LES SETTINGS
+        # 2.4. Settings
         settings = backup_data.get('settings')
         if settings:
             # Supprimer les anciens settings
-            delete_response = requests.delete(
+            requests.delete(
                 f"{supabase_url}/rest/v1/settings?id_user=eq.{user_id}",
                 headers=headers
             )
-            print(f"   🗑️ Settings supprimés (status: {delete_response.status_code})")
             
-            from datetime import datetime
             settings_data = {
                 "id_user": user_id,
                 "company_name": settings.get('company_name', ''),
@@ -1429,32 +1475,40 @@ def restore_database():
                 "primary_color": settings.get('primary_color', '#1E3A8A'),
                 "secondary_color": settings.get('secondary_color', '#7C3AED'),
                 "accent_color": settings.get('accent_color', '#06B6D4'),
+                "slogan": settings.get('slogan', ''),
+                "website": settings.get('website', ''),
+                "footer_text": settings.get('footer_text', ''),
+                "nif": settings.get('nif', ''),
+                "regime_tva": settings.get('regime_tva', 'non assujetti'),
+                "numero_contribuable": settings.get('numero_contribuable', ''),
+                "adresse_fiscale": settings.get('adresse_fiscale', ''),
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
-            
-            response = requests.post(
+            requests.post(
                 f"{supabase_url}/rest/v1/settings",
                 headers=headers,
                 json=settings_data
             )
-            
-            if response.status_code in [200, 201]:
-                print("   ✅ Settings restaurés")
-            else:
-                print(f"   ❌ Erreur settings: {response.text}")
+            print("   ✅ Settings restaurés")
         
         print("🎉 RESTAURATION TERMINÉE !")
         print("=" * 60)
         
-        # 🔥 RETOURNER UNE RÉPONSE JSON VALIDE
-        return jsonify({'success': True, 'message': 'Restauration réussie'})
-        
+        return jsonify({
+            'success': True,
+            'message': 'Restauration réussie',
+            'data': {
+                'clients': len(backup_data.get('clients', [])),
+                'projets': len(backup_data.get('projets', [])),
+                'devis': len(backup_data.get('devis', []))
+            }
+        })
+    
     except Exception as e:
         print(f"❌ Erreur restauration: {e}")
         import traceback
         traceback.print_exc()
-        # 🔥 TOUJOURS retourner du JSON valide
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==================== FACTURES ====================
@@ -2406,6 +2460,8 @@ def preview_imported_header():
 # ASSISTANT IA — GÉNÉRATION DE DEVIS (avec historique)
 # ============================================================
 
+@limiter.limit("10 per minute")
+@limiter.limit("30 per hour")
 @app.route('/api/ai/generate-devis', methods=['POST'])
 @jwt_required()
 def ai_generate_devis():
@@ -2616,6 +2672,7 @@ def ai_generate_devis():
 # ASSISTANT IA — QUOTA
 # ============================================================
 
+@limiter.limit("30 per minute")
 @app.route('/api/ai/quota', methods=['GET'])
 @jwt_required()
 def ai_get_quota():
