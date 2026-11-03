@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from unittest import result
 from database import Database
 import bcrypt
+import os
 import requests
 
 class Utilisateur:
@@ -97,8 +98,8 @@ class Client:
     def get_all(self, id_user):
         # Requête directe vers Supabase via l'API REST
         import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
         
         response = requests.get(
             f"{supabase_url}/rest/v1/client?select=*",
@@ -145,8 +146,8 @@ class Projet:
     
     def get_all(self, id_user):
         import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
         
         response = requests.get(
             f"{supabase_url}/rest/v1/projet?select=*",
@@ -225,8 +226,8 @@ class Devis:
     
 def get_by_user(self, id_user):
     import requests
-    supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+    supabase_url = os.environ.get('SUPABASE_URL')
+    supabase_key = os.environ.get('SUPABASE_KEY')
     
     headers = {
         "Authorization": f"Bearer {supabase_key}",
@@ -322,8 +323,8 @@ class Facture:
 def update(self, id_facture, data):
     """Met à jour une facture"""
     import requests
-    supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+    supabase_url = os.environ.get('SUPABASE_URL')
+    supabase_key = os.environ.get('SUPABASE_KEY')
     
     headers = {
         "Authorization": f"Bearer {supabase_key}",
@@ -347,8 +348,8 @@ class Abonnement:
     
     def get_by_user(self, id_user):
         import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
         
         response = requests.get(
             f"{supabase_url}/rest/v1/abonnements?select=*",
@@ -403,8 +404,8 @@ class LigneDevis:
     def get_by_devis(self, id_devis):
         """Récupère toutes les lignes d'un devis"""
         import requests
-        supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_KEY')
         
         headers = {
             "Authorization": f"Bearer {supabase_key}",

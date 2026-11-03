@@ -186,7 +186,7 @@ mail = Mail(app)
 # Configuration CORS - Autorise toutes les origines (pour Render)
 
 # Configuration JWT
-app.config['JWT_SECRET_KEY'] = 'btp-devis-pro-super-secret-key-2024-32chars'
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
  #AJOUTER CES LIGNES

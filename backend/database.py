@@ -1,13 +1,14 @@
 import requests
 import json
 import re
+import os
 from datetime import datetime, timedelta
 import bcrypt
 
 class Database:
     def __init__(self):
-        self.supabase_url = "https://aoqiveekzucqjhqdwiql.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvcWl2ZWVrenVjcWpocWR3aXFsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjIzMjI4NSwiZXhwIjoyMDk3ODA4Mjg1fQ.NqbuEcuQDAKOIqD26UkCbUNNJz0kRXWiAZpGLxYvtbA"
+        self.supabase_url = os.environ.get('SUPABASE_URL')
+        self.supabase_key = os.environ.get('SUPABASE_KEY')
         self.headers = {
             "Authorization": f"Bearer {self.supabase_key}",
             "apikey": self.supabase_key,
