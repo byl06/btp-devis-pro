@@ -1275,13 +1275,48 @@ def restore_database():
         }
         
         # 🔥 VIDER LES TABLES
-        tables = ['ligne_devis', 'facture', 'devis', 'client', 'projet']
-        for table in tables:
-            response = requests.delete(
-                f"{supabase_url}/rest/v1/{table}",
+                # 🔥 VIDER LES TABLES (UNIQUEMENT LES DONNÉES DE L'UTILISATEUR)
+        
+        # 1. Récupérer les devis de l'utilisateur
+        devis_user = requests.get(
+            f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}&select=id_devis",
+            headers=headers
+        )
+        ids_devis = [d.get('id_devis') for d in devis_user.json()] if devis_user.status_code == 200 else []
+        
+        # 2. Supprimer les lignes de devis de l'utilisateur
+        for id_devis in ids_devis:
+            requests.delete(
+                f"{supabase_url}/rest/v1/ligne_devis?id_devis=eq.{id_devis}",
                 headers=headers
             )
-            print(f"   🗑️ Table {table} vidée (status: {response.status_code})")
+        
+        # 3. Supprimer les factures de l'utilisateur (via les devis)
+        for id_devis in ids_devis:
+            requests.delete(
+                f"{supabase_url}/rest/v1/facture?id_devis=eq.{id_devis}",
+                headers=headers
+            )
+        
+        # 4. Supprimer les devis de l'utilisateur
+        requests.delete(
+            f"{supabase_url}/rest/v1/devis?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        # 5. Supprimer les clients de l'utilisateur
+        requests.delete(
+            f"{supabase_url}/rest/v1/client?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        # 6. Supprimer les projets de l'utilisateur
+        requests.delete(
+            f"{supabase_url}/rest/v1/projet?id_user=eq.{user_id}",
+            headers=headers
+        )
+        
+        print(f"   🗑️ Données de l'utilisateur {user_id} supprimées")
         
         # 🔥 INSÉRER LES CLIENTS
         for client in backup_data.get('clients', []):
@@ -1604,7 +1639,12 @@ def generate_pdf(id_devis):
             return jsonify({'error': 'Devis non trouvé'}), 404
         devis = devis_response.json()[0]
         
+        # 🔥 VÉRIFICATION D'APPARTENANCE
+        if devis.get('id_user') != user_id:
+            return jsonify({'error': 'Non autorisé'}), 403
+        
         client_response = requests.get(
+            
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
             headers=headers
         )
@@ -3504,6 +3544,25 @@ def upload_logo():
         import os
         from datetime import datetime
         ext = file.filename.rsplit('.', 1)[-1].lower()
+        
+        # 🔥 VÉRIFICATION DU TYPE DE FICHIER
+        extensions_autorisees = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
+        if ext not in extensions_autorisees:
+            return jsonify({
+                'success': False, 
+                'message': 'Format non autorisé. Utilisez PNG, JPG, JPEG, GIF, WEBP ou SVG.'
+            }), 400
+        
+        # 🔥 VÉRIFICATION DE LA TAILLE (max 5 Mo)
+        file.seek(0, os.SEEK_END)
+        taille = file.tell()
+        file.seek(0)
+        if taille > 5 * 1024 * 1024:
+            return jsonify({
+                'success': False, 
+                'message': 'Fichier trop volumineux (max 5 Mo).'
+            }), 400
+        
         filename = f"logo_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
         
         # 📁 Créer le dossier uploads s'il n'existe pas
@@ -4578,6 +4637,10 @@ def generate_pdf_normalise(id_facture):
             headers=headers
         )
         devis = devis_response.json()[0] if devis_response.status_code == 200 and devis_response.json() else {}
+        
+        # 🔥 VÉRIFICATION D'APPARTENANCE
+        if devis.get('id_user') != user_id:
+            return jsonify({'error': 'Non autorisé'}), 403
         
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
@@ -5717,6 +5780,10 @@ def generate_facture_pdf(id_facture):
             headers=headers
         )
         devis = devis_response.json()[0] if devis_response.status_code == 200 and devis_response.json() else {}
+        
+        # 🔥 VÉRIFICATION D'APPARTENANCE
+        if devis.get('id_user') != user_id:
+            return jsonify({'error': 'Non autorisé'}), 403
         
         client_response = requests.get(
             f"{supabase_url}/rest/v1/client?id_client=eq.{devis.get('id_client')}",
