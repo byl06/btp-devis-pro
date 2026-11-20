@@ -23,13 +23,11 @@ BTP Devis Pro est une application SaaS conçue pour les professionnels du bâtim
 
 ---
 
-## 🚀 Démo en ligne
+## 🚀  en ligne
 
 👉 [https://btp-devis-pro-1.onrender.com](https://btp-devis-pro-1.onrender.com)
 
-**Identifiants de test :**
-- Email : `bylgaitb@gmail.com`
-- Mot de passe : `000000`
+
 
 ---
 
